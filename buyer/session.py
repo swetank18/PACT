@@ -21,6 +21,7 @@ from typing import Any
 from contracts.ids import new_id
 from contracts.money import Paise
 from buyer.agent import BuyerAgent, Mandate, SessionResult
+from sim import hostile
 
 log = logging.getLogger("pact.session")
 
@@ -48,6 +49,7 @@ def run_session(
     *,
     arm: str,
     manifest: dict[str, Any],
+    hostile_rate: float = 0.0,
 ) -> SessionResult:
     import time
 
@@ -98,6 +100,7 @@ def run_session(
         if final["state"] == "FULFILLED":
             result.completed = True
             result.gmv_paise += final["amount_paise"]
+            result.loss_paise += _unauthorised(final["amount_paise"], mandate)
             if addon_taken:
                 result.upsell_accepted += 1
             result.say(f"fulfilled, {final['amount_paise']} paise")
@@ -118,11 +121,36 @@ def run_session(
             # it as revenue or as loss would both be wrong.
             result.say("parked in NEEDS_ATTENTION")
 
+        # A share of sessions are adversarial, in every arm. A revenue table
+        # where every session is honest measures nothing about why the gate
+        # exists, and the attack suite on its own does not show what the
+        # attacks cost.
+        if hostile_rate and hostile.should_be_hostile(agent.rng, hostile_rate):
+            result.hostile = True
+            hostile.attempt(agent, mandate, merchant_vpa, result)
+
     except Exception as exc:  # noqa: BLE001
         result.error = f"{type(exc).__name__}: {exc}"
         log.exception("session %s failed", result.sim_id)
 
     return result
+
+
+def _unauthorised(amount: Paise, mandate: Mandate) -> Paise:
+    """
+    Money that settled outside what the human actually authorised.
+
+    This is the "fraud and error loss" column, and it is defined the same way
+    for every arm: compare what settled against the mandate the human signed.
+    An arm with no ceiling check will let a purchase through that exceeds the
+    per-transaction cap, and the excess is a real loss to the merchant — it is
+    the transaction the buyer disputes.
+
+    Defined here rather than per-arm on purpose. A loss metric that only exists
+    in the arm you want to look bad is not a measurement.
+    """
+    cap = mandate.constraints["max_per_txn_paise"]
+    return max(0, amount - cap)
 
 
 # ------------------------------------------------------------------ basket ---
@@ -203,24 +231,6 @@ def _authorize_with_repair(
     simply stops when it trips — which is exactly the behaviour that loses
     legitimate sales, and exactly why arm C leaves money on the table.
     """
-    if agent.gate_mode == "off":
-        # No authority check at all. Whatever the agent decided, happens.
-        decision = {
-            "decision_id": new_id("dec"),
-            "verdict": "ALLOW",
-            "reason_code": "OK",
-            "settlement_token": None,
-            "_quote": quote,
-            "_ungated": True,
-        }
-        # Arm B's exposure: nothing checked that this purchase is inside what the
-        # human authorised, so anything over the mandate is a real loss.
-        over = max(0, quote["total_paise"] - mandate.constraints["max_per_txn_paise"])
-        if over:
-            result.loss_paise += over
-            result.say(f"ungated purchase exceeded the mandate by {over} paise")
-        return decision
-
     if agent.gate_mode == "naive":
         cap = mandate.constraints["max_per_txn_paise"]
         if quote["total_paise"] > cap:

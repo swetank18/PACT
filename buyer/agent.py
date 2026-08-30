@@ -83,6 +83,9 @@ class SessionResult:
     false_blocks: int = 0
     saga_recoveries: int = 0
     repairs: int = 0
+    #: True when this session included an adversarial attempt. Tracked so the
+    #: hostile share of the population is reportable rather than assumed.
+    hostile: bool = False
     transcript: list[str] = field(default_factory=list)
     error: str | None = None
 

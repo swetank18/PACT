@@ -31,9 +31,10 @@ import yaml
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
+from contracts.reason_codes import CHECK_ORDER  # noqa: E402
 from buyer.agent import BuyerAgent, SessionResult  # noqa: E402
 from buyer.session import run_session  # noqa: E402
-from sim import attacks, benign, chaos  # noqa: E402
+from sim import attacks, benign, chaos, hostile  # noqa: E402
 from sim.metrics import ArmMetrics, aggregate, cross_check, mean_and_range  # noqa: E402
 
 GATE = "http://localhost:8000"
@@ -49,8 +50,29 @@ ARMS: dict[str, dict[str, Any]] = {
         "human_only": True,
         "label": "no agent channel, human checkout only",
     },
-    "B": {"gate": "off", "upsell": "off", "label": "agent transactable, gate off, upsell off"},
-    "C": {"gate": "naive", "upsell": "naive", "label": "naive hard cap, naive upsell"},
+    # Arm B is not "the agent skips the gate" — a merchant that issues no
+    # settlement token cannot be transacted with at all, so that arm would
+    # measure nothing. It is the same merchant with **every check ablated**:
+    # agent transactable, no authority checking. Same code path, same tokens,
+    # no protection.
+    "B": {
+        "gate": "pact",
+        "upsell": "naive",
+        "ablate_all": True,
+        "label": "agent transactable, no authority checks",
+    },
+    # Arm C is what a reasonable team builds: their own hard spend cap in the
+    # agent, and a blind upsell. It runs against the same ablated gate as arm B,
+    # because a team without an authority protocol does not have one — their cap
+    # is client side. That distinction matters and it is the argument: a
+    # client-side cap protects against your own mistakes and not at all against
+    # a compromised agent.
+    "C": {
+        "gate": "naive",
+        "upsell": "naive",
+        "ablate_all": True,
+        "label": "naive client-side cap, naive upsell",
+    },
     "D": {"gate": "pact", "upsell": "headroom", "label": "PACT: gate, headroom upsell, recovery"},
 }
 
@@ -103,7 +125,13 @@ def pick_persona(personas: list[dict], rng: random.Random, uniform: bool) -> dic
 
 
 def run_arm(
-    arm: str, *, sessions: int, seed: int, uniform: bool, save: bool
+    arm: str,
+    *,
+    sessions: int,
+    seed: int,
+    uniform: bool,
+    save: bool,
+    hostile_rate: float = hostile.HOSTILE_SESSION_RATE,
 ) -> tuple[ArmMetrics, list[SessionResult]]:
     config = ARMS[arm]
     personas = load_personas()
@@ -114,6 +142,13 @@ def run_arm(
 
     if config.get("human_only"):
         return _model_arm_a(arm, sessions, seed, personas, rng), []
+
+    with httpx.Client(timeout=10) as client:
+        # Arm B runs against a gate with every check turned off. Ablation is the
+        # honest way to model "no authority checking" — it is the same service,
+        # the same tokens and the same saga, with the protection removed.
+        disabled = list(CHECK_ORDER) if config.get("ablate_all") else []
+        client.post(f"{GATE}/v1/admin/ablate", json={"disabled": disabled})
 
     agent = BuyerAgent(
         gate_mode=config["gate"], upsell_mode=config["upsell"], seed=seed
@@ -126,7 +161,11 @@ def run_arm(
             # single session can be reproduced without replaying the whole arm.
             agent.rng = random.Random(seed * 100_000 + i)
             persona = pick_persona(personas, rng, uniform)
-            results.append(run_session(agent, persona, arm=arm, manifest=manifest))
+            results.append(
+                run_session(
+                    agent, persona, arm=arm, manifest=manifest, hostile_rate=hostile_rate
+                )
+            )
 
         metrics = aggregate(arm, results)
 
@@ -139,6 +178,12 @@ def run_arm(
         return metrics, results
     finally:
         agent.close()
+        # Always leave the gate whole, whatever happened above.
+        try:
+            with httpx.Client(timeout=5) as client:
+                client.post(f"{GATE}/v1/admin/ablate", json={"disabled": []})
+        except httpx.HTTPError:
+            pass
 
 
 def _model_arm_a(
@@ -286,6 +331,12 @@ def main() -> int:
     ap.add_argument("--suite", choices=["attacks", "benign", "chaos", "ablation"])
     ap.add_argument("--all", action="store_true", help="everything, writes results.md")
     ap.add_argument("--uniform", action="store_true", help="ignore persona weights")
+    ap.add_argument(
+        "--hostile-rate",
+        type=float,
+        default=hostile.HOSTILE_SESSION_RATE,
+        help="share of sessions that are adversarial, in every arm",
+    )
     ap.add_argument("--out", default=str(RESULTS))
     ap.add_argument("--no-save", action="store_true")
     args = ap.parse_args()
@@ -305,6 +356,7 @@ def main() -> int:
             uniform=args.uniform,
             out=Path(args.out),
             save_sessions=not args.no_save,
+            hostile_rate=args.hostile_rate,
         )
 
     if args.suite == "attacks":
@@ -344,6 +396,7 @@ def main() -> int:
                 seed=seed,
                 uniform=args.uniform,
                 save=not args.no_save,
+                hostile_rate=args.hostile_rate,
             )
             per_seed.append(m)
             print(f"  seed {seed}: {json.dumps(m.to_row())}")

@@ -86,6 +86,17 @@ class ArmMetrics:
         return self.gmv_paise - self.loss_paise
 
     @property
+    def loss_per_100(self) -> float:
+        """
+        Losses on the same basis as GMV.
+
+        Reporting a multi-seed total in a column next to per-100 means makes the
+        loss look three times larger than it is. Every money column in the table
+        is per 100 sessions.
+        """
+        return (self.loss_paise / self.sessions * 100) if self.sessions else 0.0
+
+    @property
     def net_per_100(self) -> float:
         return (self.net_revenue_paise / self.sessions * 100) if self.sessions else 0.0
 

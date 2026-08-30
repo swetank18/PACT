@@ -31,6 +31,7 @@ def write_results(
     uniform: bool,
     out: Path,
     save_sessions: bool = True,
+    hostile_rate: float = 0.08,
 ) -> int:
     from sim.run import (
         ABLATIONS,
@@ -46,6 +47,12 @@ def write_results(
     )
     from sim import benign as benign_mod
 
+    #: Rates for the sensitivity sweep. Deliberately spans "almost no fraud" to
+    #: "a quarter of traffic is hostile", because the answer changes across it.
+    SWEEP_RATES = (0.0, 0.05, 0.10, 0.20, 0.35, 0.50)
+    #: Smaller than the main run: this is a shape, not a headline.
+    sweep_sessions = max(40, sessions // 4)
+
     out.mkdir(parents=True, exist_ok=True)
     started = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -58,7 +65,12 @@ def write_results(
         for seed in range(seeds):
             print(f"[sim]   arm {arm} seed {seed}…", flush=True)
             m, results = run_arm(
-                arm, sessions=sessions, seed=seed, uniform=uniform, save=save_sessions
+                arm,
+                sessions=sessions,
+                seed=seed,
+                uniform=uniform,
+                save=save_sessions,
+                hostile_rate=hostile_rate,
             )
             by_arm[arm].append(m)
             all_sessions.setdefault(arm, []).extend(results)
@@ -91,11 +103,12 @@ def write_results(
 
     a("## The four arms\n")
     a("| Arm | Configuration | GMV / 100 | Completion | AOV | Attach | Upsell rejected | "
-      "False block | Step-up recovery | Losses | Net / 100 |")
+      "False block | Step-up recovery | Losses / 100 | Net / 100 |")
     a("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for arm, runs in by_arm.items():
         gmv_mean, gmv_lo, gmv_hi = mean_and_range([m.gmv_per_100 for m in runs])
         net_mean, _, _ = mean_and_range([m.net_per_100 for m in runs])
+        loss_mean, _, _ = mean_and_range([m.loss_per_100 for m in runs])
         agg = runs[0]
         total = ArmMetrics(arm=arm)
         for m in runs:
@@ -121,7 +134,7 @@ def write_results(
             f"{_pct(total.completion_rate)} | {rupees(total.avg_order_value_paise)} | "
             f"{_pct(total.attach_rate)} | {_pct(total.upsell_rejection_rate)} | "
             f"{_pct(total.false_block_rate)} | {_pct(total.step_up_recovery_rate)} | "
-            f"{rupees(total.loss_paise)} | {rupees(round(net_mean))} |"
+            f"{rupees(round(loss_mean))} | {rupees(round(net_mean))} |"
         )
     a("")
 
@@ -141,6 +154,71 @@ def write_results(
       f"priced through the same quote engine as every other arm. Those two numbers "
       f"are assumptions, stated here rather than buried, and the comparison that "
       f"matters is C against D — both fully simulated.\n")
+
+    a("### The adversarial share\n")
+    hostile_counts = {
+        arm: sum(1 for r in rows if getattr(r, "hostile", False))
+        for arm, rows in all_sessions.items()
+    }
+    a(f"**{hostile_rate:.0%} of sessions in every arm are adversarial** — a compromised "
+      f"agent redirecting payment, a model inventing a price above the quote, or a "
+      f"captured request resubmitted. Whatever settles is counted as loss.\n")
+    a("A revenue table where every session is honest measures nothing about why the "
+      "gate exists, and the attack suite on its own does not show what the attacks "
+      "cost. This is the bridge between the two.\n")
+    a("The rate is an assumption. `--hostile-rate` reruns with a different one.\n")
+    a("| Arm | Hostile sessions | Losses / 100 | What refuses them |")
+    a("|---|---:|---:|---|")
+    defence = {
+        "A": "no agent channel, so no exposure",
+        "B": "nothing is checked",
+        "C": "the cap is **client side**, so a compromised agent does not apply it",
+        "D": "scope, quote binding and replay, all server side",
+    }
+    for arm, runs in by_arm.items():
+        loss_mean, _, _ = mean_and_range([m.loss_per_100 for m in runs])
+        a(f"| {arm} | {hostile_counts.get(arm, 0)} | {rupees(round(loss_mean))} | "
+          f"{defence.get(arm, '')} |")
+    a("")
+    a("> Arm C is the row worth pausing on. Its cap is real and it works against the "
+      "agent's own mistakes, but it lives in the agent. A compromised agent simply "
+      "does not run it. A client-side control is not a control, and that is the "
+      "difference between arm C and arm D that has nothing to do with revenue.\n")
+
+    a("### Where the gate starts paying for itself\n")
+    a("Arm B converts more than arm D, because nothing stops it — including the "
+      "things that should. Whether that is worth more than what it loses depends "
+      "entirely on how adversarial the traffic is, so the honest thing is to sweep "
+      "the assumption rather than pick one that flatters us.\n")
+    a("| Adversarial rate | B net / 100 | D net / 100 | Better |")
+    a("|---:|---:|---:|---|")
+    crossover: float | None = None
+    for rate in SWEEP_RATES:
+        b, _ = run_arm("B", sessions=sweep_sessions, seed=0, uniform=uniform,
+                       save=False, hostile_rate=rate)
+        d, _ = run_arm("D", sessions=sweep_sessions, seed=0, uniform=uniform,
+                       save=False, hostile_rate=rate)
+        winner = "D" if d.net_per_100 > b.net_per_100 else "B"
+        if winner == "D" and crossover is None:
+            crossover = rate
+        a(f"| {rate:.0%} | {rupees(round(b.net_per_100))} | "
+          f"{rupees(round(d.net_per_100))} | **{winner}** |")
+    a("")
+    if crossover is not None:
+        a(f"> **Above roughly {crossover:.0%} adversarial traffic, PACT nets more than "
+          f"an ungated agent channel.** Below it, the argument is not GMV — it is the "
+          f"false block rate, the dispute handling cost, and whether a merchant wants "
+          f"to be known for accepting unauthorised agent payments. We are not going to "
+          f"claim a revenue win that the measurement does not support.\n")
+    else:
+        a("> **Across every rate we swept, an ungated channel nets more under this "
+          "loss model.** That is the honest result. What the model does not price is "
+          "chargeback fees, dispute handling, the cost of an account in bad standing, "
+          "and the reputational cost of a merchant known to accept unauthorised agent "
+          "payments — all real, none of them things we can measure here. The case for "
+          "the gate on these numbers is arm C: same protection posture, "
+          f"{_pct(by_arm['C'][0].false_block_rate)} of legitimate sales refused, "
+          "against arm D's 0%.\n")
 
     a("## Attacks\n")
     a(f"{blocked} of {applicable} applicable attack variants blocked.\n")
