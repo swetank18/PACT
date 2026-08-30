@@ -16,8 +16,10 @@ trap 'kill 0' EXIT
 $PY -m uvicorn core.app:app --port 8000 --log-level warning &
 $PY -m uvicorn merchant.app:app --port 8100 --log-level warning &
 $PY -m uvicorn rails.razorpay.webhook_app:app --port 8110 --log-level warning &
+$PY -m uvicorn sim.demo:app --port 8300 --log-level warning &
 
 echo "gate      http://localhost:8000/v1/health"
 echo "merchant  http://localhost:8100/v1/health"
 echo "webhooks  http://localhost:8110/v1/health"
+echo "demo      http://localhost:8300/v1/health   (console keys 1-6)"
 wait

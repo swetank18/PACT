@@ -96,6 +96,9 @@ class MerchantService:
             step_delay_s=STEP_DELAY_S,
         )
         self.stats = StatsService(self.db, self.upsell)
+        #: Which recommender is live. Arm C and demo beat 3 flip this to "naive"
+        #: to show what a merchant without a readable authority envelope must do.
+        self.upsell_mode = os.environ.get("PACT_UPSELL", "headroom").lower()
 
     def publish_stats(self) -> None:
         self.bus.publish("stats", self.stats.compute().model_dump())
@@ -216,7 +219,7 @@ async def suggest_addons(request: SuggestAddonsRequest) -> dict:
     if q is None:
         raise HTTPException(404, "no such quote")
 
-    naive = os.environ.get("PACT_UPSELL", "headroom").lower() == "naive"
+    naive = service.upsell_mode == "naive"
     if naive:
         # Arm C. No authority reading; the gate sorts it out afterwards, and
         # the rejections it produces are the number the pitch turns on.
@@ -335,6 +338,22 @@ async def force_stockout(payload: dict | None = None) -> dict:
     sku = (payload or {}).get("sku")
     forced = service.inventory.force_stockout(sku)
     return {"ok": True, "sku": forced}
+
+
+@app.post("/admin/set_upsell_mode")
+async def set_upsell_mode(payload: dict) -> dict:
+    """
+    Switch between the headroom-aware recommender and the blind one.
+
+    An endpoint rather than an env var because the contrast is a demo beat: the
+    same merchant, the same catalog, the only difference being whether it can
+    read the buyer's authority before it offers.
+    """
+    mode = str(payload.get("mode", "headroom")).lower()
+    if mode not in ("headroom", "naive"):
+        raise HTTPException(400, "mode must be headroom or naive")
+    service.upsell_mode = mode
+    return {"ok": True, "mode": mode}
 
 
 @app.post("/admin/inject_failure")
@@ -468,6 +487,7 @@ async def reset() -> dict:
     await asyncio.to_thread(service.db.reset)
     service.inventory.reset()
     service.upsell.reset()
+    service.upsell_mode = "headroom"
     if hasattr(service.rail, "reset"):
         service.rail.reset()
     service.bus.publish("reset", {"at": utcnow()})

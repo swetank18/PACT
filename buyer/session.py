@@ -50,6 +50,8 @@ def run_session(
     arm: str,
     manifest: dict[str, Any],
     hostile_rate: float = 0.0,
+    force_skus: list[str] | None = None,
+    allow_repair: bool = True,
 ) -> SessionResult:
     import time
 
@@ -63,13 +65,18 @@ def run_session(
         result.say(f"mandate {mandate.id} signed on device")
 
         # 1. Browse toward the goal.
-        products = agent.search(persona["goal"])
-        wanted = _pick_basket(agent, persona, products)
-        if not wanted:
-            result.say("nothing in the catalog matched")
-            return result
-
-        items = [{"sku": p["sku"], "qty": 1} for p in wanted]
+        if force_skus:
+            # A stage demo cannot depend on a random basket. The simulation
+            # samples the catalog; the beats name their items.
+            items = [{"sku": sku, "qty": 1} for sku in force_skus]
+            result.say(f"browsing for {', '.join(force_skus)}")
+        else:
+            products = agent.search(persona["goal"])
+            wanted = _pick_basket(agent, persona, products)
+            if not wanted:
+                result.say("nothing in the catalog matched")
+                return result
+            items = [{"sku": p["sku"], "qty": 1} for p in wanted]
         quote = agent.quote(items, mandate.id)
         result.say(f"quote {quote['quote_id']} for {quote['total_paise']} paise")
 
@@ -78,7 +85,14 @@ def run_session(
 
         # 3. Authorise, repairing on a structured refusal.
         decision = _authorize_with_repair(
-            agent, mandate, quote, merchant_vpa, persona, result, carrying_addon=addon_taken
+            agent,
+            mandate,
+            quote,
+            merchant_vpa,
+            persona,
+            result,
+            carrying_addon=addon_taken,
+            allow_repair=allow_repair,
         )
         if decision is None:
             return result
@@ -223,6 +237,9 @@ def _authorize_with_repair(
     result: SessionResult,
     *,
     carrying_addon: bool = False,
+    #: An agent that does not read reason codes. Off for the contrast beat,
+    #: where the point is what happens when a refusal is not actionable.
+    allow_repair: bool = True,
 ) -> dict[str, Any] | None:
     """
     Ask, and on a structured refusal, fix the order and ask again.
@@ -275,6 +292,9 @@ def _authorize_with_repair(
             carrying_addon = False  # count it once per session, not once per repair
 
         # BLOCK. Read the code and repair, rather than crashing.
+        if not allow_repair:
+            result.say(f"no repair attempted: {decision['reason_code']}; session ends")
+            return decision
         if attempt == MAX_REPAIRS:
             result.say(f"gave up after {MAX_REPAIRS} repairs: {decision['reason_code']}")
             return decision
