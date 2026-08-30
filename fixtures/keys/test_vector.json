@@ -1,0 +1,76 @@
+{
+  "_note": "Signing procedure: strip `signature`, canonicalise with RFC 8785 JCS, sign with Ed25519, encode base64url unpadded. Test keys only.",
+  "_generated_by": "scripts/gen_test_vector.py (Lane C placeholder, Lane A may overwrite)",
+  "algorithm": "Ed25519",
+  "canonicalization": "RFC8785",
+  "encoding": "base64url-unpadded",
+  "keys": {
+    "delegator": {
+      "seed_hex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+      "private_key_b64u": "nWGxne_9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A",
+      "public_key_b64u": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+    },
+    "delegate": {
+      "seed_hex": "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+      "private_key_b64u": "TM0Imyj_ltqdtsNG7BFOD1uKMZ81q6Yk2oz27U-4pvs",
+      "public_key_b64u": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw"
+    }
+  },
+  "cases": [
+    {
+      "name": "mandate",
+      "signer": "delegator",
+      "payload": {
+        "v": 1,
+        "mandate_id": "mnd_01J8XQ4K7T",
+        "delegator": {
+          "vpa": "swetank@okaxis",
+          "pubkey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+        },
+        "delegate": {
+          "agent_id": "buyer_agent_v1",
+          "pubkey": "PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw"
+        },
+        "intent": "restock office supplies for the month",
+        "constraints": {
+          "max_per_txn_paise": 500000,
+          "max_total_paise": 1500000,
+          "max_count": 5,
+          "merchant_allowlist": [
+            "deskkit@razorpay"
+          ],
+          "category_allowlist": [
+            "stationery",
+            "office_furniture",
+            "cables"
+          ],
+          "valid_from": "2026-08-30T10:00:00Z",
+          "valid_until": "2026-08-31T10:00:00Z"
+        },
+        "issued_at": "2026-08-30T09:58:12Z"
+      },
+      "canonical": "{\"constraints\":{\"category_allowlist\":[\"stationery\",\"office_furniture\",\"cables\"],\"max_count\":5,\"max_per_txn_paise\":500000,\"max_total_paise\":1500000,\"merchant_allowlist\":[\"deskkit@razorpay\"],\"valid_from\":\"2026-08-30T10:00:00Z\",\"valid_until\":\"2026-08-31T10:00:00Z\"},\"delegate\":{\"agent_id\":\"buyer_agent_v1\",\"pubkey\":\"PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw\"},\"delegator\":{\"pubkey\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\",\"vpa\":\"swetank@okaxis\"},\"intent\":\"restock office supplies for the month\",\"issued_at\":\"2026-08-30T09:58:12Z\",\"mandate_id\":\"mnd_01J8XQ4K7T\",\"v\":1}",
+      "signature": "Hldrj4hhKx33FpQGAT2-u8A60Lh_iwlLVB0jw8cnxCqEqxiL7kto_lNEQrR1JRIohD_Vp765P3Hey_3rHZxrAw"
+    },
+    {
+      "name": "unicode_and_ordering",
+      "signer": "delegate",
+      "payload": {
+        "z_last": null,
+        "éclair": "café — ₹ 1,299",
+        "A": [],
+        "🚀_rocket": {
+          "nested": {
+            "deep": true
+          }
+        },
+        "a": {},
+        "tab\there": "line\nbreak",
+        "num": 1234567890,
+        "neg": -42
+      },
+      "canonical": "{\"A\":[],\"a\":{},\"neg\":-42,\"num\":1234567890,\"tab\\there\":\"line\\nbreak\",\"z_last\":null,\"éclair\":\"café — ₹ 1,299\",\"🚀_rocket\":{\"nested\":{\"deep\":true}}}",
+      "signature": "ksoh4rFeaMt3rvMsrx090KvK-bNTqyn4b6WQmtPIBG1KG3802_jb66OKbvIZcsIWO9KOjm4xLHZtfnG0VEu2Cw"
+    }
+  ]
+}
