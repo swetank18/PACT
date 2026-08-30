@@ -12,8 +12,16 @@ import { sha512 } from "@noble/hashes/sha512";
 import { canonicalize, type JsonValue } from "./jcs";
 
 // @noble/ed25519 v2 keeps hashing pluggable so the library stays dependency
-// free. Wire it so both the sync and async APIs are available.
+// free. Wire BOTH hooks to @noble/hashes.
+//
+// Wiring only sha512Sync would leave the async API — which is the one this
+// module actually calls — routed through crypto.subtle.digest for SHA-512.
+// That reintroduces the WebCrypto dependency this file exists to avoid, and it
+// breaks outright in any environment where the Uint8Array crosses a realm
+// boundary, because subtle.digest's argument check is a cross-realm instanceof.
+// One extra line removes WebCrypto from the signing path entirely.
 ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m));
+ed.etc.sha512Async = async (...m) => sha512(ed.etc.concatBytes(...m));
 
 export function b64uEncode(raw: Uint8Array): string {
   let bin = "";
