@@ -1,0 +1,187 @@
+.page {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+  min-height: 0;
+}
+
+/* The headroom bar is pinned, not scrolled away. It is the visual that makes
+   the whole product legible in one glance, so it never leaves the screen. */
+.headroom {
+  padding: var(--s5) var(--s5) var(--s4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+
+.headroomInner {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.thread {
+  overflow-y: auto;
+  padding: var(--s5);
+}
+
+.threadInner {
+  max-width: 860px;
+  margin: 0 auto;
+  display: grid;
+  gap: var(--s4);
+}
+
+.turn {
+  display: grid;
+  gap: var(--s2);
+}
+
+.who {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.human {
+  justify-items: end;
+  text-align: right;
+}
+
+.humanBubble {
+  background: var(--accent-wash);
+  border: 1px solid rgba(76, 141, 255, 0.28);
+  border-radius: var(--radius);
+  padding: var(--s3) var(--s4);
+  font-size: var(--fs-lg);
+  max-width: 62ch;
+  text-align: left;
+}
+
+.agentText {
+  font-size: var(--fs-lg);
+  color: var(--text);
+  max-width: 72ch;
+}
+
+.working {
+  color: var(--text-dim);
+}
+
+/* The only spinner in the product, and it is a text one so nothing spins. */
+.dots::after {
+  content: "";
+  animation: dots 1.2s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0% {
+    content: "";
+  }
+  25% {
+    content: ".";
+  }
+  50% {
+    content: "..";
+  }
+  75% {
+    content: "...";
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dots::after {
+    content: "...";
+    animation: none;
+  }
+}
+
+.composer {
+  border-top: 1px solid var(--border);
+  background: var(--surface-1);
+  padding: var(--s4) var(--s5);
+}
+
+.composerInner {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  gap: var(--s3);
+}
+
+.input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: var(--fs-lg);
+}
+.input:focus {
+  border-color: var(--accent);
+}
+
+.suggestions {
+  max-width: 860px;
+  margin: 0 auto var(--s3);
+  display: flex;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+
+.suggestion {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+.suggestion:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.noMandate {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: var(--s6);
+  text-align: center;
+  display: grid;
+  gap: var(--s4);
+  justify-items: center;
+}
+
+.noMandateTitle {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+}
+
+.orderDone {
+  border: 1px solid rgba(63, 208, 127, 0.3);
+  background: linear-gradient(0deg, var(--allow-wash), var(--allow-wash)), var(--surface-1);
+  border-radius: var(--radius);
+  padding: var(--s4);
+  display: grid;
+  gap: var(--s2);
+}
+
+.orderTitle {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+}
+
+.orderMeta {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  display: flex;
+  gap: var(--s4);
+  flex-wrap: wrap;
+}
+
+.sagaWrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  overflow: hidden;
+}

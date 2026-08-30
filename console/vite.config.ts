@@ -2,7 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import react from "@vitejs/plugin-react";
-import { defineConfig, type Plugin } from "vite";
+import type { Plugin } from "vite";
+import { defineConfig } from "vitest/config";
 
 /**
  * fixtures/ lives outside console/ because it is shared across lanes. Serve it
@@ -79,4 +80,4 @@ export default defineConfig({
     environment: "node",
     include: ["test/**/*.test.ts"],
   },
-} as any);
+});

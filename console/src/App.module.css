@@ -1,0 +1,160 @@
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ---- top bar ------------------------------------------------------------- */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  padding: var(--s3) var(--s5);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s3);
+}
+
+.wordmark {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}
+
+.nav {
+  display: flex;
+  gap: var(--s1);
+  margin-left: auto;
+}
+
+.tab {
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-md);
+  color: var(--text-dim);
+  border: 1px solid transparent;
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tabOn {
+  color: var(--text);
+  background: var(--surface-3);
+  border-color: var(--border);
+}
+
+.mandateChip {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+}
+
+.main {
+  min-height: 0;
+  overflow: auto;
+}
+
+/* ---- demo strip. unremarkable to the audience ---------------------------- */
+
+.demo {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s2) var(--s5);
+  border-top: 1px solid var(--border);
+  background: var(--surface-1);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  flex-wrap: wrap;
+}
+
+.beats {
+  display: flex;
+  gap: var(--s1);
+}
+
+.beat {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  display: grid;
+  place-items: center;
+}
+
+.beat:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.beat:disabled {
+  opacity: 0.4;
+}
+
+.beatActive {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--text);
+}
+
+.beatLabel {
+  color: var(--text-dim);
+  min-width: 26ch;
+}
+
+.demoRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+}
+
+.demoBtn {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 12px;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+.demoBtn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.stockout {
+  border-color: rgba(255, 95, 86, 0.4);
+  color: var(--veto);
+}
+.stockout:hover:not(:disabled) {
+  color: var(--veto);
+  border-color: var(--veto);
+}
+
+.resetMs {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.resetSlow {
+  color: var(--stepup);
+}

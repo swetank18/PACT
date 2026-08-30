@@ -13,9 +13,36 @@ import type {
   Mandate,
   MerchantStats,
   Order,
+  Paise,
   Quote,
   SagaStep,
 } from "./contracts";
+
+/** A product as the catalog returns it, agent readable. */
+export type Product = {
+  sku: string;
+  name: string;
+  category: string;
+  price_paise: Paise;
+  in_stock: number;
+  description: string;
+};
+
+/**
+ * The request the buyer signs and the gate verifies. `context` is populated
+ * honestly — the page text the agent was reading and its own reasoning — or the
+ * intent auditor has nothing to work with and the injection attack cannot fire.
+ */
+export type AuthorizeRequest = {
+  mandate_id: string;
+  quote_id: string;
+  amount_paise: Paise;
+  payee_vpa: string;
+  nonce: string;
+  issued_at: string;
+  context: { page_excerpt: string; agent_reasoning: string };
+  signature?: string;
+};
 
 export const GATE = "/api/gate";
 export const MERCHANT = "/api/merchant";
@@ -68,6 +95,12 @@ export const gate = {
 
   decision: (decisionId: string) => get<Decision>(`${GATE}/v1/decisions/${decisionId}`),
 
+  /**
+   * The nine checks. Returns a decision whatever happens — an error path that
+   * throws instead of returning BLOCK would be failing open.
+   */
+  authorize: (req: AuthorizeRequest) => post<Decision>(`${GATE}/v1/authorize`, req),
+
   /** Registers the mandate the human just signed on this device. */
   registerMandate: (mandate: Mandate) =>
     post<{ mandate_id: string; accepted: boolean; reason_code?: string }>(
@@ -92,6 +125,12 @@ export const gate = {
 export const merchant = {
   manifest: () => get<AgentCommerceManifest>(`${MERCHANT}/.well-known/agent-commerce.json`),
 
+  search: (query: string, category?: string) =>
+    get<{ products: Product[] }>(
+      `${MERCHANT}/v1/catalog?q=${encodeURIComponent(query)}` +
+        (category ? `&category=${encodeURIComponent(category)}` : ""),
+    ),
+
   stats: () => get<MerchantStats>(`${MERCHANT}/v1/stats`),
 
   orders: (limit = 50) => get<{ orders: Order[] }>(`${MERCHANT}/v1/orders?limit=${limit}`),
@@ -105,6 +144,14 @@ export const merchant = {
     post<{ addons: Addon[]; filtered_out: number }>(`${MERCHANT}/v1/suggest_addons`, {
       quote_id: quoteId,
       mandate_id: mandateId,
+    }),
+
+  /** Places the order against the settlement token the gate issued on ALLOW. */
+  createOrder: (quoteId: string, decisionId: string, settlementToken: string) =>
+    post<Order>(`${MERCHANT}/v1/orders`, {
+      quote_id: quoteId,
+      decision_id: decisionId,
+      settlement_token: settlementToken,
     }),
 
   /** Bound to a key in the demo strip. Lane A's endpoint, Lane B also calls it. */
