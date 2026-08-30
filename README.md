@@ -15,6 +15,12 @@ friction and becomes a conversion instrument.
 ## Run it
 
 ```bash
+docker compose up --build     # everything on http://localhost:8080
+```
+
+Or for development, with hot reload and the services on separate ports:
+
+```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh          # gate :8000, merchant :8100, webhooks :8110, beats :8300
 ./scripts/test.sh         # 114 tests
@@ -32,6 +38,11 @@ typed on stage.
 ```bash
 python sim/run.py --all --sessions 200 --seeds 3    # regenerates eval/results/
 ```
+
+Deployment notes, and the two traps in the single-port build, are in
+[`deploy/README.md`](deploy/README.md). It needs a host that runs a persistent
+process — the pollers, the background saga and the SQLite write lock all outlive
+a request, so this is not serverless-deployable as it stands.
 
 ## What is here
 

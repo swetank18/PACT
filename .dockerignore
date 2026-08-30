@@ -1,0 +1,19 @@
+# Everything the image builds for itself, or must never contain.
+.git
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+console/node_modules
+console/dist
+node_modules
+_private
+eval/results/sessions
+pact.db
+pact.db-wal
+pact.db-shm
+.env
+.env.local
+*.log
+fixtures/keys/gate_signing_key.hex

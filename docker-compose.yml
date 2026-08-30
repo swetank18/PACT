@@ -1,0 +1,55 @@
+# One service, one port. `docker compose up --build` and open http://localhost:8080
+#
+# Deliberately not four containers. The ledger's correctness rests on SQLite's
+# write lock, the simulated rail keeps its idempotency table in memory, and the
+# saga runs as a background task inside the process. Splitting those across
+# containers would need Postgres and a queue — see the note in the Dockerfile.
+
+services:
+  pact:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      PACT_PROFILE: razorpay-track01
+
+      # Paces the saga so the console can draw the rollback one row at a time.
+      # Set to 0 for the simulation, which runs hundreds of sessions.
+      PACT_SAGA_STEP_DELAY_S: "0.35"
+
+      # With no Razorpay credentials this runs the mock_upi rail, which
+      # exercises every line above the adapter. Test keys only — the client
+      # refuses to start on a key that is not rzp_test_.
+      # RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      # RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      # RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET}
+      # PACT_RAIL: razorpay
+
+      # Without a key the gate runs in deterministic mode: eight checks plus
+      # quote binding plus a pattern scan. That is a complete system; the
+      # auditor is the ninth check and it is optional by design.
+      # ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+
+    volumes:
+      # The database and the gate's Ed25519 signing key. Without this volume
+      # every restart issues a new key and forgets every mandate, so headroom
+      # envelopes a merchant is already holding stop verifying.
+      - pact-data:/data
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import sys, urllib.request
+          sys.exit(0 if urllib.request.urlopen("http://127.0.0.1:8080/healthz", timeout=2).status == 200 else 1)
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
+
+volumes:
+  pact-data:

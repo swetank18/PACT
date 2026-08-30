@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import sys
 import time
@@ -37,8 +38,10 @@ from buyer.session import run_session  # noqa: E402
 from sim import attacks, benign, chaos, hostile  # noqa: E402
 from sim.metrics import ArmMetrics, aggregate, cross_check, mean_and_range  # noqa: E402
 
-GATE = "http://localhost:8000"
-MERCHANT = "http://localhost:8100"
+#: Where the services are. Overridable because the single-port production build
+#: mounts them under /api/* on itself rather than on their own ports.
+GATE = os.environ.get("PACT_GATE_URL", "http://localhost:8000")
+MERCHANT = os.environ.get("PACT_MERCHANT_URL", "http://localhost:8100")
 RESULTS = REPO / "eval" / "results"
 SESSIONS_DIR = RESULTS / "sessions"
 

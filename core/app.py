@@ -39,6 +39,21 @@ PROFILE = config.load()
 MERCHANT_VPA = PROFILE.merchant_vpa
 SWEEP_INTERVAL_SECONDS = 10
 
+if not MERCHANT_VPA:
+    # Fail at boot, loudly, rather than at runtime, silently.
+    #
+    # With no merchant VPA the scope check can never match, so every purchase is
+    # refused SCOPE_MERCHANT_NOT_ALLOWED and every headroom envelope reports
+    # merchant_in_scope false — which makes the upsell filter withhold
+    # everything, because it fails closed. The result is a system where health
+    # checks are green, the console renders, and nothing can ever be bought.
+    # That is far harder to diagnose than not starting.
+    raise RuntimeError(
+        "No merchant VPA configured, so the gate would refuse every purchase "
+        "and offer nothing. Set PACT_PROFILE to a file in profiles/ (for "
+        "example PACT_PROFILE=razorpay-track01) or set PACT_MERCHANT_VPA."
+    )
+
 
 class GateService:
     """Everything the app holds, in one object so tests can build it directly."""

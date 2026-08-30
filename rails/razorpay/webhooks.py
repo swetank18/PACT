@@ -132,10 +132,15 @@ class WebhookProcessor:
         return False
 
 
-def build_app(processor: WebhookProcessor) -> FastAPI:
+def build_app(processor: WebhookProcessor, *, path: str = "/webhooks/rail") -> FastAPI:
+    """
+    `path` is configurable so the single-container build can mount this app
+    under /api/webhooks and still expose a sane URL, rather than the
+    /api/webhooks/webhooks/rail a fixed path would produce.
+    """
     app = FastAPI(title="PACT webhook receiver", version="1.0.0")
 
-    @app.post("/webhooks/rail")
+    @app.post(path)
     async def receive(request: Request, x_razorpay_signature: str = Header(default="")):
         # The RAW body. Never `await request.json()` before verifying — the
         # signature is over the bytes the rail sent, and re-serialising changes
