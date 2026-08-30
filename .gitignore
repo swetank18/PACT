@@ -5,10 +5,17 @@ dist/
 *.log
 .DS_Store
 pact.db
+pact.db-wal
+pact.db-shm
 __pycache__/
 *.pyc
+.pytest_cache/
+.venv/
+venv/
 .vite/
 coverage/
+htmlcov/
+.coverage
 
 # Internal planning docs. Never tracked.
 _private/
