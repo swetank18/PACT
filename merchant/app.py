@@ -337,6 +337,132 @@ async def force_stockout(payload: dict | None = None) -> dict:
     return {"ok": True, "sku": forced}
 
 
+@app.post("/admin/inject_failure")
+async def inject_failure(payload: dict) -> dict:
+    """
+    Deterministic failure injection for the chaos suite.
+
+    A chaos test you trigger by unplugging something is an anecdote. These
+    switches make each scenario rerunnable, which is what lets Lane B report a
+    rate rather than a story. Only the simulated rail exposes them — you cannot
+    ask Razorpay to fail on demand.
+    """
+    failures = getattr(service.rail, "failures", None)
+    if failures is None:
+        raise HTTPException(
+            400, f"the {service.rail.name} rail has no failure switches; use mock_upi"
+        )
+    for name in ("capture_fails", "refund_fails", "refund_pending"):
+        if name in payload:
+            setattr(failures, name, bool(payload[name]))
+    return {
+        "ok": True,
+        "rail": service.rail.name,
+        "capture_fails": failures.capture_fails,
+        "refund_fails": failures.refund_fails,
+        "refund_pending": failures.refund_pending,
+    }
+
+
+@app.post("/admin/simulate_webhook")
+async def simulate_webhook(payload: dict) -> dict:
+    """
+    Deliver a rail callback for an order, signed so it actually verifies.
+
+    Goes through the real WebhookProcessor rather than a shortcut, so the
+    duplicate and out-of-order tests exercise the code that will run in
+    production rather than a test-only path.
+    """
+    from rails.razorpay.webhooks import WebhookProcessor
+
+    order = await asyncio.to_thread(service.orders.get, str(payload.get("order_id", "")))
+    if order is None or not order.rail_payment_id:
+        raise HTTPException(404, "no such order, or it has no payment id yet")
+
+    event = str(payload.get("event", "payment.captured"))
+    body = json.dumps(
+        {
+            "entity": "event",
+            "account_id": "acc_SIM",
+            "event": event,
+            "contains": ["payment"],
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": order.rail_payment_id,
+                        "status": "captured" if event == "payment.captured" else "authorized",
+                        "amount": order.amount_paise,
+                    }
+                }
+            },
+            "created_at": 0,
+        }
+    ).encode()
+
+    signer = getattr(service.rail, "sign_callback", None)
+    if signer is None:
+        raise HTTPException(400, "this rail cannot self-sign a callback")
+
+    processor = WebhookProcessor(service.db, service.rail, on_applied=_apply_webhook)
+    try:
+        outcome = await asyncio.to_thread(processor.process, body, signer(body))
+    except PermissionError:
+        raise HTTPException(400, "signature mismatch") from None
+
+    return {
+        "ok": True,
+        "applied": outcome.applied,
+        "duplicate": outcome.duplicate,
+        "detail": outcome.detail,
+    }
+
+
+@app.post("/admin/simulate_dropped_webhook")
+async def simulate_dropped_webhook(payload: dict) -> dict:
+    """
+    Pretend the capture confirmation never arrived, then let the reconciliation
+    poller find the truth.
+
+    Rewinding the order is the honest simulation: the money did move, and what
+    is missing is only our knowledge of it, which is exactly the situation a
+    dropped webhook leaves behind.
+    """
+    order_id = str(payload.get("order_id", ""))
+    order = await asyncio.to_thread(service.orders.get, order_id)
+    if order is None:
+        raise HTTPException(404, "no such order")
+
+    def rewind() -> None:
+        with service.db.immediate_tx() as conn:
+            conn.execute(
+                "UPDATE orders SET state = 'GATE_ALLOWED', "
+                "updated_at = '2000-01-01T00:00:00Z' WHERE order_id = ?",
+                (order_id,),
+            )
+
+    await asyncio.to_thread(rewind)
+    resolved = await asyncio.to_thread(service.saga.reconcile)
+    after = await asyncio.to_thread(service.orders.get, order_id)
+    service.publish_stats()
+    return {
+        "ok": True,
+        "reconciled": resolved > 0,
+        "state_after": after.state if after else "?",
+    }
+
+
+def _apply_webhook(order_id: str, state: str, entity: dict) -> None:
+    service.audit.append_step(
+        order_id=order_id,
+        state=state,
+        action="webhook.payment.captured",
+        outcome="OK",
+        detail="confirmed by webhook",
+        ref=entity.get("id"),
+    )
+    service.publish_stats()
+
+
 @app.post("/admin/reset")
 async def reset() -> dict:
     await asyncio.to_thread(service.db.reset)
