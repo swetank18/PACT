@@ -20,7 +20,7 @@ import hashlib
 import hmac
 import logging
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from contracts.ids import new_id
 from contracts.money import Paise
@@ -86,8 +86,9 @@ class MockUpiAdapter(RailAdapter):
     def capture(self, intent_id: str, amount_paise: Paise, idem_key: str) -> RailResult:
         with self._lock:
             if idem_key in self._idem:
-                cached = self._idem[idem_key]
-                return RailResult(**{**cached.__dict__, "replayed": True})
+                # RailResult is a slots dataclass and has no __dict__; replace
+                # is the only correct way to copy one with a field changed.
+                return replace(self._idem[idem_key], replayed=True)
 
             intent = self._by_payment.get(intent_id) or self._intents.get(intent_id)
             if intent is None:
@@ -111,8 +112,7 @@ class MockUpiAdapter(RailAdapter):
     def refund(self, intent_id: str, amount_paise: Paise, idem_key: str) -> RailResult:
         with self._lock:
             if idem_key in self._idem:
-                cached = self._idem[idem_key]
-                return RailResult(**{**cached.__dict__, "replayed": True})
+                return replace(self._idem[idem_key], replayed=True)
 
             intent = self._by_payment.get(intent_id) or self._intents.get(intent_id)
             if intent is None:

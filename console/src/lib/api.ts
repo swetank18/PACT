@@ -110,12 +110,23 @@ export const gate = {
 
   revokeMandate: (mandateId: string) => post<{ ok: boolean }>(`${GATE}/v1/mandates/${mandateId}/revoke`),
 
-  /** Resolves a STEP_UP the human approved or refused in the modal. */
-  resolveStepUp: (decisionId: string, approve: boolean, signature?: string) =>
-    post<{ verdict: string; reason_code: string }>(`${GATE}/v1/decisions/${decisionId}/step_up`, {
-      approve,
-      signature,
-    }),
+  /**
+   * Resolves a STEP_UP the human approved or refused in the modal.
+   *
+   * `approval` is the object the device signed. The gate verifies the signature
+   * against the delegator key on the mandate and checks the object names this
+   * decision, so an approval it cannot attribute to the device is refused.
+   */
+  resolveStepUp: (
+    decisionId: string,
+    approve: boolean,
+    approval?: Record<string, string | number>,
+    signature?: string,
+  ) =>
+    post<{ verdict: string; reason_code: string; settlement_token?: string }>(
+      `${GATE}/v1/decisions/${decisionId}/step_up`,
+      { approve, approval, signature },
+    ),
 
   reset: () => post<{ ok: boolean }>(`${GATE}/v1/admin/reset`),
 };

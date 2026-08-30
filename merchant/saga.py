@@ -416,10 +416,13 @@ class SagaRunner:
             order_id=recovered.order_id, state=recovered.state, action="recovered_from",
             outcome="OK", detail=f"recovers {original_order_id}", ref=original_order_id,
         )
-        self.audit.append_step(
-            order_id=original.order_id, state="ROLLED_BACK", action="recovered_as",
-            outcome="OK", detail=f"sale recovered as {recovered.order_id}",
-            ref=recovered.order_id,
+        # `_step` rather than `append_step`: the original's row has to move to
+        # ROLLED_BACK too. Appending only the saga row would leave the order feed
+        # saying ALTERNATIVE_OFFERED while the audit trail beside it says
+        # ROLLED_BACK, and the console shows both at once.
+        self._step(
+            original, "ROLLED_BACK", "recovered_as", "OK",
+            f"sale recovered as {recovered.order_id}", recovered.order_id,
         )
         self.audit.bus.publish("order", recovered.model_dump())
 

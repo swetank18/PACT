@@ -46,23 +46,25 @@ export function StepUpModal({
     setBusy(approve ? "approve" : "refuse");
     setError(null);
     try {
+      let approval: Record<string, string | number> | undefined;
       let signature: string | undefined;
       if (approve) {
-        // The human's own signature over the specific decision, so the engine
+        // The human's own signature over this specific decision, so the engine
         // can prove the approval came from the device and not from the agent.
+        // The engine re-verifies against the delegator key on the mandate and
+        // checks that the signed object names this decision, so both the
+        // object and the signature have to travel.
         const key = await getDeviceKey();
-        signature = await signPayload(
-          {
-            decision_id: decision.decision_id,
-            mandate_id: decision.mandate_id,
-            amount_paise: decision.amount_paise,
-            payee_vpa: decision.payee_vpa,
-            approved_at: nowRfc3339(),
-          },
-          key.privateKey,
-        );
+        approval = {
+          decision_id: decision.decision_id,
+          mandate_id: decision.mandate_id,
+          amount_paise: decision.amount_paise,
+          payee_vpa: decision.payee_vpa,
+          approved_at: nowRfc3339(),
+        };
+        signature = await signPayload(approval, key.privateKey);
       }
-      await gate.resolveStepUp(decision.decision_id, approve, signature);
+      await gate.resolveStepUp(decision.decision_id, approve, approval, signature);
       onResolved(approve);
     } catch (e) {
       // Fail closed. If we cannot tell the gate what the human said, we do not
