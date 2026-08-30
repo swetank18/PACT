@@ -142,7 +142,7 @@ def merchant(db, gate, rail, quotes):
             self.db = db
             self.inventory = Inventory()
             self.quotes = quotes
-            self.upsell = UpsellEngine(self.inventory)
+            self.upsell = UpsellEngine(self.inventory, quotes)
             self.orders = OrderStore(db)
             self.audit = AuditStore(db)
             self.gate_client = InProcessGateClient(gate, gate.headroom_service)

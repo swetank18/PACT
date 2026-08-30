@@ -44,19 +44,22 @@ class QuoteEngine:
     def __init__(self, db: Database) -> None:
         self.db = db
 
-    def build(
-        self,
-        items: list[QuoteItemRequest],
-        *,
-        mandate_id: str | None = None,
-        headroom: Headroom | None = None,
-    ) -> Quote:
+    @staticmethod
+    def price(items: list[QuoteItemRequest]) -> tuple[list[LineItem], Paise, Paise, Paise, Paise]:
+        """
+        Pure pricing. Returns (lines, subtotal, tax, shipping, total).
+
+        Separated from `build` so callers can ask what something *would* cost
+        without persisting a quote. The upsell engine needs exactly this: an
+        addon's effect on the total is not its sticker price, because tax
+        applies to it and adding it can cross the free-shipping threshold.
+        Adding raw prices understates the real total and is how a filter ends up
+        offering something the gate then refuses.
+        """
         lines: list[LineItem] = []
         for req in items:
             product = BY_SKU.get(req.sku)
             if product is None:
-                # A quote for a SKU we do not sell is a client bug, and silently
-                # dropping it would produce a total the caller cannot explain.
                 raise KeyError(f"unknown sku: {req.sku}")
             lines.append(
                 LineItem(
@@ -68,11 +71,27 @@ class QuoteEngine:
                     category=product.category,
                 )
             )
-
         subtotal: Paise = sum(line.line_total_paise for line in lines)
         tax: Paise = gst(subtotal, GST_BPS)
         shipping: Paise = 0 if subtotal >= FREE_SHIPPING_OVER_PAISE else SHIPPING_PAISE
-        total: Paise = subtotal + tax + shipping
+        return lines, subtotal, tax, shipping, subtotal + tax + shipping
+
+    def total_with_addon(self, quote: Quote, addon_sku: str) -> Paise:
+        """The true total if this addon joins the quote. Never quote.total + price."""
+        items = [QuoteItemRequest(sku=l.sku, qty=l.qty) for l in quote.items]
+        items.append(QuoteItemRequest(sku=addon_sku, qty=1))
+        return self.price(items)[4]
+
+    def build(
+        self,
+        items: list[QuoteItemRequest],
+        *,
+        mandate_id: str | None = None,
+        headroom: Headroom | None = None,
+    ) -> Quote:
+        # A quote for a SKU we do not sell raises rather than silently dropping
+        # the line, which would produce a total the caller cannot explain.
+        lines, subtotal, tax, shipping, total = self.price(items)
 
         now = utcnow()
         expires = (

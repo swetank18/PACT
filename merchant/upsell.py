@@ -45,8 +45,11 @@ class UpsellCounters:
 
 
 class UpsellEngine:
-    def __init__(self, inventory: Inventory) -> None:
+    def __init__(self, inventory: Inventory, quotes) -> None:  # noqa: ANN001
         self.inventory = inventory
+        #: The quote engine, so the filter can ask what the basket would
+        #: actually cost with the addon on it. See `suggest`.
+        self.quotes = quotes
         self.counters = UpsellCounters()
         self._lock = threading.Lock()
 
@@ -63,34 +66,35 @@ class UpsellEngine:
         """
         Returns (offers, filtered_out).
 
-        Four conditions, checked **before** the offer is made rather than after
-        it is refused:
+        The conditions are checked **before** the offer is made rather than
+        after it is refused, and they are checked against the total the gate
+        will actually see.
 
-            line_total <= remaining headroom, net of this quote
-            category   in categories_allowed
-            quote + addon <= max_per_txn
-            payments_remaining > 0
-
-        The third one is the subtle one. The addon rides on this quote, so what
-        must fit under the per-transaction cap is the combined total, not the
-        addon's own price. Checking the addon alone is how a naive
-        implementation offers something that then fails CEILING_PER_TXN.
+        That last point is the one that bites. The addon rides on this quote, so
+        the number that matters is the **recombined total** — quote plus addon,
+        repriced — not `quote.total + addon.price`. Tax applies to the addon,
+        and adding it can cross the free-shipping threshold, so adding raw
+        prices understates the real figure. Understating it by even one paisa is
+        enough to offer something that then fails CEILING_PER_TXN or
+        CEILING_TOTAL, which would falsify the whole claim.
         """
         offers: list[Addon] = []
         filtered = 0
-
-        remaining_after_quote = headroom.headroom_paise - quote.total_paise
 
         for sku in self._candidates(quote):
             product = BY_SKU.get(sku)
             if product is None:
                 continue
 
+            # What the gate will be asked to approve, priced by the same engine
+            # that will price the real quote.
+            combined_total = self.quotes.total_with_addon(quote, sku)
+
             approvable = (
                 headroom.merchant_in_scope
                 and product.category in headroom.categories_allowed
-                and product.price_paise <= remaining_after_quote
-                and quote.total_paise + product.price_paise <= headroom.max_per_txn_paise
+                and combined_total <= headroom.headroom_paise
+                and combined_total <= headroom.max_per_txn_paise
                 and headroom.payments_remaining > 0
                 and self.inventory.level(sku) > 0
             )

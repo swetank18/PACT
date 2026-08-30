@@ -81,7 +81,7 @@ class MerchantService:
         self.audit = AuditStore(self.db, self.bus)
         self.inventory = Inventory()
         self.quotes = QuoteEngine(self.db)
-        self.upsell = UpsellEngine(self.inventory)
+        self.upsell = UpsellEngine(self.inventory, self.quotes)
         self.orders = OrderStore(self.db)
         self.gate = HttpGateClient()
         self.rail = _build_rail(self.db)
