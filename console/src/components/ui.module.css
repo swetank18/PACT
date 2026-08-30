@@ -1,0 +1,140 @@
+/* Small shared primitives. Anything used by two surfaces lives here. */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.allow {
+  color: var(--allow);
+  background: var(--allow-wash);
+  border-color: rgba(63, 208, 127, 0.28);
+}
+.veto {
+  color: var(--veto);
+  background: var(--veto-wash);
+  border-color: rgba(255, 95, 86, 0.28);
+}
+.stepup {
+  color: var(--stepup);
+  background: var(--stepup-wash);
+  border-color: rgba(255, 176, 32, 0.28);
+}
+.neutral {
+  color: var(--text-dim);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.accent {
+  color: var(--accent);
+  background: var(--accent-wash);
+  border-color: rgba(76, 141, 255, 0.28);
+}
+
+/* ---- connection dot ------------------------------------------------------ */
+
+.conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.live {
+  background: var(--allow);
+}
+.retrying {
+  background: var(--stepup);
+}
+.connecting {
+  background: var(--text-faint);
+}
+
+/* ---- empty state --------------------------------------------------------- */
+
+.empty {
+  padding: var(--s6) var(--s4);
+  text-align: center;
+  color: var(--text-faint);
+  font-size: var(--fs-md);
+}
+
+/* ---- signature block ----------------------------------------------------- */
+
+.sig {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  word-break: break-all;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--s3);
+}
+
+.sigNote {
+  margin-top: var(--s2);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+/* ---- buttons ------------------------------------------------------------- */
+
+.btn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  font-size: var(--fs-md);
+  font-weight: 500;
+}
+.btn:hover:not(:disabled) {
+  background: var(--surface-3);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btnPrimary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #04101f;
+  font-weight: 600;
+}
+.btnPrimary:hover:not(:disabled) {
+  background: #629bff;
+}
+
+.btnQuiet {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-dim);
+}
+.btnQuiet:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: transparent;
+}

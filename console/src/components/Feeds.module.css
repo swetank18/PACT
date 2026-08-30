@@ -1,0 +1,133 @@
+/* Shared table shell for the decision feed and the order feed. */
+
+.scroll {
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-md);
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-1);
+  text-align: left;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 600;
+  padding: var(--s2) var(--s4);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--border);
+  vertical-align: baseline;
+}
+
+.rowBtn {
+  cursor: pointer;
+}
+.rowBtn:hover td {
+  background: var(--surface-2);
+}
+
+.selected td {
+  background: var(--surface-2);
+}
+
+.amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ms {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.at {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.vpa {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.reason {
+  color: var(--text-dim);
+}
+
+.reasonCode {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  display: block;
+}
+
+.expand {
+  padding: 0 !important;
+}
+
+.state {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stateOk {
+  color: var(--allow);
+}
+.stateFail {
+  color: var(--veto);
+}
+.stateWork {
+  color: var(--stepup);
+}
+.stateIdle {
+  color: var(--text-dim);
+}
+
+.recovered {
+  color: var(--allow);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.items {
+  color: var(--text-dim);
+  max-width: 30ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caret {
+  color: var(--text-faint);
+  width: 14px;
+  display: inline-block;
+}

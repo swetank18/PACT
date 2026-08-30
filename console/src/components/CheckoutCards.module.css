@@ -1,0 +1,221 @@
+/* Structured cards that appear inline in the conversation, rather than walls
+   of text. LANE-C section 3. */
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--border);
+}
+
+.cardTitle {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.ttl {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}
+
+.ttlWarn {
+  color: var(--stepup);
+}
+
+/* ---- quote --------------------------------------------------------------- */
+
+.lines {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-md);
+}
+
+.lines td {
+  padding: var(--s2) var(--s4);
+}
+
+.lines tr + tr td {
+  border-top: 1px solid var(--border);
+}
+
+.qty {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  width: 44px;
+}
+
+.lineAmt {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  width: 130px;
+}
+
+.sku {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+  display: block;
+}
+
+.totals {
+  border-top: 1px solid var(--border);
+  padding: var(--s3) var(--s4);
+  display: grid;
+  gap: var(--s2);
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s4);
+  font-size: var(--fs-md);
+  color: var(--text-dim);
+}
+
+.grand {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s4);
+  padding-top: var(--s2);
+  border-top: 1px solid var(--border);
+}
+
+.grandLabel {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.grandValue {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The sentence that kills the financial hallucination question before it is
+   asked. Small, always present, never omitted to save space. */
+.provenance {
+  padding: 0 var(--s4) var(--s4);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}
+
+/* ---- upsell -------------------------------------------------------------- */
+
+.addon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s3) var(--s4);
+}
+
+.addon + .addon {
+  border-top: 1px solid var(--border);
+}
+
+.addonName {
+  font-size: var(--fs-lg);
+  font-weight: 500;
+}
+
+.addonMeta {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+.addonPrice {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.addonActions {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+/* The claim: every offer made is provably approvable. */
+.fits {
+  padding: var(--s2) var(--s4) var(--s3);
+  font-size: var(--fs-sm);
+  color: var(--allow);
+  border-top: 1px solid var(--border);
+}
+
+.filtered {
+  padding: var(--s2) var(--s4) var(--s3);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}
+
+/* ---- gate result --------------------------------------------------------- */
+
+.result {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s4);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+}
+
+.resultAllow {
+  border-color: rgba(63, 208, 127, 0.3);
+  background: linear-gradient(0deg, var(--allow-wash), var(--allow-wash)), var(--surface-1);
+}
+.resultVeto {
+  border-color: rgba(255, 95, 86, 0.3);
+  background: linear-gradient(0deg, var(--veto-wash), var(--veto-wash)), var(--surface-1);
+}
+.resultStepup {
+  border-color: rgba(255, 176, 32, 0.3);
+  background: linear-gradient(0deg, var(--stepup-wash), var(--stepup-wash)), var(--surface-1);
+}
+
+.resultHead {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.resultReason {
+  font-size: var(--fs-lg);
+}
+
+.resultMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}
+
+.traceToggle {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 0;
+}
+.traceToggle:hover {
+  color: var(--text);
+}

@@ -309,3 +309,36 @@ def test_the_mandates_table_still_exists_after_an_injection_attempt(gate, make_m
     )
     with gate.db.read_tx() as conn:
         assert conn.execute("SELECT COUNT(*) AS n FROM mandates").fetchone()["n"] >= 1
+
+
+# ------------------------------------------------- generated TS contracts ---
+
+
+def test_the_generated_typescript_contracts_are_current():
+    """
+    `contracts/generated.ts` is produced from the Python enum and committed, so
+    a reviewer sees the diff when a code changes. This asserts nobody edited the
+    Python without rerunning the generator — a drift there is not a compile
+    error, it is a console rendering a code it does not recognise on stage.
+    """
+    import subprocess
+    import sys
+
+    generated = REPO / "contracts" / "generated.ts"
+    before = generated.read_text()
+    subprocess.run(
+        [sys.executable, str(REPO / "scripts" / "gen_ts_contracts.py")],
+        check=True,
+        capture_output=True,
+        cwd=REPO,
+    )
+    after = generated.read_text()
+    assert before == after, (
+        "contracts/generated.ts is stale. Run: python3 scripts/gen_ts_contracts.py"
+    )
+
+
+def test_every_reason_code_reached_the_typescript_side():
+    generated = (REPO / "contracts" / "generated.ts").read_text()
+    for code in ReasonCode:
+        assert f'"{code.value}"' in generated, f"{code.value} is missing from generated.ts"

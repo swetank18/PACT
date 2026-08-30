@@ -1,0 +1,69 @@
+/*
+ * "Numbers are the design. Revenue tiles at 48 to 72 pixels, everything else
+ * recedes." LANE-C section 7.
+ */
+
+.strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+@media (max-width: 1100px) {
+  .strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.tile {
+  background: var(--surface-1);
+  padding: var(--s5) var(--s5) var(--s5);
+  display: grid;
+  gap: var(--s2);
+  align-content: start;
+}
+
+.label {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.value {
+  font-size: var(--fs-tile);
+  line-height: 1.02;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.symbol {
+  font-size: 0.55em;
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.sub {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  min-height: 20px;
+}
+
+/* RECOVERED is the number no other submission has on screen, so it is the one
+   tile allowed to carry a semantic colour. */
+.recovered .value {
+  color: var(--allow);
+}
+
+.attention .value {
+  color: var(--stepup);
+}

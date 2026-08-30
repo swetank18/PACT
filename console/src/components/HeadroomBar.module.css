@@ -1,0 +1,130 @@
+.wrap {
+  display: grid;
+  gap: var(--s3);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s4);
+}
+
+.title {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 600;
+}
+
+.remaining {
+  font-size: var(--fs-xl);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* The bar itself. Given room deliberately — this is the visual that makes the
+   product legible in one glance. */
+.track {
+  position: relative;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: flex;
+}
+
+.seg {
+  height: 100%;
+  /* Width is the only property that animates, and only here. Money moving is
+     worth watching; nothing else in the product moves. */
+  transition: width var(--enter);
+}
+
+.used {
+  background: var(--surface-3);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--border-strong) 0 1px,
+    transparent 1px 7px
+  );
+}
+
+.pending {
+  background: var(--accent);
+}
+
+/* The upsell rides on top of the pending purchase so the audience sees the
+   offer land inside the bar. */
+.addon {
+  background: var(--accent-dim);
+  border-left: 1px solid var(--bg);
+}
+
+.free {
+  background: transparent;
+}
+
+/* Per transaction cap, drawn as a hard edge on the track. */
+.cap {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  background: var(--text-faint);
+}
+
+.capLabel {
+  position: absolute;
+  top: calc(100% + 4px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s4);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s4);
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+.overflow {
+  color: var(--veto);
+}
+
+.capRow {
+  position: relative;
+  padding-bottom: 18px;
+}
