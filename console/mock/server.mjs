@@ -517,7 +517,7 @@ function commitReservation(decisionId) {
  * The purchase as an explicit state machine, with every transition persisted.
  * The compensating half runs in reverse and every compensation is idempotent.
  */
-async function runSaga(order, quote, decisionId) {
+async function runSaga(order, quote, decisionId, { autoAccept = false } = {}) {
   const payId = `pay_${randomUUID().replace(/-/g, "").slice(0, 14)}`;
 
   pushStep(order.order_id, "QUOTED", "quote", "OK", paise(order.amount_paise), quote.quote_id);
@@ -592,6 +592,15 @@ async function runSaga(order, quote, decisionId) {
     return;
   }
 
+  // The offer is made and the saga stops here. A recovery the merchant grants
+  // itself is not a recovery; the buyer has to accept it. Demo beats accept on
+  // the operator's behalf so nothing has to be clicked on stage.
+  order.alternative = {
+    sku: alt.sku,
+    name: alt.name,
+    category: alt.category,
+    price_paise: alt.price_paise,
+  };
   pushStep(
     order.order_id,
     "ALTERNATIVE_OFFERED",
@@ -600,7 +609,18 @@ async function runSaga(order, quote, decisionId) {
     `${alt.name}, in stock, fits headroom`,
     alt.sku,
   );
-  await sleep(520);
+
+  if (!autoAccept) return;
+  await sleep(700);
+  await acceptAlternative(order.order_id);
+}
+
+/** The buyer takes the alternative. This is where a failure becomes revenue. */
+async function acceptAlternative(orderId) {
+  const order = S.orders.get(orderId);
+  const alt = order?.alternative;
+  if (!order || !alt) return null;
+  order.alternative = null;
 
   const replacement = buildQuote([{ sku: alt.sku, qty: 1 }], order.mandate_id);
   const recovered = {
@@ -644,6 +664,7 @@ async function runSaga(order, quote, decisionId) {
     recovered.order_id,
   );
   recomputeStats();
+  return recovered;
 }
 
 /** Nearest in-stock item in the same category that fits remaining headroom. */
@@ -965,6 +986,17 @@ createServer(
 
     [
       "POST",
+      /^\/v1\/orders\/([^/]+)\/accept_alternative$/,
+      async ({ res, params }) => {
+        const recovered = await acceptAlternative(params[0]);
+        return recovered
+          ? json(res, recovered)
+          : json(res, { error: "no alternative on offer" }, 409);
+      },
+    ],
+
+    [
+      "POST",
       /^\/admin\/force_stockout$/,
       ({ res, body }) => {
         S.forcedStockout = body.sku ?? "*";
@@ -1057,7 +1089,7 @@ async function buy(mandateId, skus, overrides) {
   };
   S.orders.set(order.order_id, order);
   merchantHub.send("order", order);
-  await runSaga(order, quote, decision.decision_id);
+  await runSaga(order, quote, decision.decision_id, { autoAccept: true });
   return decision;
 }
 

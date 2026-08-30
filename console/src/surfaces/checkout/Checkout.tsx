@@ -30,7 +30,8 @@ type Card =
   | { kind: "upsell"; addons: Addon[]; filteredOut: number }
   | { kind: "gate"; decision: Decision }
   | { kind: "order"; order: Order }
-  | { kind: "saga"; orderId: string };
+  | { kind: "saga"; orderId: string }
+  | { kind: "recovery"; orderId: string; alternative: Addon };
 
 /**
  * Omit<Turn, "id"> does not distribute over a union, so the body type is named
@@ -52,10 +53,12 @@ const SUGGESTIONS = [
 export function Checkout({
   grant,
   saga,
+  orders,
   onWatchOrder,
 }: {
   grant: GrantResult | null;
   saga: Record<string, SagaStep[]>;
+  orders: Order[];
   onWatchOrder: (orderId: string) => void;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -68,7 +71,9 @@ export function Checkout({
 
   const threadRef = useRef<HTMLDivElement>(null);
   const seq = useRef(0);
-  const nextId = () => `t${seq.current++}`;
+  /** Orders we have already surfaced a recovery offer for. */
+  const offered = useRef<Set<string>>(new Set());
+  const [recovering, setRecovering] = useState<string | null>(null);
 
   const say = useCallback((turn: TurnBody) => {
     const id = `t${seq.current++}`;
@@ -263,6 +268,50 @@ export function Checkout({
     }
   }
 
+  /* ---------------------------------------------------- recovery flow --- */
+
+  /**
+   * The saga rolled an order back and the merchant put an alternative on the
+   * table. This is the beat where a lost sale becomes a recovered one, so the
+   * buyer is asked rather than told — a recovery the merchant grants itself is
+   * not a recovery.
+   */
+  useEffect(() => {
+    for (const order of orders) {
+      if (!order.alternative || offered.current.has(order.order_id)) continue;
+      offered.current.add(order.order_id);
+      say({
+        role: "agent",
+        text: `That order was refunded — the item went out of stock after the payment cleared. Your ${inr(
+          order.amount_paise,
+        )} is already back in your budget. The merchant has something in stock that fits.`,
+      });
+      say({
+        role: "card",
+        card: { kind: "recovery", orderId: order.order_id, alternative: order.alternative },
+      });
+    }
+  }, [orders, say]);
+
+  async function acceptAlternative(orderId: string) {
+    setRecovering(orderId);
+    try {
+      const recovered = await merchant.acceptAlternative(orderId);
+      onWatchOrder(recovered.order_id);
+      say({ role: "human", text: "Take the alternative." });
+      say({ role: "card", card: { kind: "order", order: recovered } });
+      say({ role: "card", card: { kind: "saga", orderId: recovered.order_id } });
+      await refreshHeadroom();
+    } catch (e) {
+      say({
+        role: "agent",
+        text: `The alternative could not be placed: ${e instanceof Error ? e.message : String(e)}`,
+      });
+    } finally {
+      setRecovering(null);
+    }
+  }
+
   /* -------------------------------------------------------------- view --- */
 
   if (!grant) {
@@ -352,6 +401,16 @@ export function Checkout({
                       <span>{c.order.state}</span>
                     </div>
                   </div>
+                )}
+                {c.kind === "recovery" && (
+                  <UpsellCard
+                    addons={[c.alternative]}
+                    onAccept={() => void acceptAlternative(c.orderId)}
+                    onDecline={() =>
+                      say({ role: "agent", text: "Understood. Nothing further was charged." })
+                    }
+                    busy={recovering === c.orderId}
+                  />
                 )}
                 {c.kind === "saga" && (
                   <div className={s.sagaWrap}>

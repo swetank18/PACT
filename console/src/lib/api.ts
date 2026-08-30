@@ -154,6 +154,10 @@ export const merchant = {
       settlement_token: settlementToken,
     }),
 
+  /** Takes the alternative offered after a rollback. Turns a loss into a sale. */
+  acceptAlternative: (orderId: string) =>
+    post<Order>(`${MERCHANT}/v1/orders/${orderId}/accept_alternative`),
+
   /** Bound to a key in the demo strip. Lane A's endpoint, Lane B also calls it. */
   forceStockout: (sku?: string) =>
     post<{ ok: boolean; sku: string }>(`${MERCHANT}/admin/force_stockout`, { sku: sku ?? null }),

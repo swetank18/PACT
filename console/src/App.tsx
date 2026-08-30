@@ -85,7 +85,7 @@ function ParityBadge() {
 function Shell() {
   const [route, go] = useHashRoute();
   const [grant, setGrant] = useState<GrantResult | null>(null);
-  const { pendingStepUp, clearStepUp, loadSaga, saga, refetchAll } = useLive();
+  const { pendingStepUp, clearStepUp, loadSaga, saga, orders, refetchAll } = useLive();
 
   const onGranted = useCallback(
     (r: GrantResult) => {
@@ -123,7 +123,12 @@ function Shell() {
       <main className={s.main}>
         {route === "grant" && <Grant onGranted={onGranted} />}
         {route === "checkout" && (
-          <Checkout grant={grant} saga={saga} onWatchOrder={(id) => void loadSaga(id)} />
+          <Checkout
+            grant={grant}
+            saga={saga}
+            orders={orders}
+            onWatchOrder={(id) => void loadSaga(id)}
+          />
         )}
         {route === "console" && <Console />}
         {route === "slides" && <Slides />}

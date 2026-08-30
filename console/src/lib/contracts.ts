@@ -238,6 +238,12 @@ export type Order = {
   razorpay_payment_id?: string | null;
   /** True when this order exists because an earlier one rolled back. */
   recovered_from?: string | null;
+  /**
+   * Set between ALTERNATIVE_OFFERED and the buyer's answer. A recovery the
+   * merchant grants itself is not a recovery, so the saga stops here until
+   * someone accepts.
+   */
+  alternative?: Addon | null;
   at: string;
 };
 
