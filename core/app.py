@@ -20,6 +20,7 @@ from sse_starlette.sse import EventSourceResponse
 from contracts.crypto import verify
 from contracts.reason_codes import CHECK_ORDER, ReasonCode, Verdict
 from contracts.schemas import AuthorizeRequest, Decision, Mandate, utcnow
+from core import config
 from core.audit.store import AuditStore, EventBus
 from core.db import Database
 from core.gate.auditor import Auditor
@@ -31,7 +32,11 @@ from core.mandate.store import MandateStore
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
 log = logging.getLogger("pact.gate.app")
 
-MERCHANT_VPA = os.environ.get("PACT_MERCHANT_VPA", "deskkit@razorpay")
+#: From the profile, never a literal here. See core/config.py — a default VPA
+#: hardcoded in the rail-agnostic layer is exactly the coupling the layering
+#: test greps for.
+PROFILE = config.load()
+MERCHANT_VPA = PROFILE.merchant_vpa
 SWEEP_INTERVAL_SECONDS = 10
 
 

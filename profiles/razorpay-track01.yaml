@@ -1,0 +1,19 @@
+# Event one: Razorpay, AI Growth and Agentic Commerce track.
+#
+# A profile is a config file, not a fork. Changing events is changing a flag.
+# Nothing event-specific belongs in core/.
+rail: razorpay
+merchant_name: DeskKit
+merchant_vpa: deskkit@razorpay
+surfaces: [checkout, merchant_console]
+
+beats:
+  "1": happy path, agent buys end to end
+  "2": headroom upsell, offer made and accepted
+  "3": naive upsell for contrast, offer rejected by the gate
+  "4": attacks, rapid fire
+  "5": forced stockout, refund, budget released, alternative accepted
+  "6": duplicate webhook arrives, nothing happens
+
+framing:
+  opening: The merchant reads what the buyer is allowed to spend, before it quotes.

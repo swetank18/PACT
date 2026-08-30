@@ -130,10 +130,11 @@ CREATE TABLE IF NOT EXISTS saga_steps (
   PRIMARY KEY (order_id, seq)
 );
 
--- Our own idempotency table. API_NOTES.md explains why: Razorpay has no
--- idempotency header, `receipt` covers orders and refunds only and rejects
--- rather than replaying, and capture has no idempotency at all. So we
--- short circuit here, before the call, and every write is safe to repeat.
+-- Our own idempotency table. The rail we settle on has no idempotency header,
+-- and the field it does offer covers only some operations and rejects
+-- duplicates rather than replaying the original response. So we short circuit
+-- here, before the call, and every write is safe to repeat. The rail-specific
+-- detail lives in rails/*/API_NOTES.md, which is where it belongs.
 CREATE TABLE IF NOT EXISTS idempotency (
   idem_key    TEXT PRIMARY KEY,
   operation   TEXT NOT NULL,
