@@ -21,3 +21,8 @@ htmlcov/
 _private/
 *SHARED-CONTRACTS*.md
 LANE-*.md
+
+# Per-session transcripts. Thousands of files per run, regenerable, and only
+# useful while debugging a specific session. results.md and raw.json are the
+# deliverables and they are committed.
+eval/results/sessions/
