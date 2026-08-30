@@ -173,6 +173,20 @@ RESETTABLE_TABLES = (
 )
 
 
+class _NullLock:
+    """A no-op context manager, so the file-backed path takes no Python lock and
+    genuinely relies on SQLite's own locking."""
+
+    def __enter__(self) -> None:
+        return None
+
+    def __exit__(self, *exc: object) -> bool:
+        return False
+
+
+_NULL_LOCK = _NullLock()
+
+
 def _path_from_url(url: str) -> str:
     if url.startswith("sqlite:///"):
         return url[len("sqlite:///") :]
@@ -191,6 +205,11 @@ class Database:
         self.url = url or os.environ.get("PACT_DB_URL", DEFAULT_URL)
         self.path = _path_from_url(self.url)
         self._local = threading.local()
+        # Only used for the in-memory case, where every thread shares one
+        # connection and SQLite cannot nest transactions on it. File-backed
+        # databases give each thread its own connection and rely on SQLite's own
+        # write lock, which is the mechanism we actually want to exercise.
+        self._shared_write_lock = threading.Lock()
         if self.path != ":memory:":
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self._shared: sqlite3.Connection | None = None
@@ -236,14 +255,20 @@ class Database:
         the cap, alongside the naive number for comparison.
         """
         conn = self.conn
-        conn.execute("BEGIN IMMEDIATE")
-        try:
-            yield conn
-        except Exception:
-            conn.execute("ROLLBACK")
-            raise
-        else:
-            conn.execute("COMMIT")
+        # On a shared in-memory connection, hold a process lock for the same
+        # duration BEGIN IMMEDIATE would hold SQLite's. Without it, twenty
+        # threads on one connection raise "cannot start a transaction within a
+        # transaction" rather than serialising.
+        lock = self._shared_write_lock if self._shared is not None else _NULL_LOCK
+        with lock:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                yield conn
+            except Exception:
+                conn.execute("ROLLBACK")
+                raise
+            else:
+                conn.execute("COMMIT")
 
     @contextmanager
     def read_tx(self) -> Iterator[sqlite3.Connection]:

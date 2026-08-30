@@ -290,6 +290,9 @@ class CreateOrderRequest(Strict):
     quote_id: str
     decision_id: str
     settlement_token: str
+    #: Set when this order is the replacement for one that rolled back, so the
+    #: revenue is attributed to the recovery rather than counted as fresh GMV.
+    recovered_from: str | None = None
 
 
 # ------------------------------------------------------------------ stats ---
