@@ -158,3 +158,31 @@
 .resetSlow {
   color: var(--stepup);
 }
+
+/* ---- parity badge -------------------------------------------------------- */
+
+.parity {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+}
+
+.parityOk {
+  color: var(--allow);
+  border-color: rgba(63, 208, 127, 0.3);
+  background: var(--allow-wash);
+}
+
+.parityFailed {
+  color: var(--veto);
+  border-color: rgba(255, 95, 86, 0.35);
+  background: var(--veto-wash);
+}

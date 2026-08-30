@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { DemoBar } from "./DemoBar";
 import { StepUpModal } from "./components/StepUpModal";
+import { checkParity, type ParityState } from "./lib/parity";
 import { LiveDataProvider, useLive } from "./lib/store";
 import { shortId } from "./lib/money";
 import { Checkout } from "./surfaces/checkout/Checkout";
@@ -43,6 +44,44 @@ function useHashRoute(): [Route, (r: Route) => void] {
   return [route, (r: Route) => (window.location.hash = `#/${r}`)];
 }
 
+/**
+ * The blocking gate, on screen. A judge can point at this and ask what it
+ * means, and the answer is short: the signature this browser produces is
+ * byte-identical to the one the Python engine produces from the same key and
+ * the same object.
+ */
+function ParityBadge() {
+  const [state, setState] = useState<ParityState>({ status: "checking" });
+
+  useEffect(() => {
+    void checkParity().then(setState);
+  }, []);
+
+  if (state.status === "unavailable") return null;
+
+  const cls =
+    state.status === "ok" ? s.parityOk : state.status === "failed" ? s.parityFailed : "";
+  const text =
+    state.status === "ok"
+      ? `signature parity · ${state.cases} vectors`
+      : state.status === "failed"
+        ? "signature parity FAILED"
+        : "checking parity";
+
+  return (
+    <span
+      className={`${s.parity} ${cls}`}
+      title={
+        state.status === "failed"
+          ? state.detail
+          : "Ed25519 over RFC 8785 JCS, verified in this browser against the cross language test vector"
+      }
+    >
+      {text}
+    </span>
+  );
+}
+
 function Shell() {
   const [route, go] = useHashRoute();
   const [grant, setGrant] = useState<GrantResult | null>(null);
@@ -63,6 +102,8 @@ function Shell() {
           <span className={s.wordmark}>PACT</span>
           <span className={s.tagline}>the merchant reads the buyer's authority before it quotes</span>
         </div>
+
+        <ParityBadge />
 
         {grant && <span className={s.mandateChip}>{shortId(grant.mandate.mandate_id, 8)}</span>}
 
