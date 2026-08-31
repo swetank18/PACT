@@ -65,10 +65,17 @@ class Auditor:
         api_key: str | None = None,
         model: str | None = None,
         timeout_ms: int | None = None,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.api_key = api_key if api_key is not None else os.environ.get("ANTHROPIC_API_KEY")
         self.model = model or os.environ.get("AUDITOR_MODEL", "claude-haiku-4-5-20251001")
         self.timeout_ms = timeout_ms or int(os.environ.get("AUDITOR_TIMEOUT_MS", DEFAULT_TIMEOUT_MS))
+        #: Only tests pass this. It exists because the alternative was leaving
+        #: every line below unexecuted until someone has a key — and the parts
+        #: worth checking here are the failure paths, which a live key exercises
+        #: least of all. What it cannot verify is that the model answers well;
+        #: that needs a key and a run of the ablation suite.
+        self._transport = transport
 
         if not self.api_key:
             log.warning(
@@ -108,22 +115,24 @@ class Auditor:
         )
 
         try:
-            response = httpx.post(
-                "https://api.anthropic.com/v1/messages",
-                timeout=self.timeout_ms / 1000,
-                headers={
-                    "x-api-key": self.api_key or "",
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": self.model,
-                    "max_tokens": 300,
-                    "temperature": 0,
-                    "system": SYSTEM_PROMPT,
-                    "messages": [{"role": "user", "content": user}],
-                },
-            )
+            with httpx.Client(
+                timeout=self.timeout_ms / 1000, transport=self._transport
+            ) as client:
+                response = client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": self.api_key or "",
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": self.model,
+                        "max_tokens": 300,
+                        "temperature": 0,
+                        "system": SYSTEM_PROMPT,
+                        "messages": [{"role": "user", "content": user}],
+                    },
+                )
             response.raise_for_status()
             body = response.json()
             text = "".join(
