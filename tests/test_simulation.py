@@ -298,3 +298,60 @@ def test_the_agents_defaults_follow_the_environment():
         del os.environ["PACT_GATE_URL"]
         del os.environ["PACT_MERCHANT_URL"]
         importlib.reload(buyer.agent)
+
+
+def test_the_cross_check_has_no_default_urls():
+    """
+    Same failure class as the agent's hardcoded ports, in the one function whose
+    entire job is to catch discrepancies. A defaulted URL here means the check
+    that validates the numbers can be validating a different instance than the
+    one that produced them.
+    """
+    import inspect
+
+    from sim.metrics import cross_check
+
+    for name, param in inspect.signature(cross_check).parameters.items():
+        if name in ("gate_url", "merchant_url"):
+            assert param.default is inspect.Parameter.empty, (
+                f"cross_check.{name} has a default; it must be passed explicitly"
+            )
+
+
+def test_the_cross_check_is_given_only_the_sessions_the_services_still_hold():
+    """
+    Every seed begins with a reset, so the merchant's counter holds the last seed
+    and nothing before it. Handing cross_check all three seeds compares a
+    three-seed total against a one-seed counter, produces a ratio near three, and
+    reports it as a harness bug.
+
+    It did exactly that, and the accusation shipped in a committed results file:
+    "GMV: merchant says 34469240, harness says 98812944. The merchant is right;
+    the harness has a bug." Neither was wrong. They were measuring different
+    windows, and the check that existed to catch bad numbers was itself the bad
+    number.
+    """
+    import ast
+
+    source = (REPO / "sim" / "report.py").read_text()
+    tree = ast.parse(source)
+
+    calls = [
+        node for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "cross_check"
+    ]
+    assert calls, "report.py no longer cross-checks at all"
+
+    for call in calls:
+        first = call.args[0]
+        # last_seed[...] / last_seed.get(...), never all_sessions.
+        rendered = ast.dump(first)
+        assert "all_sessions" not in rendered, (
+            f"line {call.lineno}: cross_check is given every seed, but the "
+            "services only hold the last one"
+        )
+        assert "last_seed" in rendered, (
+            f"line {call.lineno}: cross_check must be given the final seed's sessions"
+        )

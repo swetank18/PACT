@@ -1,6 +1,6 @@
 # Results
 
-Generated 2026-08-30T18:39:28+00:00 by `python sim/run.py --all`.
+Generated 2026-08-31T08:00:47+00:00 by `python sim/run.py --all`.
 200 sessions per arm, 3 seed(s), weighted personas.
 
 Every number here comes from a run. Nothing is typed in by hand.
@@ -122,9 +122,7 @@ Disable one check, rerun the attack set, record what leaks. Read the diagonal.
 
 ## Cross-check against the services
 
-**The harness and the services disagree. The services are right.**
-
-- GMV: merchant says 34469240, harness says 98812944. The merchant is right; the harness has a bug.
+The harness and the merchant agree: GMV ₹3,44,692.40.
 
 ## Caveats
 

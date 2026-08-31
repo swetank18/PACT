@@ -36,6 +36,8 @@ def write_results(
     from sim.run import (
         ABLATIONS,
         ARMS,
+        GATE,
+        MERCHANT,
         HUMAN_ADDON_RATE,
         HUMAN_COMPLETION_RATE,
         auditor_enabled,
@@ -60,6 +62,9 @@ def write_results(
     print(f"[sim] four arms, {sessions} sessions x {seeds} seed(s)")
     by_arm: dict[str, list[ArmMetrics]] = {}
     all_sessions: dict[str, list] = {}
+    #: Only the final seed of each arm, because that is all the services still
+    #: hold — every seed starts with a reset. See cross_check.
+    last_seed: dict[str, list] = {}
     for arm in ARMS:
         by_arm[arm] = []
         for seed in range(seeds):
@@ -74,8 +79,9 @@ def write_results(
             )
             by_arm[arm].append(m)
             all_sessions.setdefault(arm, []).extend(results)
+            last_seed[arm] = results
 
-    check = cross_check(all_sessions.get("D", []))
+    check = cross_check(last_seed.get("D", []), gate_url=GATE, merchant_url=MERCHANT)
 
     # ---------------------------------------------------------- suites ---
     print("[sim] attacks…", flush=True)

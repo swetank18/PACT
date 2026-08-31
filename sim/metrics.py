@@ -173,8 +173,8 @@ class CrossCheck:
 def cross_check(
     sessions: Sequence[SessionResult],
     *,
-    gate_url: str = "http://localhost:8000",
-    merchant_url: str = "http://localhost:8100",
+    gate_url: str,
+    merchant_url: str,
 ) -> CrossCheck:
     """
     Compare the harness's tally against the services' own records.
@@ -182,6 +182,16 @@ def cross_check(
     This is the check that stops a plausible-looking table being wrong. If the
     merchant's stats endpoint and this harness disagree on GMV, one of them is
     lying and it is worth knowing which before the number is read out loud.
+
+    **`sessions` must be only the sessions still reflected in the services'
+    state.** Each seed begins with a reset, so the merchant's counter holds the
+    last seed and nothing before it. Handing this every seed compares a
+    three-seed total against a one-seed counter, gets a ratio near three, and
+    reports it as a harness bug — which is what it did, in a committed results
+    file, for the life of the project.
+
+    The URLs are required rather than defaulted. Defaulting them is how this
+    ends up quietly measuring a different instance than the one under test.
     """
     check = CrossCheck()
     try:
