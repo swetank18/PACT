@@ -1,0 +1,67 @@
+# Fly.io. One machine, one volume, one process.
+#
+#     fly launch --no-deploy --copy-config     # creates the app, keeps this file
+#     fly volumes create pact_data --size 1 --region bom
+#     fly deploy
+#
+# Region bom because the rail is UPI and the buyers are in India; latency to the
+# gate is on the critical path of every quote.
+#
+# NOT DEPLOYED. There are no Fly credentials in the environment this was written
+# in, so this file is unexecuted — unlike the image it deploys, which CI builds
+# and drives the six demo beats against on every push. Expect to iterate on the
+# machine size and the health check grace period, not on the app.
+
+app = "pact"
+primary_region = "bom"
+
+[build]
+  # The image CI publishes, after the smoke test passed against it. Deploying
+  # the tag rather than rebuilding here means the artefact that ships is the one
+  # that was tested, not a second build nothing verified.
+  image = "ghcr.io/swetank18/pact:latest"
+
+[env]
+  PACT_PROFILE = "razorpay-track01"
+  PACT_DB_URL = "sqlite:////data/pact.db"
+  PACT_GATE_KEY_PATH = "/data/gate_signing_key.hex"
+  PORT = "8080"
+  # Paces the rollback so the console can draw it one row at a time. Set to 0
+  # before running the simulation against a deployed instance.
+  PACT_SAGA_STEP_DELAY_S = "0.35"
+
+# The database and the gate's signing key. Without this the machine still boots
+# and still works — and every restart issues a new signing key, so headroom
+# envelopes a merchant is already holding stop verifying, silently.
+[mounts]
+  source = "pact_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+  # Both false, deliberately. The reservation sweeper, the reconciliation poller
+  # and the saga are background work inside the process; a machine that stops
+  # when the last request finishes stops doing them. A suspended machine also
+  # drops every open SSE stream, which is the console's only live feed.
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/healthz"
+
+# One machine, and it is not an oversight. The ledger's correctness rests on
+# SQLite's write lock, the simulated rail keeps its idempotency table in memory,
+# and the saga runs in-process. A second machine would have its own database and
+# its own answer to "how much budget is left", which is the one question this
+# system exists to answer correctly. Scaling means Postgres and a queue.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  processes = ["app"]

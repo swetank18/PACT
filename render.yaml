@@ -1,0 +1,56 @@
+# Render. Same shape as fly.toml: one instance, one disk, one process.
+#
+# Blueprint deploy: point Render at this repo and it reads this file.
+#
+# NOT DEPLOYED — no Render credentials here. The image it runs is the one CI
+# builds and smoke tests on every push.
+
+services:
+  - type: web
+    name: pact
+    runtime: image
+    plan: starter          # a free instance sleeps, and a sleeping instance
+                           # stops running the sweeper and the poller
+    region: singapore      # closest Render region to the UPI rail
+    image:
+      url: ghcr.io/swetank18/pact:latest
+
+    healthCheckPath: /healthz
+
+    # One instance. See the note in fly.toml: the ledger rests on SQLite's write
+    # lock and the saga runs in-process, so a second instance would keep its own
+    # answer to how much budget is left.
+    numInstances: 1
+
+    disk:
+      name: pact-data
+      mountPath: /data
+      sizeGB: 1
+
+    envVars:
+      - key: PACT_PROFILE
+        value: razorpay-track01
+      - key: PACT_DB_URL
+        value: sqlite:////data/pact.db
+      - key: PACT_GATE_KEY_PATH
+        value: /data/gate_signing_key.hex
+      - key: PORT
+        value: "8080"
+      - key: PACT_SAGA_STEP_DELAY_S
+        value: "0.35"
+
+      # Test keys only. The client refuses to start on a key that is not
+      # rzp_test_, so a live key here fails the deploy rather than moving real
+      # money. Left unset runs the mock_upi rail, which exercises every line
+      # above the adapter.
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+      # Without it the gate runs deterministic mode: eight checks plus quote
+      # binding plus a pattern scan. That is a complete system by design.
+      - key: ANTHROPIC_API_KEY
+        sync: false

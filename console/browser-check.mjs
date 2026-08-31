@@ -48,10 +48,36 @@ page.on("response", (r) => { if (r.status() >= 400) problems.push(`http ${r.stat
 
 await page.goto(base, { waitUntil: "networkidle" });
 
-// Beat 5 so the console has a rollback and a recovery on it — the states that
-// carry a reason code, and the ones an empty screenshot would hide.
-await page.keyboard.press("5");
-await page.waitForTimeout(9000);
+/**
+ * Press a beat key and wait for it to actually finish.
+ *
+ * Waited on rather than slept through. The saga step delay is 0.05s locally and
+ * 0.35s in the container, so a fixed timeout that is comfortable here navigates
+ * away mid-beat there — which aborts the in-flight request and reports a failure
+ * that is entirely the test's own fault. The beat buttons disable themselves
+ * while one is running, so their state is the signal.
+ */
+async function beat(n) {
+  await page.keyboard.press(String(n));
+  await page.waitForFunction(
+    (key) => {
+      const button = [...document.querySelectorAll("button")]
+        .find((b) => b.textContent?.trim() === key);
+      return button instanceof HTMLButtonElement && !button.disabled;
+    },
+    String(n),
+    { timeout: 60_000 },
+  );
+  await page.waitForTimeout(600);
+}
+
+// 1 and 2 put orders and an accepted upsell on the board, 5 adds the rollback
+// and the recovery — the states that carry a reason code. A screenshot of an
+// empty console proves the page loads and nothing else.
+await beat(1);
+await beat(2);
+await beat(5);
+await page.waitForTimeout(1500);
 
 // The parity badge is the one claim on screen a judge can check by looking, and
 // it is the thing that was quietly broken in the deployed build.
