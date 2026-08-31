@@ -77,6 +77,17 @@ jobs:
           docker compose restart
           python3 scripts/smoke.py --base http://localhost:8080 --skip-beats --compare /tmp/before.json --timeout 120
 
+      # The claim, under concurrent load, against the container rather than
+      # in-process. Twenty buyers race one mandate with room for five: five
+      # settle and the budget is spent exactly, to the paise.
+      #
+      # Only the overspend assertion is hard. A shared runner can be slow enough
+      # that buyers are refused for want of capacity rather than authority, and
+      # failing a build for that would be reporting saturation as a correctness
+      # bug. Overspending is never acceptable at any speed.
+      - name: Ceiling under concurrent load
+        run: python3 -m pip install --quiet -r requirements.txt && python3 scripts/load.py ceiling --base http://localhost:8080
+
       # The console, in a real browser, against the real container.
       #
       # The 32 unit tests include a jsdom mount, which proves the components do
