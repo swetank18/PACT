@@ -74,25 +74,28 @@ of its public half and **refuses to start** — so a clone predating the purge,
 which still has the file on disk with `DEFAULT_KEY_PATH` pointing at it, fails
 loudly instead of booting with a key anyone can download.
 
-### The one thing still outstanding
+### The registry package, and why it was deleted
 
-**The GHCR package is still bound to the archived repository**, so the new
-repo's CI fails at the publish step with `denied: permission_denied:
-write_package`. Everything before it passes — build, 13 smoke checks, the volume
-restart, the concurrency race, the browser run. Only the push to the registry is
+The GHCR package survived the purge bound to the **archived** repository, so the
+new repo's CI failed at the publish step with `denied: permission_denied:
+write_package`. Everything before it passed; only the push to the registry was
 blocked.
 
-Fixing it needs a scope this environment does not have. Either:
+GitHub has no API to rebind a package to a different repository — the link is
+set by the first push and is otherwise a UI-only setting. So the package was
+**deleted** and recreated by the next CI run, which is the documented way round
+this.
 
-- **One click:** github.com/users/swetank18/packages/container/pact/settings →
-  *Manage Actions access* → add `swetank18/PACT` with **Write**. Or delete the
-  package and let the next CI run recreate it against the new repo.
-- **Or grant the scope** and it can be done from here:
-  `gh auth refresh -h github.com -s write:packages,delete:packages`
+Deleting it cost nothing and cleaned something up. Its eleven versions were all
+tagged with pre-purge commit SHAs that no longer exist in this repository, so
+every tag but `latest` was already a dead reference. The images never contained
+the signing key — `.dockerignore` has excluded key material since before the
+first image was built — so there was no secret to purge from them, only dead
+metadata.
 
-Until then `ghcr.io/swetank18/pact:latest` still holds the last image published
-from the old repository, which is functionally current — the rewrite changed no
-file content.
+If it ever needs doing again by hand, the alternative is one click:
+github.com/users/swetank18/packages/container/pact/settings → *Manage Actions
+access* → add the repository with **Write**.
 
 ### Still true, and still the rule
 
@@ -362,19 +365,18 @@ chaos, ablation, the sweep. Only the timestamp and the cross-check line moved.
 
 ## 7. Open work, roughly prioritised
 
-1. **Rebind the GHCR package to this repository.** Section 0, last part. One
-   click, or one scope. It is the only thing keeping CI red.
-2. **Exercise the Razorpay path with real test keys.** Still the single largest
-   unverified surface, though a much narrower one than it was: the client is now
-   driven against a fake built from `API_NOTES.md`, so what remains is whatever
-   the notes got wrong. Run it and diff against the expectations in that file.
-3. Run the auditor with a key, then re-run `--suite ablation` so `atk_06`
+1. **Exercise the Razorpay path with real test keys.** The largest remaining
+   unverified surface — see section 3 for exactly how narrow it now is.
+   The client is now driven against a fake built from `API_NOTES.md`, so what
+   remains is whatever the notes themselves got wrong. Run it and diff against
+   the expectations in that file.
+2. Run the auditor with a key, then re-run `--suite ablation` so `atk_06`
    reports a real result instead of N/A.
-4. **Actually deploy it.** `fly.toml` or `render.yaml`, one command, then
+3. **Actually deploy it.** `fly.toml` or `render.yaml`, one command, then
    `python3 scripts/smoke.py --base https://… --skip-beats` against the result.
    Do not run the beats against a public instance without meaning to.
-5. Rehearsals and the backup video. Not started.
-6. A soak. `scripts/load.py` covers a burst; nothing has watched memory or the
+4. Rehearsals and the backup video. Not started.
+5. A soak. `scripts/load.py` covers a burst; nothing has watched memory or the
    volume over hours.
 
 Closed since this file was written: **the exposure in section 0** — history
