@@ -260,8 +260,7 @@ def build_app():  # noqa: ANN201
         # otherwise stall the SSE streams the console is watching.
         return await asyncio.to_thread(runner)
 
-    @app.post("/admin/reset")
-    async def reset_all() -> dict:
+    def _reset_all() -> dict:
         with httpx.Client(timeout=10) as client:
             reset(client)
             _ablate(client, [])
@@ -270,6 +269,16 @@ def build_app():  # noqa: ANN201
                         json={"capture_fails": False, "refund_fails": False,
                               "refund_pending": False})
         return {"ok": True}
+
+    @app.post("/admin/reset")
+    async def reset_all() -> dict:
+        # Off the event loop, for the same reason the beats are: these are
+        # blocking calls to the gate and the merchant, and in the single-port
+        # build those are *this same process*. Awaiting them on the loop that
+        # has to serve them deadlocks until the client times out — the console's
+        # `0` key would hang for ten seconds and then 500. Separate processes in
+        # development hide this entirely, which is what makes it worth a note.
+        return await asyncio.to_thread(_reset_all)
 
     @app.get("/v1/health")
     async def health() -> dict:
