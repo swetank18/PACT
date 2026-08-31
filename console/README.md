@@ -39,6 +39,30 @@ The vector lives at `../fixtures/keys/test_vector.json` and is regenerated with
 canonicalisers were written separately from RFC 8785 on purpose; parity between
 two ports of the same code proves nothing.
 
+**Where the vector comes from differs by build, and that bit once.** In
+development a Vite middleware serves `fixtures/`. A built bundle has no such
+middleware, so the fetch 404d and the badge read "unavailable" in the deployed
+build — degrading honestly rather than claiming a parity failure, which is
+correct and is precisely why no test caught it. `deploy/app.py` now serves that
+one file by name. If the badge is missing rather than red, check that route
+before checking the crypto.
+
+## Looking at it
+
+```bash
+npm test                                          # 33 tests, including a jsdom mount
+npm run browser -- http://localhost:8080 shots    # a real browser, four surfaces
+```
+
+The unit tests prove the components do not throw. They cannot prove a stylesheet
+loaded, a font resolved, an asset path is right, or that a fetch made at boot
+returns anything — and until 2026-08-31 nobody had ever seen this rendered.
+`browser-check.mjs` runs beats 1, 2 and 5 so the board is populated, visits all
+four surfaces, and fails on any console error, any failed request, any surface
+that renders nothing, or a missing parity badge. CI runs it against the
+container on every push and uploads the screenshots; the committed ones are in
+`../docs/screenshots/`.
+
 The signing procedure, defined once in `src/lib/crypto.ts` and nowhere else:
 
 ```

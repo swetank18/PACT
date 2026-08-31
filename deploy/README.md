@@ -6,6 +6,16 @@ Everything behind one port.
 docker compose up --build      # http://localhost:8080
 ```
 
+Or pull the image CI publishes, which is the one the six demo beats have already
+run against:
+
+```bash
+docker run -p 8080:8080 -v pact-data:/data ghcr.io/swetank18/pact:latest
+```
+
+The GHCR package is private by default. Make it public once, in the repository's
+package settings, if anonymous pulls are wanted.
+
 Or without Docker, which is what was used to verify this:
 
 ```bash
@@ -82,16 +92,54 @@ Railway, Render, Fly.io, or any VPS. It is **not** deployable to a serverless
 platform as it stands — the pollers, the background saga and the SQLite write
 lock all need a process that outlives a request.
 
+## Two more that bit
+
+**`/admin/reset` deadlocked.** It made blocking HTTP calls to the gate and the
+merchant, awaited on the event loop — and here those services *are* this
+process. The loop sat waiting on a request only it could serve until the client
+timed out, then returned 500. The console binds that call to `0`, so the reset
+key was dead in the deployed topology and worked perfectly in development, where
+the four services are separate processes. Now off the loop, like the demo beats
+already were.
+
+**The signature parity vector 404d.** `fixtures/` is served in development by a
+Vite dev-server middleware, which does not exist in a built bundle. So the
+console's parity badge — the one claim on screen a judge can check by looking —
+was silently absent from the only build anyone would demo from. It degraded to
+"unavailable" rather than reporting a failure, which is correct behaviour and
+exactly why no test caught it; it took opening a browser.
+
+`deploy/app.py` now serves that one file **by name**. Deliberately not a
+`StaticFiles` mount on `fixtures/`, because that directory also holds the gate's
+private signing key — mounting it would have published the key over HTTP in
+order to fix a badge. `scripts/smoke.py` asserts both halves: the vector is
+served, and the key and its directory are not.
+
 ## Verification status
 
-Verified natively, on this machine, at `deploy/app.py` on port 8080: all four
-mounts respond, the console is served, all six demo beats pass, and 75 SSE
-frames were delivered to a subscriber during the run — which is the check that
-proves the mounted lifespans are actually running.
+**The image builds and works**, and this is checked on every push rather than
+once. `.github/workflows/container.yml` builds it through the compose file — so
+the volume, the healthcheck and the environment are exercised too — waits for
+the healthcheck to go green, then:
 
-**The container image itself is unbuilt.** There is no Docker daemon in the
-environment this was written in. The `Dockerfile` and `docker-compose.yml` are
-written but unproven; what *was* verified is the layout assumption they rest on
-— the console builds correctly against `contracts/generated.ts` from the mirrored
-directory structure the build stage creates. Expect to iterate on the image once
-on a machine with Docker.
+- 13 smoke checks, including all six demo beats asserted on what each is meant
+  to prove, and a live SSE frame count
+- a restart with the volume attached, asserting the orders and the gate's
+  signing key both survived
+- all four console surfaces driven in Chromium, failing on any console error or
+  failed request
+
+~208 MB, 22 layers. Published to `ghcr.io/swetank18/pact:latest` only after all
+of that passes, so what ships is the artefact that was tested.
+
+**Not verified: any actual hosted deployment.** `fly.toml` and `render.yaml` are
+written and unexecuted — there are no Fly or Render credentials in the
+environment this was built in. Expect to iterate on machine size and health
+check grace periods, not on the app. Smoke-test whatever comes up:
+
+```bash
+python3 scripts/smoke.py --base https://your-instance --skip-beats
+```
+
+`--skip-beats` because the beats write orders and force a stockout. Run them
+against a public instance only if you mean to.

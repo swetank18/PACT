@@ -16,4 +16,8 @@ pact.db-shm
 .env
 .env.local
 *.log
-fixtures/keys/gate_signing_key.hex
+# Key material, by pattern rather than by name — the next key file will have
+# a different one, and the image must not carry any of them. The gate
+# generates its own on the mounted volume at first boot.
+fixtures/keys/*.hex
+*_signing_key.hex

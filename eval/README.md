@@ -29,6 +29,25 @@ to a merchant to be known for accepting unauthorised agent payments. Those are
 real and they all point the same way. They are also not measurable in this
 harness, so they are named rather than estimated.
 
+## The cross-check, and why it used to fail
+
+`results.md` ends with the harness's own tally set against the merchant's stats
+endpoint. That check exists so a plausible-looking table cannot be wrong without
+somebody noticing.
+
+It was wrong itself, for the life of the project. Each seed begins with a reset,
+so the merchant's counter holds the last seed and nothing before it — and the
+harness handed it all three. A three-seed total against a one-seed counter gives
+a ratio near three, and the check reported it as a harness bug and named a
+culprit. Neither was wrong; they were measuring different windows.
+
+It now compares the final seed only, and agrees to the paise. If that line ever
+says "disagree" again, the number in the table is not safe to read out loud.
+
+The run is also reproducible across topologies: regenerated on 2026-08-31
+against the single-port build, which it had never been run against, every
+measured number came out byte identical.
+
 One number in `results.md` is worth more than the crossover: **arm D's net is
 flat across every adversarial rate we swept.** It refuses all of it. Arm B
 degrades linearly.
