@@ -8,63 +8,97 @@ was decided and why, what is verified and what is not, and what is still open.
 
 ---
 
-## 0. Do this first
+## 0. The exposure, and how it was closed
 
-**The repository is public and internal planning documents are still fetchable
-from orphaned commits.**
+**Done on 2026-08-31. Nothing here is outstanding except one click, described at
+the bottom.** Kept rather than deleted, because the next person needs to know
+the history was rewritten and why.
 
-They were removed from `HEAD` and the history was rewritten, but a force-push
-does not delete orphaned commits — GitHub keeps serving them by SHA. The repo
-was made private as a stopgap and has since been made public again, so they are
-readable by anyone with the SHA right now. Verified 2026-08-31: anonymous fetch
-of `00-SHARED-CONTRACTS.md` at `02b9841` returns **200**.
+### What was exposed
 
-`HEAD` is clean. Only the orphans are the problem.
+Two things, both anonymously fetchable from a public repository:
 
-The fix requires an auth scope this environment does not have:
+- **Internal planning documents.** Removed from `HEAD` early on and the history
+  rewritten, but a force-push does not delete orphaned commits — GitHub keeps
+  serving them by SHA. `00-SHARED-CONTRACTS.md` at `02b9841` returned **200**.
+- **The gate's Ed25519 signing key**, `fixtures/keys/gate_signing_key.hex`. Not
+  an orphan: tracked on `main` from `00cc29a` to `948c080`, so it was in every
+  clone. Returned **200**.
 
-```bash
-gh auth refresh -h github.com -s delete_repo
-# then: delete the repo, recreate it, push main + lane-c-console
-```
+### What it did and did not mean
 
-Stopgap if that is not wanted right now:
-`gh api -X PATCH repos/swetank18/PACT -f private=true`
+Worth keeping straight, because overstating it is as bad as missing it. The key
+signs headroom envelopes. Nothing in `merchant/` verifies an envelope signature
+today — it fetches headroom from the gate over HTTP and trusts the transport —
+and `authorize` re-derives every ceiling from the ledger server side. So a
+forged envelope could never move money. What the leak destroyed was the claim
+the design rests on: that a merchant can trust a signed envelope it was handed
+without asking. That was false for as long as anyone could download the key.
 
-The documents themselves live in `_private/` locally and are gitignored. They
-are the source of the three-lane structure and the frozen contract. **Do not
-commit them, and do not quote them into files that get committed.**
+Deployed instances were never affected: `.dockerignore` excludes key material,
+`PACT_GATE_KEY_PATH` points at the mounted volume, and the gate generates its
+own on first boot.
 
-**A second thing needs the same purge, and it is worse than an orphan.**
-`fixtures/keys/gate_signing_key.hex` — the gate's own Ed25519 signing key, the
-one that signs the headroom envelopes a merchant is supposed to trust without
-asking — was committed at `00cc29a` and untracked at `948c080`. That is 25
-commits on **`main`'s reachable history**, not in an orphan, so it is in every
-clone and every fork.
+### How it was closed
 
-Verified 2026-08-31: anonymous fetch of the key at `00cc29a` returns **200**.
+Deleting and recreating the repository needs `delete_repo` scope, which was not
+available. The same end state was reached with `repo` scope alone, and more
+safely — the old repository is **archived, not destroyed**, so this is
+reversible:
 
-What it does and does not mean, precisely, because overstating this is as bad as
-missing it:
+1. History rewritten with `git filter-repo --invert-paths --path
+   fixtures/keys/gate_signing_key.hex`. Verified: zero occurrences across all 40
+   commits, and `HEAD`'s tree hash unchanged at `b9110ec` — no file content
+   moved, only history.
+2. The old repository renamed to **`swetank18/PACT-pre-purge`** and made
+   **private**. Every leaked object is now behind authentication.
+3. A fresh public `swetank18/PACT` created, and the rewritten `main` and
+   `lane-c-console` pushed to it. The old SHAs do not exist in it: the API
+   returns `422 No commit found` for `00cc29a`.
 
-- **It is not a live spend bypass.** Nothing in `merchant/` verifies an envelope
-  signature today; the merchant fetches headroom from the gate over HTTP and
-  trusts the transport. The `authorize` path re-derives every ceiling from the
-  ledger server side, so a forged envelope cannot move money.
-- **It voids the central claim anyway.** "A merchant can verify a signed
-  envelope it was handed" is the whole design, and it is false for as long as
-  the key is downloadable. Anyone can mint an envelope that verifies.
-- **Deployed instances are already clean.** `.dockerignore` excludes key
-  material, `PACT_GATE_KEY_PATH` points at the mounted volume, and the gate
-  generates its own on first boot.
-- **Stale clones were not.** A clone made before `948c080` still has the file,
-  and `DEFAULT_KEY_PATH` points straight at it — so it would boot with a public
-  key, silently. `core/ledger/headroom.py` now **refuses to start** on that
-  specific key, matched by the SHA-256 of its public half. Delete the file and
-  restart; the gate makes a new one.
+### Verified closed
 
-Removing it from `HEAD` does not remove it from history, so it goes into the
-same purge as the planning documents.
+Anonymous, cache-busted, after the Fastly cache expired — `raw.githubusercontent`
+serves a stale copy for up to five minutes after a repository goes private, so
+an immediate re-check will show a misleading **200**:
+
+| Fetched | Result |
+| --- | --- |
+| signing key at `00cc29a`, new repo | **404** |
+| planning doc at `02b9841`, new repo | **404** |
+| signing key at `00cc29a`, archived repo | **404** |
+| planning doc at `02b9841`, archived repo | **404** |
+
+The key is also refused in code. `core/ledger/headroom.py` matches the SHA-256
+of its public half and **refuses to start** — so a clone predating the purge,
+which still has the file on disk with `DEFAULT_KEY_PATH` pointing at it, fails
+loudly instead of booting with a key anyone can download.
+
+### The one thing still outstanding
+
+**The GHCR package is still bound to the archived repository**, so the new
+repo's CI fails at the publish step with `denied: permission_denied:
+write_package`. Everything before it passes — build, 13 smoke checks, the volume
+restart, the concurrency race, the browser run. Only the push to the registry is
+blocked.
+
+Fixing it needs a scope this environment does not have. Either:
+
+- **One click:** github.com/users/swetank18/packages/container/pact/settings →
+  *Manage Actions access* → add `swetank18/PACT` with **Write**. Or delete the
+  package and let the next CI run recreate it against the new repo.
+- **Or grant the scope** and it can be done from here:
+  `gh auth refresh -h github.com -s write:packages,delete:packages`
+
+Until then `ghcr.io/swetank18/pact:latest` still holds the last image published
+from the old repository, which is functionally current — the rewrite changed no
+file content.
+
+### Still true, and still the rule
+
+The planning documents live in `_private/` locally and are gitignored. **Do not
+commit them, and do not quote them into files that get committed.** Test keys
+only.
 
 ---
 
@@ -328,8 +362,8 @@ chaos, ablation, the sweep. Only the timestamp and the cross-check line moved.
 
 ## 7. Open work, roughly prioritised
 
-1. **Purge the orphaned commits, and the signing key with them.** Section 0.
-   Needs `delete_repo` scope, which this environment does not have.
+1. **Rebind the GHCR package to this repository.** Section 0, last part. One
+   click, or one scope. It is the only thing keeping CI red.
 2. **Exercise the Razorpay path with real test keys.** Still the single largest
    unverified surface, though a much narrower one than it was: the client is now
    driven against a fake built from `API_NOTES.md`, so what remains is whatever
@@ -343,11 +377,12 @@ chaos, ablation, the sweep. Only the timestamp and the cross-check line moved.
 6. A soak. `scripts/load.py` covers a burst; nothing has watched memory or the
    volume over hours.
 
-Closed since this file was written: the container image is built and driven by
-CI on every push and published to GHCR; the console has been opened in a browser
-and is screenshotted every run; the Razorpay client and the auditor are both
-exercised; `RAZORPAY_CAPTURE_FAILED` is now `RAIL_CAPTURE_FAILED` and the
-layering allowlist is empty.
+Closed since this file was written: **the exposure in section 0** — history
+rewritten, the old repository archived private, a clean one pushed, all four
+fetches verified 404; the container image is built and driven by CI on every
+push; the console has been opened in a browser and is screenshotted every run;
+the Razorpay client and the auditor are both exercised; `RAZORPAY_CAPTURE_FAILED`
+is now `RAIL_CAPTURE_FAILED` and the layering allowlist is empty.
 
 ---
 
@@ -361,7 +396,12 @@ layering allowlist is empty.
   them. The existing history is the reference for tone.
 - `main` is the branch. `lane-c-console` exists as a preservation branch from
   when the console was briefly removed; it is behind `main` and can be deleted
-  once nobody wants it.
+  once nobody wants it. Both were re-pushed to the new repository after the
+  purge, and both are clean.
+- **The history was rewritten on 2026-08-31.** Every SHA before that date
+  differs from the one in the archived repository. Any clone taken before the
+  purge should be re-cloned rather than pulled — a pull will conflict on every
+  commit.
 - Never commit anything from `_private/`.
 - Test keys only. The Razorpay client refuses a non-`rzp_test_` key on purpose.
 
