@@ -1,0 +1,75 @@
+# Every push runs what a developer runs locally, on a machine that has never
+# seen this project. The point is not redundancy with `./scripts/test.sh` — it
+# is that the runner has no .venv, no cached node_modules and no ROS install
+# polluting PYTHONPATH, so it catches the class of "works on mine" that a local
+# run cannot.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A second push supersedes the first. No value in finishing a run for a commit
+# nobody will look at again.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: python (114 tests, layering, contract drift)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - run: pip install -r requirements.txt
+
+      # The same entry point developers use, deliberately. A second, subtly
+      # different CI command is how the two drift until only one of them passes.
+      - run: ./scripts/test.sh -q
+
+      # test_invariants regenerates contracts/generated.ts and fails if the
+      # committed copy is stale, so this is belt and braces — but a drift here
+      # is a console rendering an unknown reason code on stage, and that is
+      # worth two seconds.
+      - name: contracts/generated.ts is not stale
+        run: |
+          python3 scripts/gen_ts_contracts.py
+          git diff --exit-code contracts/generated.ts \
+            || { echo "::error::contracts/generated.ts is stale. Run scripts/gen_ts_contracts.py and commit it."; exit 1; }
+
+  console:
+    name: console (32 tests, typecheck, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+
+      - run: npm ci
+        working-directory: console
+
+      # Includes the parity test: the same message, signed by the browser's
+      # Ed25519 and by Python's, must produce byte-identical signatures. That is
+      # the test that stops a console demo signing something the gate rejects.
+      - run: npm test
+        working-directory: console
+
+      # `npm run build` is `tsc --noEmit && vite build`, so this typechecks too.
+      # It also proves the console still resolves ../../../contracts/generated,
+      # which is the assumption the Dockerfile's mirrored layout rests on.
+      - run: npm run build
+        working-directory: console

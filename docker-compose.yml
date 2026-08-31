@@ -8,6 +8,12 @@
 services:
   pact:
     build: .
+
+    # Tagged rather than left as the default compose name, so CI can retag this
+    # exact image for the registry instead of building it a second time and
+    # publishing something the smoke test never ran against.
+    image: pact:local
+
     ports:
       - "8080:8080"
     environment:

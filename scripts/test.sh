@@ -7,4 +7,11 @@
 # plugin autoload, which would also disable the ones we do want.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-exec env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest "$@"
+
+# The venv is the local case. CI installs into the runner's own interpreter and
+# has no .venv, and it should run the same command developers do rather than a
+# second, subtly different one that can drift.
+PY=.venv/bin/python
+[[ -x "$PY" ]] || PY="$(command -v python3)"
+
+exec env -u PYTHONPATH PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 "$PY" -m pytest "$@"

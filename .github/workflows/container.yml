@@ -1,0 +1,116 @@
+# The image, built and actually run.
+#
+# The Dockerfile and compose file were written on a machine with no Docker
+# daemon, so until this workflow ran they were unproven — plausible YAML that
+# had never produced a container. This builds the image, starts it through the
+# compose file, and drives the six demo beats against it over HTTP. A green run
+# here is the difference between "the deployment is written" and "the deployment
+# works".
+#
+# The smoke test is the same one that runs locally. It asserts what each beat is
+# meant to prove, and it asserts the SSE frame count, which is the only cheap
+# check that the mounted sub-app lifespans are running.
+
+name: container
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-run-and-publish:
+    name: build the image, run it, drive the beats
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Through compose, not `docker build`, so the compose file is exercised
+      # too. It carries the volume, the healthcheck and the environment, and a
+      # mistake in any of those is a deployment that fails in a way the image
+      # alone would not show.
+      - name: Build
+        run: docker compose build
+
+      - name: Start
+        run: docker compose up -d
+
+      - name: Wait for the container to report healthy
+        run: |
+          for i in $(seq 1 60); do
+            status=$(docker inspect --format '{{ .State.Health.Status }}' \
+              "$(docker compose ps -q pact)" 2>/dev/null || echo missing)
+            echo "[$i] $status"
+            [ "$status" = healthy ] && exit 0
+            [ "$status" = missing ] && { docker compose ps -a; exit 1; }
+            sleep 2
+          done
+          echo "::error::never became healthy"
+          exit 1
+
+      # Stdlib only, so nothing is installed on the runner to run it. It talks
+      # to the container exactly as a browser would.
+      - name: Smoke test, six beats and the SSE stream
+        run: python3 scripts/smoke.py --base http://localhost:8080 --timeout 120
+
+      # The state that must survive a restart: the orders, and the gate's
+      # signing key. Lose the key and every headroom envelope a merchant is
+      # already holding stops verifying — silently, because a merchant cannot
+      # tell a rotated key from a forged envelope. Both live on the named volume,
+      # so this is really a test of whether the volume is mounted where the
+      # image says it is.
+      - name: Restart with the volume attached, and check nothing was lost
+        run: |
+          python3 scripts/smoke.py --base http://localhost:8080 --skip-beats --snapshot /tmp/before.json
+          docker compose restart
+          python3 scripts/smoke.py --base http://localhost:8080 --skip-beats --compare /tmp/before.json --timeout 120
+
+      # A failing run is only useful if you can see why. Always, not on success.
+      - name: Container logs
+        if: always()
+        run: docker compose logs --no-color --tail 400
+
+      - name: Image size
+        if: always()
+        run: docker image inspect pact:local --format 'pact:local {{ .Size }} bytes, {{ len .RootFS.Layers }} layers'
+
+      - name: Stop
+        if: always()
+        run: docker compose down -v
+
+      # Published only from main, and only after the image above passed. What
+      # reaches the registry is the exact image the beats ran against, retagged
+      # — not a second build that nothing verified.
+      - name: Log in to the registry
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          repo=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          image="ghcr.io/${repo}"
+          docker tag pact:local "${image}:${GITHUB_SHA}"
+          docker tag pact:local "${image}:latest"
+          docker push "${image}:${GITHUB_SHA}"
+          docker push "${image}:latest"
+          echo "### Published" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "docker run -p 8080:8080 -v pact-data:/data ${image}:latest" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

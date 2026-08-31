@@ -222,6 +222,38 @@ def check_reset(base: str) -> str:
     return f"cleared in {took * 1000:.0f} ms"
 
 
+def state_snapshot(base: str) -> dict:
+    """
+    The state a restart must not lose.
+
+    The order history is the obvious half. The gate's signing key is the half
+    that gets missed: lose it and every headroom envelope a merchant is already
+    holding stops verifying, silently, because the merchant has no way to tell a
+    rotated key from a forged envelope. Both live on the mounted volume, so this
+    is really a test of whether the volume is mounted where the image says.
+    """
+    orders = request(base, "/api/merchant/v1/orders?limit=50")["orders"]
+    return {
+        "order_ids": sorted(o["order_id"] for o in orders),
+        "gate_pubkey": request(base, "/api/gate/v1/gate/pubkey"),
+    }
+
+
+def check_survived_restart(base: str, before: dict) -> str:
+    after = state_snapshot(base)
+    if after["gate_pubkey"] != before["gate_pubkey"]:
+        raise Failure(
+            "the gate issued a new signing key across the restart. Every "
+            "headroom envelope already in a merchant's hands is now unverifiable."
+        )
+    lost = set(before["order_ids"]) - set(after["order_ids"])
+    if lost:
+        raise Failure(f"{len(lost)} orders did not survive the restart: {sorted(lost)[:5]}")
+    if not before["order_ids"]:
+        raise Failure("nothing was in the snapshot, so it proves nothing")
+    return f"{len(before['order_ids'])} orders and the signing key survived"
+
+
 BEATS = (
     ("beat 1  happy path", check_beat_1),
     ("beat 2  headroom upsell", check_beat_2),
@@ -240,6 +272,10 @@ def main() -> int:
     ap.add_argument("--skip-beats", action="store_true",
                     help="health and mounts only; for a deployed instance you "
                          "do not want to write orders into")
+    ap.add_argument("--snapshot", metavar="FILE",
+                    help="write the state that must survive a restart")
+    ap.add_argument("--compare", metavar="FILE",
+                    help="assert that state survived, against an earlier --snapshot")
     args = ap.parse_args()
     base = args.base.rstrip("/")
 
@@ -264,6 +300,10 @@ def main() -> int:
 
     run("sub-apps answer", check_sub_apps, base)
     run("console served", check_console_served, base)
+
+    if args.compare:
+        with open(args.compare) as fh:
+            run("state survived a restart", check_survived_restart, base, json.load(fh))
 
     if not args.skip_beats:
         # Subscribed before the beats run, so the frames it counts are theirs.
@@ -294,6 +334,11 @@ def main() -> int:
             return f"{sse.frames} frames delivered to a live subscriber"
 
         run("SSE live during the beats", check_sse)
+
+    if args.snapshot:
+        with open(args.snapshot, "w") as fh:
+            json.dump(state_snapshot(base), fh)
+        print(f"ok    snapshot written to {args.snapshot}", flush=True)
 
     failed = [r for r in results if not r[1]]
     print(f"\n{len(results) - len(failed)}/{len(results)} checks passed", flush=True)
