@@ -35,6 +35,18 @@ The documents themselves live in `_private/` locally and are gitignored. They
 are the source of the three-lane structure and the frozen contract. **Do not
 commit them, and do not quote them into files that get committed.**
 
+**A second thing needs the same purge.** `fixtures/keys/gate_signing_key.hex`
+was committed and sat in a public repo for 25 commits. It is the gate's own
+Ed25519 signing key — the one that signs headroom envelopes a merchant then
+trusts without asking. It is a demo key, it is regenerated on first boot when
+absent, and it should not have been there: the loader chmods it `0600`, which
+buys nothing when the same bytes are in the history.
+
+Untracked and gitignored as of 2026-08-31. Removing it from `HEAD` does not
+remove it from history, so it goes into the same purge as the planning
+documents. Anyone deploying before that purge should treat the key as public and
+let the container generate a fresh one on its volume — which is what it does.
+
 ---
 
 ## 1. What this is
@@ -57,8 +69,10 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-24 commits. ~11k lines of Python, ~4.6k of TypeScript. 114 Python tests, 32
-console tests, all green.
+~11k lines of Python, ~4.6k of TypeScript. **170 Python tests, 33 console
+tests**, all green, plus two GitHub Actions workflows that build the container
+image and drive the six demo beats and all four console surfaces against it on
+every push.
 
 ---
 
@@ -66,6 +80,9 @@ console tests, all green.
 
 ```bash
 docker compose up --build      # everything on http://localhost:8080
+
+# or, without building: the image CI publishes after the beats have run on it
+docker run -p 8080:8080 -v pact-data:/data ghcr.io/swetank18/pact:latest
 ```
 
 Development, services on separate ports with hot reload:
@@ -74,18 +91,32 @@ Development, services on separate ports with hot reload:
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh                            # 8000 gate, 8100 merchant, 8110 hooks, 8300 beats
 cd console && npm install && npm run dev    # 5173
-./scripts/test.sh                           # 114 tests
+./scripts/test.sh                           # 170 tests
 ```
 
 `scripts/test.sh` exists because a ROS install on this machine puts broken pytest
 plugins on `PYTHONPATH`; it clears the variable. Running `pytest` directly fails
 with an unrelated `lark` import error.
 
-The simulation needs the services up:
+The simulation needs the services up, and now honours where they are:
 
 ```bash
 python sim/run.py --all --sessions 200 --seeds 3     # regenerates eval/results/
 python sim/run.py --suite attacks|benign|chaos|ablation
+
+# against the single-port build rather than the four dev ports
+PACT_GATE_URL=http://localhost:8080/api/gate \
+PACT_MERCHANT_URL=http://localhost:8080/api/merchant \
+  python sim/run.py --all --sessions 200 --seeds 3
+```
+
+That second form did not work until 2026-08-31 — see section 5.
+
+Smoke-test any running instance, including a deployed one:
+
+```bash
+python3 scripts/smoke.py --base http://localhost:8080      # stdlib only
+cd console && npm run browser -- http://localhost:8080 shots
 ```
 
 Press `1`–`6` in the console for the six demo beats. Nothing is typed on stage.
@@ -112,24 +143,44 @@ everyone at the event.
 - 75 SSE frames delivered to a live subscriber in the single-port build — which
   is what proves the mounted lifespans actually run.
 
+Added 2026-08-31, and all of it runs on every push rather than once by hand:
+
+- **The container image builds and works.** CI builds it through the compose
+  file, waits for the healthcheck, and runs all six beats against it: 13 smoke
+  checks green, ~208 MB, 22 layers. Published to
+  `ghcr.io/swetank18/pact:latest` only after that passes.
+- **It survives a restart with the volume attached** — orders and the gate's
+  signing key both. Verified falsifiable: pointed at a fresh volume the check
+  reports the new key rather than passing quietly.
+- **The console has been seen.** Chromium, all four surfaces, zero console
+  errors and zero failed requests. Screenshots in `docs/screenshots/`.
+- **The Razorpay client runs**, against a fake built from `API_NOTES.md` that
+  refuses what the real API refuses. 27 tests, mutation-checked.
+- **The auditor runs**, through an injected transport. 19 tests. Every failure
+  path returns `unavailable` and steps up, never approval.
+- **The harness's tally agrees with the merchant's ledger to the paise.**
+
 ### NOT verified — the honest boundary
 
-- **The Razorpay client has never run against the real API.** No test keys in
-  this environment. It is written from `rails/razorpay/API_NOTES.md`, which was
-  written from the live docs on 2026-08-30, but that code path is unexercised.
-  Everything above the adapter is tested against `mock_upi`.
+- **The Razorpay client has never run against the *real* API.** Still true, and
+  still the largest gap. There are no test keys here. What changed is that it is
+  no longer *unexercised*: `tests/fake_razorpay.py` enforces the documented rules
+  and 27 tests drive the real client through it. The boundary is now exactly the
+  accuracy of `API_NOTES.md` — a field the live API requires that the notes
+  failed to record is still invisible.
   To close it: `export RAZORPAY_KEY_ID=rzp_test_… RAZORPAY_KEY_SECRET=… PACT_RAIL=razorpay`.
   The client refuses to start on a non-`rzp_test_` key.
-- **The container image has never been built.** No Docker daemon here. The
-  `Dockerfile` and `docker-compose.yml` are written but unproven. What *was*
-  verified is the layout assumption they rest on. Expect to iterate.
-- **The intent auditor has never run.** No `ANTHROPIC_API_KEY`. The gate runs in
-  deterministic mode: eight checks + quote binding + a regex injection scan.
-  `atk_06` targets the auditor and is reported **N/A**, not as a pass.
-- **No browser screenshot of the console.** Chromium is present but hangs under
-  snap confinement in screenshot mode. The UI is covered by 32 tests including a
-  full jsdom mount, and it was driven end to end through its own proxy — but
-  nobody has looked at it rendered.
+- **The intent auditor's model has never been called.** No `ANTHROPIC_API_KEY`.
+  The gate runs deterministic mode: eight checks + quote binding + a regex
+  injection scan. The auditor's *wiring* is now tested — request shape, every
+  failure path, and the three-way mapping onto verdicts through the gate — but
+  nothing has measured how well the model answers. `atk_06` stays **N/A**, not a
+  pass. Run the ablation suite with a key to change that.
+- **Neither deployment target has been deployed.** `fly.toml` and `render.yaml`
+  are written and unexecuted; there are no Fly or Render credentials here. The
+  image they point at is not unexecuted.
+- **Nothing has been run under load.** One container, one worker, and no
+  concurrency test above the 20-thread race in `tests/test_race.py`.
 
 ---
 
@@ -164,6 +215,16 @@ a control, because a compromised agent does not run it.
 write lock, the simulated rail's idempotency table is in memory, and the saga
 runs as a background task in-process. Scaling means Postgres and a queue.
 
+**Schema changes are additive and nullable, applied on every boot.**
+`CREATE TABLE IF NOT EXISTS` does nothing to a table that already exists, which
+was harmless while every database was a throwaway demo file and stopped being
+harmless the moment the deployment grew a named volume — a `docker pull` puts
+new code in front of an old file. `core/db.py` applies `ADD_COLUMNS` guarded by
+`PRAGMA table_info`. Never with `NOT NULL` (fails outright on a populated table)
+and never with a `DEFAULT` (silently backfills every historical row with a value
+that was never true of it — in an audit trail that is a fabricated record, which
+is worse than a null). Both are asserted.
+
 **Contracts are generated, not duplicated.** `scripts/gen_ts_contracts.py`
 produces `contracts/generated.ts` from the Python enum; the console re-exports
 it. A Python test regenerates and fails if the committed copy is stale. A drift
@@ -185,6 +246,19 @@ Kept because each one is a class of mistake that will recur.
 | `link_recovery` moved the saga row but not the order row | Order feed and audit trail would have disagreed on screen. |
 | Demo beats driven by the random basket sampler | Four of six did the wrong thing; beat 5 never reached the stockout. |
 | Mounted sub-apps get no lifespan in Starlette | Would have silently disabled the sweeper, the reconciler and SSE. |
+
+Found on 2026-08-31, all of them by building something that looks rather than by
+reading code. Each is listed with what would have gone wrong on stage.
+
+| Bug | Why it mattered |
+| --- | --- |
+| `/admin/reset` made blocking HTTP calls to itself, awaited on its own event loop | In the single-port build the gate and the merchant *are* this process, so the loop sat waiting on a request only it could serve, timed out after ten seconds, and 500d. The console binds that to `0`. **The reset key was dead in the deployed topology and fine in development**, where the services are separate processes. |
+| Three reason codes declared and emitted by nothing | `STOCK_UNAVAILABLE`, the capture failure and `SAGA_ROLLED_BACK` were in the frozen enum while the saga wrote English into `detail`. The console had branches that had never rendered and Lane B had assertions that could never fire — a rollback on stage was prose, where the pitch claims a machine-readable trail. |
+| The parity vector 404s in the deployed build | Served by a Vite dev-server middleware that does not exist in a built bundle. The badge degraded honestly to "unavailable" rather than claiming a failure, which is correct and is exactly why no test caught it. **It took opening a browser.** The one claim on screen a judge can check by looking was silently absent from the only build anyone would demo. |
+| The gate's signing key was committed | Section 0. |
+| The simulation harness measured a different system than it reset | `BuyerAgent` hardcoded the dev ports while `sim/run.py` read `PACT_GATE_URL` for its reset and ablate calls. With a dev topology *and* a deployed instance both up, it would reset one, measure the other, and still print numbers. |
+| The cross-check was itself the wrong number | It compared a three-seed harness total against a merchant counter that is reset each seed, got a ratio near three, and shipped "the harness has a bug" in `results.md` for the life of the project. Neither was wrong. Fixed, it agrees to the paise. |
+| A missing webhook signature passed verification | Found by mutating `compare_digest` to return True on an empty signature — the whole suite still passed. Nothing covered a delivery with no `X-Razorpay-Signature` while a secret was configured: the cheapest possible forgery. |
 
 ---
 
@@ -211,21 +285,42 @@ swept.** It refuses all of it. Arm B degrades linearly.
 Assumptions are tabulated in `eval/README.md` with how to vary each. Arm A is
 **modelled, not simulated** — there is no agent to run.
 
+**The cross-check now agrees.** For the life of the project `results.md` carried
+"the harness and the services disagree, the services are right, the harness has
+a bug". Neither was wrong: it compared a three-seed harness total against a
+merchant counter that is reset before each seed. Fixed, the harness's tally and
+the merchant's own ledger match to the paise — which is a stronger statement
+than the old line was, and it is now the one printed.
+
+**The numbers reproduce.** The full run was regenerated on 2026-08-31 against
+the single-port build, a topology it had never run against. Every measured
+number is byte identical to the previous run: four arms, seed ranges, attacks,
+chaos, ablation, the sweep. Only the timestamp and the cross-check line moved.
+
 ---
 
 ## 7. Open work, roughly prioritised
 
-1. **Purge the orphaned commits.** Section 0. Needs `delete_repo` scope.
-2. **Exercise the Razorpay path with test keys.** The single largest unverified
-   surface. `API_NOTES.md` has the field-by-field expectations to check against.
-3. **Build the container once on a machine with Docker.** Expect small fixes.
-4. **Look at the console in a browser.** Nobody has.
-5. Run the auditor with a key, then re-run `--suite ablation` so `atk_06`
+1. **Purge the orphaned commits, and the signing key with them.** Section 0.
+   Needs `delete_repo` scope, which this environment does not have.
+2. **Exercise the Razorpay path with real test keys.** Still the single largest
+   unverified surface, though a much narrower one than it was: the client is now
+   driven against a fake built from `API_NOTES.md`, so what remains is whatever
+   the notes got wrong. Run it and diff against the expectations in that file.
+3. Run the auditor with a key, then re-run `--suite ablation` so `atk_06`
    reports a real result instead of N/A.
-6. Rehearsals and the backup video. Not started.
-7. `RAZORPAY_CAPTURE_FAILED` is a vendor name in the frozen reason-code enum. It
-   should have been `RAIL_CAPTURE_FAILED`. Allowlisted in the layering test
-   rather than hidden; worth fixing between events.
+4. **Actually deploy it.** `fly.toml` or `render.yaml`, one command, then
+   `python3 scripts/smoke.py --base https://… --skip-beats` against the result.
+   Do not run the beats against a public instance without meaning to.
+5. Rehearsals and the backup video. Not started.
+6. Load. One container, one worker, and nothing has run concurrency above the 20
+   threads in `tests/test_race.py`.
+
+Closed since this file was written: the container image is built and driven by
+CI on every push and published to GHCR; the console has been opened in a browser
+and is screenshotted every run; the Razorpay client and the auditor are both
+exercised; `RAZORPAY_CAPTURE_FAILED` is now `RAIL_CAPTURE_FAILED` and the
+layering allowlist is empty.
 
 ---
 
@@ -255,3 +350,7 @@ Assumptions are tabulated in `eval/README.md` with how to vary each. Arm A is
 | `rails/razorpay/API_NOTES.md` | What was verified against the live docs, dated, with unverified items marked |
 | `console/README.md` | The three surfaces, and the signature-parity gate |
 | `tests/test_invariants.py` | The rules that stop the design decaying |
+| `.github/workflows/container.yml` | What is actually proven on every push, and against what |
+| `scripts/smoke.py` | The six beats as assertions; runs against any instance, stdlib only |
+| `console/browser-check.mjs` | The console in a real browser, and what it asserts |
+| `docs/screenshots/` | What it looks like |

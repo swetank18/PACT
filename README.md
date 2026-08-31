@@ -18,12 +18,19 @@ friction and becomes a conversion instrument.
 docker compose up --build     # everything on http://localhost:8080
 ```
 
+Or without building, from the image CI publishes after the six demo beats have
+run against it:
+
+```bash
+docker run -p 8080:8080 -v pact-data:/data ghcr.io/swetank18/pact:latest
+```
+
 Or for development, with hot reload and the services on separate ports:
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh          # gate :8000, merchant :8100, webhooks :8110, beats :8300
-./scripts/test.sh         # 114 tests
+./scripts/test.sh         # 170 tests
 
 cd console && npm install && npm run dev    # http://localhost:5173
 ```
@@ -42,7 +49,26 @@ python sim/run.py --all --sessions 200 --seeds 3    # regenerates eval/results/
 Deployment notes, and the two traps in the single-port build, are in
 [`deploy/README.md`](deploy/README.md). It needs a host that runs a persistent
 process — the pollers, the background saga and the SQLite write lock all outlive
-a request, so this is not serverless-deployable as it stands.
+a request, so this is not serverless-deployable as it stands. `fly.toml` and
+`render.yaml` deploy the published image; neither has been run.
+
+## What CI proves on every push
+
+Not "the tests pass". The image is built, started through the compose file, and
+driven:
+
+| | |
+| --- | --- |
+| `ci` | 170 Python tests, 33 console tests, typecheck, and a contract-drift check |
+| `container` | builds the image, waits for its healthcheck, runs the six demo beats against it over HTTP, asserts the SSE stream is live, restarts it with the volume attached and checks the orders and the gate's signing key survived, then drives all four console surfaces in Chromium |
+
+The beats are asserted on what they are meant to prove, not on a 200 — beat 3
+has to *fail* to complete, or the contrast it exists to draw is not there.
+Screenshots are uploaded from every run; the committed ones are in
+[`docs/screenshots/`](docs/screenshots/).
+
+Only after all of that does the image reach `ghcr.io/swetank18/pact:latest`, so
+what ships is the artefact that was tested rather than a second build.
 
 ## What is here
 
@@ -153,7 +179,17 @@ the same code proves nothing.
 python3 scripts/gen_test_vector.py     # regenerate
 ```
 
-The browser side that reproduces it lives on the `lane-c-console` branch.
+The browser side that reproduces it lives on the `lane-c-console` branch, and
+runs at boot: the console fetches the vector, verifies it in the browser's own
+Ed25519 and JCS, and puts `SIGNATURE PARITY · 2 VECTORS` in the header. It is
+the one claim here a judge can check by looking.
+
+It was silently missing in the deployed build for as long as that build existed.
+The vector is served by a Vite dev-server middleware, so a built bundle 404d and
+the badge degraded to "unavailable" — correct behaviour, and precisely why 32
+tests and a full jsdom mount could not see it. `deploy/app.py` now serves that
+one file by name, deliberately not by mounting `fixtures/`, which also holds the
+gate's private signing key.
 
 ## Razorpay
 
@@ -168,6 +204,19 @@ So we keep our own table and short-circuit before the call. That is the only way
 "calling twice must not charge twice" holds across all three operations rather
 than two. A refund returning `pending` is also not a completed compensation, and
 the saga does not treat it as one.
+
+**The client has never run against the live API** — there are no test keys in
+the environment this was built in. It is instead driven through
+`tests/fake_razorpay.py`, which is not a mock that returns what the caller hopes
+for: it is built from `API_NOTES.md` and it *refuses* what the real API refuses.
+Missing `currency` on capture is a 400. A second capture is the documented
+"already paid" 400, not a success. A duplicate `receipt` is rejected rather than
+replayed. 27 tests, mutation-checked — dropping `currency` from capture fails
+four of them.
+
+What that cannot catch is a field the real API requires that `API_NOTES.md`
+failed to record. Only a test key closes that, and it is the largest remaining
+gap in the system.
 
 Webhook signatures are HMAC-SHA256 over the **raw** body — re-serialising before
 verifying is the standard way that check silently stops working, and
@@ -189,7 +238,17 @@ reconciliation poller resolves anything pending and older than 30 seconds.
 
 ## Limitations
 
-- Test mode only. No live money has moved through this.
+- Test mode only. No live money has moved through this, and the Razorpay client
+  has never run against the live API — see above for what stands in for it and
+  what that does not cover.
+- The intent auditor's model has never been called. With no `ANTHROPIC_API_KEY`
+  the gate runs deterministic mode, which is a complete system by design. The
+  auditor's wiring is now tested through an injected transport — every failure
+  path returns `unavailable` and steps up, never approval — but nothing has
+  measured how well the model actually answers, so `atk_06` is reported **N/A**
+  rather than as a pass.
+- `fly.toml` and `render.yaml` are written and unexecuted. No credentials. The
+  image they deploy is not unexecuted.
 - One merchant, one catalog.
 - The intent auditor is probabilistic, which is exactly why it steps up rather
   than blocking. The eight deterministic checks plus quote binding are the
