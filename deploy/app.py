@@ -112,6 +112,32 @@ for path, sub in MOUNTED:
     app.mount(path, sub)
 
 
+#: The cross-language signature vector, and only it.
+#:
+#: The console fetches this at boot and checks that the browser's Ed25519 and
+#: RFC 8785 agree with Python's, byte for byte, then puts the result on screen.
+#: In development a Vite middleware serves `fixtures/` — a dev-server plugin
+#: that does not exist in a built bundle, so in the deployed build the fetch
+#: 404d and the badge read "unavailable". It degraded honestly, which is why no
+#: test caught it and why it took opening a browser to see.
+#:
+#: Served as one named file rather than by mounting `fixtures/`, because that
+#: directory also holds `gate_signing_key.hex`. Mounting it would have published
+#: the gate's private key over HTTP to fix a badge.
+PARITY_VECTOR = REPO / "fixtures" / "keys" / "test_vector.json"
+
+
+@app.get("/fixtures/keys/test_vector.json", response_model=None)
+async def parity_vector() -> FileResponse | JSONResponse:
+    if not PARITY_VECTOR.is_file():
+        return JSONResponse(
+            {"error": "the signature test vector is not in this build",
+             "fix": "python3 scripts/gen_test_vector.py"},
+            status_code=404,
+        )
+    return FileResponse(PARITY_VECTOR, media_type="application/json")
+
+
 @app.get("/healthz")
 async def healthz() -> dict:
     """One check that covers everything, for whatever is watching the container."""

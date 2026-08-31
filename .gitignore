@@ -17,6 +17,14 @@ coverage/
 htmlcov/
 .coverage
 
+# The gate's own Ed25519 signing key. Generated on first boot, persisted so a
+# restart does not invalidate headroom envelopes a merchant is already holding
+# — and never committed. It was, for 25 commits, in a public repo. It is a demo
+# key and it still should not have been there: the loader chmods it 0600, which
+# is pointless if the same bytes are in the history.
+fixtures/keys/gate_signing_key.hex
+*_signing_key.hex
+
 # Internal planning docs. Never tracked.
 _private/
 *SHARED-CONTRACTS*.md
@@ -26,3 +34,6 @@ LANE-*.md
 # useful while debugging a specific session. results.md and raw.json are the
 # deliverables and they are committed.
 eval/results/sessions/
+
+# Browser-check output. docs/screenshots/ holds the committed ones.
+console/shots/

@@ -77,6 +77,38 @@ jobs:
           docker compose restart
           python3 scripts/smoke.py --base http://localhost:8080 --skip-beats --compare /tmp/before.json --timeout 120
 
+      # The console, in a real browser, against the real container.
+      #
+      # The 32 unit tests include a jsdom mount, which proves the components do
+      # not throw. It does not prove a stylesheet loaded, an asset path is right,
+      # or that a fetch the app makes at boot returns anything — and the first
+      # time this ran by hand it found that the signature parity vector 404s in
+      # a built bundle, because a Vite dev-server middleware serves it in
+      # development and nothing serves it in production. The badge degraded
+      # honestly to "unavailable", which is why no unit test could see it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: console/package-lock.json
+
+      - run: npm ci
+        working-directory: console
+
+      - run: npx playwright install --with-deps chromium
+        working-directory: console
+
+      - name: Drive the console in Chromium
+        working-directory: console
+        run: node browser-check.mjs http://localhost:8080 shots
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: console-screenshots
+          path: console/shots/
+          if-no-files-found: warn
+
       # A failing run is only useful if you can see why. Always, not on success.
       - name: Container logs
         if: always()

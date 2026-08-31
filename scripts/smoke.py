@@ -141,6 +141,47 @@ def check_console_served(base: str) -> str:
     return "index.html served with its asset bundle"
 
 
+def check_parity_vector_is_served(base: str) -> str:
+    """
+    The console's one visible, checkable claim.
+
+    It fetches this at boot, verifies the browser's Ed25519 and RFC 8785 against
+    Python's byte for byte, and puts the result on screen. In development a Vite
+    middleware serves it; a built bundle has no such middleware, so this 404d in
+    the deployed build and the badge read "unavailable" — degrading honestly,
+    which is exactly why no test caught it and why it took opening a browser.
+    """
+    vector = request(base, "/fixtures/keys/test_vector.json")
+    if not isinstance(vector, dict) or not vector.get("cases"):
+        raise Failure(f"the test vector is not being served: {vector!r:.120}")
+    return f"{len(vector['cases'])} signature cases available to the browser"
+
+
+def check_the_signing_key_is_not_served(base: str) -> str:
+    """
+    The other half, and the more important one.
+
+    `fixtures/keys/` holds the gate's private signing key beside the vector.
+    Serving that directory to fix the badge would publish the key over HTTP —
+    anyone could forge a headroom envelope, which is the one signature the
+    merchant trusts without asking. So the vector is served as a single named
+    file, and this asserts the neighbouring path stays shut.
+    """
+    for path in (
+        "/fixtures/keys/gate_signing_key.hex",
+        "/fixtures/keys/",
+        "/fixtures/",
+    ):
+        try:
+            body = request(base, path)
+        except urllib.error.HTTPError as exc:
+            if exc.code in (403, 404):
+                continue
+            raise Failure(f"{path} answered {exc.code}")
+        raise Failure(f"{path} IS SERVED and must not be: {body!r:.120}")
+    return "the signing key and its directory are not reachable"
+
+
 def check_beat_1(base: str) -> str:
     r = request(base, "/api/sim/demo/beat/1", "POST")
     if not r.get("completed"):
@@ -300,6 +341,8 @@ def main() -> int:
 
     run("sub-apps answer", check_sub_apps, base)
     run("console served", check_console_served, base)
+    run("parity vector served", check_parity_vector_is_served, base)
+    run("signing key NOT served", check_the_signing_key_is_not_served, base)
 
     if args.compare:
         with open(args.compare) as fh:
