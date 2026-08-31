@@ -242,3 +242,59 @@ def test_an_unrunnable_attack_is_never_counted_as_a_pass():
         reason_code="INTENT_INJECTION_SUSPECTED", blocked=True, not_applicable=True,
     )
     assert r.outcome == "N/A"
+
+# --------------------------------------- the harness points at one system ---
+
+
+def test_every_agent_the_harness_builds_is_given_the_configured_urls():
+    """
+    The harness must measure the system it reset.
+
+    BuyerAgent's URLs used to be hardcoded to the development ports while
+    sim/run.py read PACT_GATE_URL and PACT_MERCHANT_URL for its own reset and
+    ablate calls. Against the development topology the two coincide and nothing
+    looks wrong. Against the single-port build the harness resets the right
+    services and then transacts against nothing — and with both running, it
+    resets one and measures the other while still printing numbers.
+
+    A grep, because the failure is invisible in the output.
+    """
+    import ast
+
+    source = (REPO / "sim" / "run.py").read_text()
+    tree = ast.parse(source)
+
+    missing: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not (isinstance(node.func, ast.Name) and node.func.id == "BuyerAgent"):
+            continue
+        given = {kw.arg for kw in node.keywords}
+        if not {"gate_url", "merchant_url"} <= given:
+            missing.append(f"line {node.lineno}: BuyerAgent(...) without {{gate_url, merchant_url}}")
+
+    assert not missing, (
+        "the harness builds an agent against the default ports rather than the "
+        "configured ones:\n  " + "\n  ".join(missing)
+    )
+
+
+def test_the_agents_defaults_follow_the_environment():
+    """The other half. A default that ignores PACT_GATE_URL is how the two
+    drifted apart in the first place."""
+    import importlib
+    import os
+
+    import buyer.agent
+
+    os.environ["PACT_GATE_URL"] = "http://example.invalid/api/gate"
+    os.environ["PACT_MERCHANT_URL"] = "http://example.invalid/api/merchant"
+    try:
+        reloaded = importlib.reload(buyer.agent)
+        assert reloaded.DEFAULT_GATE_URL == "http://example.invalid/api/gate"
+        assert reloaded.DEFAULT_MERCHANT_URL == "http://example.invalid/api/merchant"
+    finally:
+        del os.environ["PACT_GATE_URL"]
+        del os.environ["PACT_MERCHANT_URL"]
+        importlib.reload(buyer.agent)

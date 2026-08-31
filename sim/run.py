@@ -154,7 +154,11 @@ def run_arm(
         client.post(f"{GATE}/v1/admin/ablate", json={"disabled": disabled})
 
     agent = BuyerAgent(
-        gate_mode=config["gate"], upsell_mode=config["upsell"], seed=seed
+        gate_url=GATE,
+        merchant_url=MERCHANT,
+        gate_mode=config["gate"],
+        upsell_mode=config["upsell"],
+        seed=seed,
     )
     try:
         manifest = agent.discover()
@@ -235,7 +239,7 @@ def _model_arm_a(
 
 def run_attacks() -> list[attacks.AttackResult]:
     personas = load_personas()
-    agent = BuyerAgent(seed=1)
+    agent = BuyerAgent(gate_url=GATE, merchant_url=MERCHANT, seed=1)
     try:
         manifest = agent.discover()
         with httpx.Client(timeout=10) as c:
@@ -248,7 +252,7 @@ def run_attacks() -> list[attacks.AttackResult]:
 
 
 def run_benign(count: int = 60) -> list[benign.BenignResult]:
-    agent = BuyerAgent(seed=2)
+    agent = BuyerAgent(gate_url=GATE, merchant_url=MERCHANT, seed=2)
     try:
         manifest = agent.discover()
         with httpx.Client(timeout=10) as c:
@@ -260,7 +264,7 @@ def run_benign(count: int = 60) -> list[benign.BenignResult]:
 
 def run_chaos() -> list[chaos.ChaosResult]:
     personas = load_personas()
-    agent = BuyerAgent(seed=3)
+    agent = BuyerAgent(gate_url=GATE, merchant_url=MERCHANT, seed=3)
     try:
         manifest = agent.discover()
         with httpx.Client(timeout=10) as c:
@@ -296,7 +300,7 @@ def run_ablation() -> dict[str, dict[str, str]]:
             reset(client)
             client.post(f"{GATE}/v1/admin/ablate", json={"disabled": disabled})
 
-            agent = BuyerAgent(seed=4)
+            agent = BuyerAgent(gate_url=GATE, merchant_url=MERCHANT, seed=4)
             try:
                 manifest = agent.discover()
                 results = attacks.run_all(

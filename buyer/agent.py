@@ -24,6 +24,7 @@ recovered revenue rather than lost sales.
 from __future__ import annotations
 
 import logging
+import os
 import random
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -36,6 +37,20 @@ from contracts.ids import new_id
 from contracts.money import Paise
 
 log = logging.getLogger("pact.buyer")
+
+#: Where the agent looks for the two services.
+#:
+#: From the environment, with the development ports as the fallback, because the
+#: alternative bit: these were hardcoded here while sim/run.py read
+#: PACT_GATE_URL and PACT_MERCHANT_URL for its own reset and ablate calls. The
+#: harness therefore reset the services it was configured for and then
+#: transacted against whatever was on 8000 and 8100. Against the development
+#: topology the two happen to coincide and it works; against the single-port
+#: build — the one that is actually deployed — it resets the right services and
+#: measures nothing. With both running it would reset one and measure the other,
+#: silently, and still print numbers.
+DEFAULT_GATE_URL = os.environ.get("PACT_GATE_URL", "http://localhost:8000")
+DEFAULT_MERCHANT_URL = os.environ.get("PACT_MERCHANT_URL", "http://localhost:8100")
 
 GateMode = Literal["off", "naive", "pact"]
 UpsellMode = Literal["off", "naive", "headroom"]
@@ -113,8 +128,8 @@ class BuyerAgent:
     def __init__(
         self,
         *,
-        gate_url: str = "http://localhost:8000",
-        merchant_url: str = "http://localhost:8100",
+        gate_url: str = DEFAULT_GATE_URL,
+        merchant_url: str = DEFAULT_MERCHANT_URL,
         gate_mode: GateMode = "pact",
         upsell_mode: UpsellMode = "headroom",
         seed: int = 0,
