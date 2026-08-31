@@ -116,6 +116,7 @@ Smoke-test any running instance, including a deployed one:
 
 ```bash
 python3 scripts/smoke.py --base http://localhost:8080      # stdlib only
+python3 scripts/load.py  --base http://localhost:8080      # ceiling + throughput
 cd console && npm run browser -- http://localhost:8080 shots
 ```
 
@@ -179,8 +180,14 @@ Added 2026-08-31, and all of it runs on every push rather than once by hand:
 - **Neither deployment target has been deployed.** `fly.toml` and `render.yaml`
   are written and unexecuted; there are no Fly or Render credentials here. The
   image they point at is not unexecuted.
-- **Nothing has been run under load.** One container, one worker, and no
-  concurrency test above the 20-thread race in `tests/test_race.py`.
+- **Load has now been run, and the limit is known rather than guessed.**
+  `scripts/load.py` at 32 concurrent buyers: 200/200 purchases, 53/s, p50 396
+  ms, p99 1.6 s. At 64 it saturates — p50 20 s, a third complete — and it
+  degrades by *refusing* rather than by settling without live authority. The
+  ceiling holds throughout: twenty buyers racing one mandate spend ₹13,564.10
+  against a ceiling of ₹13,564.10, exact in both directions.
+  What has **not** been measured: a long soak, memory over hours, or behaviour
+  when the volume fills.
 
 ---
 
@@ -259,6 +266,7 @@ reading code. Each is listed with what would have gone wrong on stage.
 | The simulation harness measured a different system than it reset | `BuyerAgent` hardcoded the dev ports while `sim/run.py` read `PACT_GATE_URL` for its reset and ablate calls. With a dev topology *and* a deployed instance both up, it would reset one, measure the other, and still print numbers. |
 | The cross-check was itself the wrong number | It compared a three-seed harness total against a merchant counter that is reset each seed, got a ratio near three, and shipped "the harness has a bug" in `results.md` for the life of the project. Neither was wrong. Fixed, it agrees to the paise. |
 | A missing webhook signature passed verification | Found by mutating `compare_digest` to return True on an empty signature — the whole suite still passed. Nothing covered a delivery with no `X-Razorpay-Signature` while a secret was configured: the cheapest possible forgery. |
+| A gate timeout was reported as `TOKEN_INVALID` | The merchant refuses the order, which is right. But that code means "that settlement token is not valid" and reads as forgery, so a load spike put 97 of them in the audit trail in one run — pointing whoever read it at an attacker who did not exist. Now `GATE_UNAVAILABLE`, which still blocks. |
 
 ---
 
@@ -313,8 +321,8 @@ chaos, ablation, the sweep. Only the timestamp and the cross-check line moved.
    `python3 scripts/smoke.py --base https://… --skip-beats` against the result.
    Do not run the beats against a public instance without meaning to.
 5. Rehearsals and the backup video. Not started.
-6. Load. One container, one worker, and nothing has run concurrency above the 20
-   threads in `tests/test_race.py`.
+6. A soak. `scripts/load.py` covers a burst; nothing has watched memory or the
+   volume over hours.
 
 Closed since this file was written: the container image is built and driven by
 CI on every push and published to GHCR; the console has been opened in a browser

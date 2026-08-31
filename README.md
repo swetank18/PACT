@@ -249,6 +249,12 @@ reconciliation poller resolves anything pending and older than 30 seconds.
   rather than as a pass.
 - `fly.toml` and `render.yaml` are written and unexecuted. No credentials. The
   image they deploy is not unexecuted.
+- **One instance saturates at somewhere between 32 and 64 concurrent buyers.**
+  At 32: 200/200 purchases complete, 53/s, p50 396 ms. At 64: p50 20 s and a
+  third complete. It degrades by refusing to settle rather than by settling
+  without live authority, which is the right direction, but it is one worker on
+  SQLite and scaling it means Postgres and a queue. `scripts/load.py` measures
+  both, and asserts the ceiling holds while it does.
 - One merchant, one catalog.
 - The intent auditor is probabilistic, which is exactly why it steps up rather
   than blocking. The eight deterministic checks plus quote binding are the
