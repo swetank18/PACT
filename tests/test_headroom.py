@@ -8,6 +8,10 @@ envelope's values would pass right up until someone adds a convenient field.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from contracts.crypto import verify
 from contracts.schemas import Headroom, QuoteItemRequest
 
@@ -132,3 +136,38 @@ def test_an_out_of_scope_merchant_is_told_so(gate, make_mandate):
 
 def test_unknown_mandate_returns_nothing(gate):
     assert gate.headroom_service.for_mandate("mnd_NOPE") is None
+
+
+def test_the_gate_refuses_a_signing_key_that_is_public(tmp_path):
+    """
+    `fixtures/keys/gate_signing_key.hex` was committed and is fetchable from the
+    repository's history at HTTP 200. A clone made after it was untracked has no
+    such file and the gate generates its own; a clone made before still has it
+    on disk and would boot with it silently.
+
+    That is the case worth failing loudly for. An envelope signed with a key
+    anyone can download proves nothing, and the entire point of the envelope is
+    that a merchant can trust it without asking the gate.
+    """
+    from core.ledger.headroom import COMPROMISED_PUBLIC_KEYS, load_or_create_gate_key
+
+    compromised = Path("fixtures/keys/gate_signing_key.hex")
+    if not compromised.exists():
+        pytest.skip("this clone does not carry the compromised key, which is the point")
+
+    with pytest.raises(RuntimeError, match="public repository"):
+        load_or_create_gate_key(str(compromised))
+
+    assert COMPROMISED_PUBLIC_KEYS, "the denylist must not be silently emptied"
+
+
+def test_a_freshly_generated_key_is_accepted(tmp_path):
+    """The check must recognise one key, not distrust every key."""
+    from core.ledger.headroom import load_or_create_gate_key
+
+    path = tmp_path / "gate_signing_key.hex"
+    first = load_or_create_gate_key(str(path))
+    assert path.exists()
+    # And it is stable across restarts, or every envelope already issued breaks.
+    second = load_or_create_gate_key(str(path))
+    assert first.public_key().public_bytes_raw() == second.public_key().public_bytes_raw()

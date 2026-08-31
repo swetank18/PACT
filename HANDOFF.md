@@ -35,17 +35,36 @@ The documents themselves live in `_private/` locally and are gitignored. They
 are the source of the three-lane structure and the frozen contract. **Do not
 commit them, and do not quote them into files that get committed.**
 
-**A second thing needs the same purge.** `fixtures/keys/gate_signing_key.hex`
-was committed and sat in a public repo for 25 commits. It is the gate's own
-Ed25519 signing key — the one that signs headroom envelopes a merchant then
-trusts without asking. It is a demo key, it is regenerated on first boot when
-absent, and it should not have been there: the loader chmods it `0600`, which
-buys nothing when the same bytes are in the history.
+**A second thing needs the same purge, and it is worse than an orphan.**
+`fixtures/keys/gate_signing_key.hex` — the gate's own Ed25519 signing key, the
+one that signs the headroom envelopes a merchant is supposed to trust without
+asking — was committed at `00cc29a` and untracked at `948c080`. That is 25
+commits on **`main`'s reachable history**, not in an orphan, so it is in every
+clone and every fork.
 
-Untracked and gitignored as of 2026-08-31. Removing it from `HEAD` does not
-remove it from history, so it goes into the same purge as the planning
-documents. Anyone deploying before that purge should treat the key as public and
-let the container generate a fresh one on its volume — which is what it does.
+Verified 2026-08-31: anonymous fetch of the key at `00cc29a` returns **200**.
+
+What it does and does not mean, precisely, because overstating this is as bad as
+missing it:
+
+- **It is not a live spend bypass.** Nothing in `merchant/` verifies an envelope
+  signature today; the merchant fetches headroom from the gate over HTTP and
+  trusts the transport. The `authorize` path re-derives every ceiling from the
+  ledger server side, so a forged envelope cannot move money.
+- **It voids the central claim anyway.** "A merchant can verify a signed
+  envelope it was handed" is the whole design, and it is false for as long as
+  the key is downloadable. Anyone can mint an envelope that verifies.
+- **Deployed instances are already clean.** `.dockerignore` excludes key
+  material, `PACT_GATE_KEY_PATH` points at the mounted volume, and the gate
+  generates its own on first boot.
+- **Stale clones were not.** A clone made before `948c080` still has the file,
+  and `DEFAULT_KEY_PATH` points straight at it — so it would boot with a public
+  key, silently. `core/ledger/headroom.py` now **refuses to start** on that
+  specific key, matched by the SHA-256 of its public half. Delete the file and
+  restart; the gate makes a new one.
+
+Removing it from `HEAD` does not remove it from history, so it goes into the
+same purge as the planning documents.
 
 ---
 

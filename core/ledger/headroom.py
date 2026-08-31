@@ -24,6 +24,7 @@ which is the dispute story, and it costs ten minutes.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from pathlib import Path
 
@@ -40,10 +41,37 @@ from core.mandate.store import MandateStore
 DEFAULT_KEY_PATH = "fixtures/keys/gate_signing_key.hex"
 
 
+#: SHA-256 of the *public* half of a signing key that was committed to a public
+#: repository and is therefore known to everyone. The private half is not here
+#: and must never be; a public-key fingerprint is enough to recognise it.
+#:
+#: A fresh clone cannot hit this — the file is untracked and the gate generates
+#: its own on first boot. A clone that predates that still has the compromised
+#: file on disk and would boot with it silently, which is the case this exists
+#: for. Refusing is not paranoia: an envelope signed with a key anyone can
+#: download proves nothing, and the whole point of the envelope is that a
+#: merchant can trust it without asking.
+COMPROMISED_PUBLIC_KEYS: frozenset[str] = frozenset(
+    {"1b12f696b6de17d0e9a50f8cda09e02038b513df2d37465dcec8b3a6a3487d90"}
+)
+
+
+def _fingerprint(key: Ed25519PrivateKey) -> str:
+    return hashlib.sha256(key.public_key().public_bytes_raw()).hexdigest()
+
+
 def load_or_create_gate_key(path: str | None = None) -> Ed25519PrivateKey:
     key_path = Path(path or os.environ.get("PACT_GATE_KEY_PATH", DEFAULT_KEY_PATH))
     if key_path.exists():
-        return private_key_from_seed(bytes.fromhex(key_path.read_text().strip()))
+        key = private_key_from_seed(bytes.fromhex(key_path.read_text().strip()))
+        if _fingerprint(key) in COMPROMISED_PUBLIC_KEYS:
+            raise RuntimeError(
+                f"{key_path} holds a signing key that was committed to a public "
+                "repository. Anyone can sign a headroom envelope with it, so a "
+                "merchant verifying one learns nothing. Delete the file and "
+                "restart — the gate will generate a new one. Refusing to start."
+            )
+        return key
 
     key = Ed25519PrivateKey.generate()
     key_path.parent.mkdir(parents=True, exist_ok=True)
