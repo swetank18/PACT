@@ -19,6 +19,7 @@ from typing import Protocol
 import httpx
 
 from contracts.money import Paise
+from contracts.reason_codes import ReasonCode
 from contracts.schemas import Headroom
 
 log = logging.getLogger("pact.merchant.gate")
@@ -61,8 +62,19 @@ class HttpGateClient(GateClient):
             body = r.json()
             return bool(body.get("ok")), str(body.get("reason_code")), body.get("decision_id")
         except httpx.HTTPError as exc:
+            # Fail closed — no order without a redeemed token — but say why
+            # truthfully. This used to return TOKEN_INVALID, which means "that
+            # token is not valid" and reads as a forgery. Under load the gate
+            # simply does not answer within the timeout, and a burst of
+            # TOKEN_INVALID in the audit trail sends someone hunting an attacker
+            # who does not exist. Found by scripts/load.py at 32 concurrent.
+            #
+            # Deliberately not retried. Redemption is single use and not
+            # idempotent: a retry after a timeout where the gate *did* redeem is
+            # exactly where a double spend gets introduced. Refusing and letting
+            # the buyer retry the whole purchase is the safe direction.
             log.error("token redemption failed: %s", exc)
-            return False, "TOKEN_INVALID", None
+            return False, str(ReasonCode.GATE_UNAVAILABLE), None
 
     def commit(self, decision_id: str) -> bool:
         try:

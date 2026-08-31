@@ -61,6 +61,11 @@ class ReasonCode(StrEnum):
     SAGA_ROLLED_BACK = "SAGA_ROLLED_BACK"
 
     # settlement token
+    #: The gate did not answer. Distinct from TOKEN_INVALID on purpose: a
+    #: forged token and an unreachable gate both refuse the order, and they are
+    #: completely different incidents. Reporting the first when the second
+    #: happened sends whoever reads the audit trail hunting an attacker.
+    GATE_UNAVAILABLE = "GATE_UNAVAILABLE"
     TOKEN_INVALID = "TOKEN_INVALID"
     TOKEN_ALREADY_USED = "TOKEN_ALREADY_USED"
     TOKEN_EXPIRED = "TOKEN_EXPIRED"
@@ -129,6 +134,7 @@ REASON_TEXT: dict[ReasonCode, str] = {
     ReasonCode.STOCK_UNAVAILABLE: "Out of stock",
     ReasonCode.RAIL_CAPTURE_FAILED: "The payment could not be captured",
     ReasonCode.SAGA_ROLLED_BACK: "The order was rolled back and the money returned",
+    ReasonCode.GATE_UNAVAILABLE: "The gate did not answer, so the order was not placed",
     ReasonCode.TOKEN_INVALID: "That settlement token is not valid",
     ReasonCode.TOKEN_ALREADY_USED: "That settlement token was already spent",
     ReasonCode.TOKEN_EXPIRED: "That settlement token has expired",

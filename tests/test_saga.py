@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from contracts.reason_codes import ReasonCode
+from contracts.reason_codes import ReasonCode, verdict_for
 from contracts.schemas import QuoteItemRequest
 from rails.razorpay.client import idempotency_key
 
@@ -234,6 +234,35 @@ def test_a_failed_capture_rolls_back_without_charging(bought, merchant, rail, ga
     assert after == before + q.total_paise
     # Stock must go back too, or a failed capture quietly destroys inventory.
     assert merchant.inventory.level("FUR-LMP-01") == 20
+
+
+# ----------------------------------------------- when the gate does not answer ---
+
+
+def test_an_unreachable_gate_is_not_reported_as_an_invalid_token():
+    """
+    Found by scripts/load.py at 32 concurrent buyers.
+
+    HttpGateClient.redeem catches any transport failure and refuses the order,
+    which is right — no order without a redeemed token. It reported
+    TOKEN_INVALID, which is not right. That code means "that settlement token is
+    not valid" and reads as a forgery, so a burst of them in the audit trail
+    after a load spike sends someone hunting an attacker who does not exist.
+
+    Failing closed and telling the truth about why are not in tension.
+    """
+    from merchant.gate_client import HttpGateClient
+
+    # A port nothing is listening on. Short timeout so the test is not slow.
+    client = HttpGateClient(base_url="http://127.0.0.1:9", timeout=0.25)
+
+    ok, code, decision_id = client.redeem("stl_anything", 100)
+
+    assert ok is False, "an unreachable gate must never approve a settlement"
+    assert code == ReasonCode.GATE_UNAVAILABLE.value
+    assert decision_id is None
+    # And it still blocks, because a gate that cannot be reached cannot approve.
+    assert verdict_for(ReasonCode.GATE_UNAVAILABLE) == "BLOCK"
 
 
 # --------------------------------------------------- the trail is machine readable ---
