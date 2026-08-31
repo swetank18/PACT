@@ -103,6 +103,7 @@ const steps: SagaStep[] = [
     action: "fulfil",
     outcome: "FAIL",
     detail: "out of stock, concurrent sale",
+    reason_code: "STOCK_UNAVAILABLE",
     at: "2026-08-30T14:22:09Z",
   },
 ];
@@ -166,6 +167,18 @@ describe("components render without throwing", () => {
     expect(renderToString(<SagaTimeline steps={steps} animate={false} />)).toContain(
       "out of stock, concurrent sale",
     );
+  });
+
+  it("a failing saga row shows the reason code, not only the prose", () => {
+    // The prose is presentation and may be reworded at any time. The code is
+    // the contract, and it is what makes the trail on screen look like a
+    // machine-readable record rather than a log file.
+    const html = renderToString(<SagaTimeline steps={steps} animate={false} />);
+    expect(html).toContain("STOCK_UNAVAILABLE");
+
+    // And a successful row stays quiet, or the code stops meaning anything.
+    const okOnly = renderToString(<SagaTimeline steps={[steps[0]]} animate={false} />);
+    expect(okOnly).not.toContain("STOCK_UNAVAILABLE");
   });
 
   it("checkout cards carry the sentences the pitch depends on", () => {

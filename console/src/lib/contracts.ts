@@ -173,7 +173,13 @@ export type SagaStep = {
   action: string;
   outcome: "OK" | "FAIL" | "PENDING" | string;
   detail: string;
-  /** Razorpay id where one exists: pay_, rfnd_, order_. */
+  /**
+   * Why a step failed, in the contract's vocabulary. `detail` beside it is
+   * prose and may be reworded freely; this is the half that is safe to branch
+   * on. Absent on steps that succeeded.
+   */
+  reason_code?: ReasonCode | null;
+  /** The rail's id where one exists: pay_, rfnd_, order_. */
   ref?: string | null;
   at: string;
 };

@@ -72,6 +72,20 @@
   font-size: var(--fs-sm);
 }
 
+/* Only failing rows carry one, so it does not need to compete with the prose
+   beside it — it needs to be legible from the back of a room. */
+.code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--veto);
+  border: 1px solid var(--veto-wash);
+  background: var(--veto-wash);
+  border-radius: 3px;
+  padding: 0 4px;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
 .outcome {
   text-align: center;
   font-weight: 700;

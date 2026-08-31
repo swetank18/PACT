@@ -16,12 +16,15 @@ key. The check is an INSERT, and the IntegrityError *is* the replay. A
 
 from __future__ import annotations
 
+import logging
 import os
 import sqlite3
 import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
+
+log = logging.getLogger("pact.db")
 
 DEFAULT_URL = "sqlite:///./pact.db"
 
@@ -127,6 +130,10 @@ CREATE TABLE IF NOT EXISTS saga_steps (
   detail_json TEXT NOT NULL,
   ref         TEXT,
   at          TEXT NOT NULL,
+  -- The contract's name for a failure, alongside the prose in detail_json.
+  -- Nullable: most steps succeed, and added by ADD_COLUMNS below rather than
+  -- only here, so a volume written by an earlier image gains it on next boot.
+  reason_code TEXT,
   PRIMARY KEY (order_id, seq)
 );
 
@@ -157,6 +164,13 @@ CREATE TABLE IF NOT EXISTS counters (
   value INTEGER NOT NULL DEFAULT 0
 );
 """
+
+#: Columns added after a table shipped. `CREATE TABLE IF NOT EXISTS` will not
+#: add them to a database that already exists, so they are applied separately on
+#: every boot, guarded by PRAGMA table_info. Additive and nullable only.
+ADD_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("saga_steps", "reason_code", "TEXT"),
+)
 
 #: Wiped by POST /v1/admin/reset, in dependency order.
 RESETTABLE_TABLES = (
@@ -241,7 +255,29 @@ class Database:
         return c
 
     def migrate(self) -> None:
+        """
+        The schema, then the additive column migrations.
+
+        `CREATE TABLE IF NOT EXISTS` does nothing to a table that already
+        exists, so a column added to SCHEMA never reaches a database created by
+        an earlier build. That was harmless while every database was a throwaway
+        demo file. It stopped being harmless the moment the deployment grew a
+        named volume that survives a `docker pull`: the new code would write to a
+        column the old file does not have, and every saga step would fail on an
+        instance that had already taken a real order.
+
+        Additive only, and idempotent. Anything that needs to drop or retype a
+        column needs a real migration tool, and saying so here is cheaper than
+        discovering it later.
+        """
         self.conn.executescript(SCHEMA)
+        for table, column, decl in ADD_COLUMNS:
+            existing = {
+                r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")
+            }
+            if column not in existing:
+                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+                log.info("migrated: %s.%s added", table, column)
 
     @contextmanager
     def immediate_tx(self) -> Iterator[sqlite3.Connection]:

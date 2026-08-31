@@ -194,10 +194,10 @@ reconciliation poller resolves anything pending and older than 30 seconds.
 - The intent auditor is probabilistic, which is exactly why it steps up rather
   than blocking. The eight deterministic checks plus quote binding are the
   system; the auditor is the ninth and it is cuttable.
-- `RAZORPAY_CAPTURE_FAILED` is in the frozen reason code enum, so a vendor name
-  is baked into a contract two other lanes assert on. It should have been
-  `RAIL_CAPTURE_FAILED`. Allowlisted in the layering test rather than hidden,
-  and worth fixing between events.
+- The saga's three settlement-side reason codes were declared in the enum and
+  emitted by nothing for three releases — the trail said what happened in
+  English and the contract said nothing. Fixed, and `tests/test_invariants.py`
+  now fails on any code the engine never raises.
 - The regulatory direction this aims at is press reporting, not a published
   specification. The delegation shape it borrows from does exist today.
 - The headroom endpoint is worth nothing unless buyer agents call it. That is a

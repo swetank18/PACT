@@ -50,12 +50,12 @@ def test_nothing_in_core_imports_a_rail():
     assert not offenders, "core must not import rails:\n  " + "\n  ".join(offenders)
 
 
-#: `RAZORPAY_CAPTURE_FAILED` is in the frozen reason code enum, so a vendor name
-#: is baked into the contract that Lane B and Lane C both assert on. It is a
-#: wart: the code should have been RAIL_CAPTURE_FAILED. It is not worth an
-#: unfreeze mid-build, so it is allowlisted here rather than quietly ignored —
-#: and named as a thing to fix between events.
-KNOWN_VENDOR_NAMES_IN_CONTRACT = {"RAZORPAY_CAPTURE_FAILED"}
+#: The contract used to carry `RAZORPAY_CAPTURE_FAILED`, which baked a vendor
+#: name into the enum Lane B asserts on and Lane C colours by. It is now
+#: `RAIL_CAPTURE_FAILED` and this set is empty. It stays as a set rather than
+#: being deleted so that adding to it is a visible, deliberate act with a
+#: comment attached, instead of a quiet edit to an assertion.
+KNOWN_VENDOR_NAMES_IN_CONTRACT: set[str] = set()
 
 VENDORS = ("razorpay", "stripe", "adyen")
 
@@ -110,14 +110,50 @@ def test_no_vendor_name_appears_in_rail_agnostic_code():
     assert not offenders, "\n  ".join(["vendor coupling in the rail-agnostic layer:"] + offenders)
 
 
-def test_the_known_contract_wart_is_still_the_only_one():
+def test_no_reason_code_names_a_vendor():
     """
-    If a second vendor-named reason code ever appears, that is a contract
-    problem and someone should have to come here and think about it.
+    A reason code is the thing two other lanes branch on and the audience reads
+    off a screen. A vendor name in one leaks the rail into the contract, and it
+    is the kind of leak nobody can undo later without breaking both consumers.
     """
     named = {c.value for c in ReasonCode if any(v in c.value.lower() for v in VENDORS)}
     assert named == KNOWN_VENDOR_NAMES_IN_CONTRACT, (
-        f"vendor-named reason codes changed: {named}"
+        f"vendor-named reason codes: {sorted(named)}"
+    )
+
+
+#: Codes the engine defines but does not itself raise. Empty, and it should stay
+#: that way — see the test below for why.
+UNPRODUCED_CODES: set[str] = set()
+
+
+def test_every_reason_code_is_actually_produced():
+    """
+    A code nothing emits is worse than a missing code.
+
+    Lane C has a branch for every code, Lane B asserts on them, and the audit
+    trail is the artefact the whole trust story rests on. A code that only
+    exists in the enum is a branch that has never rendered and an assertion that
+    can never fire — and it hides a real gap: for three releases STOCK_UNAVAILABLE,
+    the capture failure and SAGA_ROLLED_BACK were declared here while the saga
+    wrote English prose into `detail` and no code at all. The trail said what
+    happened in a sentence, and the contract said nothing.
+    """
+    produced: set[str] = set()
+    for directory in ("core", "merchant", "rails"):
+        for path in (REPO / directory).rglob("*.py"):
+            # _executable_source returns tokens separated by spaces, so an
+            # attribute access arrives as "ReasonCode . CEILING_TOTAL". Collapse
+            # the whitespace before looking for it.
+            source = re.sub(r"\s+", "", _executable_source(path))
+            for code in ReasonCode:
+                if f"ReasonCode.{code.name}" in source:
+                    produced.add(code.value)
+
+    missing = {c.value for c in ReasonCode} - produced - {ReasonCode.OK.value}
+    assert missing == UNPRODUCED_CODES, (
+        "reason codes declared but never emitted by the engine: "
+        f"{sorted(missing - UNPRODUCED_CODES)}"
     )
 
 

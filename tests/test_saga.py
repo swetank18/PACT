@@ -236,6 +236,55 @@ def test_a_failed_capture_rolls_back_without_charging(bought, merchant, rail, ga
     assert merchant.inventory.level("FUR-LMP-01") == 20
 
 
+# --------------------------------------------------- the trail is machine readable ---
+
+
+def test_the_audit_trail_carries_reason_codes_not_only_prose(bought, merchant, rail):
+    """
+    A rollback must say why in the contract's vocabulary, not only in English.
+
+    `detail` is prose and may be reworded at any time — it is presentation. The
+    reason code is what Lane B asserts on and what Lane C colours by. For three
+    releases the saga wrote a sentence into `detail` and no code at all, so the
+    three settlement-side codes existed in the enum and were emitted by nothing:
+    a console branch that had never rendered and an assertion that could never
+    fire.
+    """
+    mandate, q, decision = bought
+    rail.failures.capture_fails = True
+
+    result = merchant.saga.run(
+        quote=q, mandate_id=mandate.mandate_id, decision_id=decision.decision_id
+    )
+    steps = merchant.audit.list_steps(result.order_id)
+
+    failed = [s for s in steps if s["outcome"] == "FAIL"]
+    assert failed, "a failed capture produced no failing step"
+    assert all(s["reason_code"] for s in failed), (
+        "a failing step with no reason code: " + repr(failed)
+    )
+    assert ReasonCode.RAIL_CAPTURE_FAILED.value in {s["reason_code"] for s in failed}
+
+    # And the successful ones stay quiet. A code on every row is noise, and it
+    # would make "has a reason code" useless as a filter.
+    assert all(s["reason_code"] is None for s in steps if s["outcome"] == "OK")
+
+
+def test_a_stockout_rollback_names_the_stockout(bought, merchant):
+    mandate, q, decision = bought
+    merchant.inventory.force_stockout("FUR-LMP-01")
+
+    result = merchant.saga.run(
+        quote=q, mandate_id=mandate.mandate_id, decision_id=decision.decision_id
+    )
+    codes = {
+        s["reason_code"] for s in merchant.audit.list_steps(result.order_id)
+        if s["reason_code"]
+    }
+    assert ReasonCode.STOCK_UNAVAILABLE.value in codes
+    assert ReasonCode.SAGA_ROLLED_BACK.value in codes
+
+
 # ------------------------------------------------------------ idempotency ---
 
 

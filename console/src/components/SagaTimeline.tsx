@@ -118,6 +118,12 @@ export function SagaTimeline({
             <span className={s.dot} />
             <span className={s.state}>{step.state}</span>
             <span className={s.detail}>
+              {step.reason_code && (
+                // Shown for the same reason the gate trace shows codes rather
+                // than sentences: the audience is being asked to believe there
+                // is a contract underneath, and prose alone does not show one.
+                <span className={s.code}>{step.reason_code}</span>
+              )}
               {step.detail}
               {step.ref && <span className={s.ref}> {step.ref}</span>}
             </span>

@@ -19,6 +19,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
+from contracts.reason_codes import ReasonCode
 from contracts.schemas import Decision, SagaStep, utcnow
 from core.db import Database
 
@@ -148,6 +149,7 @@ class AuditStore:
         outcome: str,
         detail: str = "",
         ref: str | None = None,
+        reason_code: ReasonCode | None = None,
     ) -> SagaStep:
         """
         Append the next step. The sequence number is allocated inside the write
@@ -164,10 +166,12 @@ class AuditStore:
             conn.execute(
                 """
                 INSERT INTO saga_steps
-                    (order_id, seq, state, action, outcome, detail_json, ref, at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (order_id, seq, state, action, outcome, detail_json, ref, at,
+                     reason_code)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (order_id, seq, state, action, outcome, json.dumps(detail), ref, at),
+                (order_id, seq, state, action, outcome, json.dumps(detail), ref, at,
+                 str(reason_code) if reason_code else None),
             )
 
         step = SagaStep(
@@ -179,6 +183,7 @@ class AuditStore:
             detail=detail,
             ref=ref,
             at=at,
+            reason_code=reason_code,
         )
         self.bus.publish("saga_step", step.model_dump())
         return step
@@ -186,8 +191,8 @@ class AuditStore:
     def list_steps(self, order_id: str) -> list[dict]:
         with self.db.read_tx() as conn:
             rows = conn.execute(
-                "SELECT order_id, seq, state, action, outcome, detail_json, ref, at "
-                "FROM saga_steps WHERE order_id = ? ORDER BY seq",
+                "SELECT order_id, seq, state, action, outcome, detail_json, ref, at, "
+                "reason_code FROM saga_steps WHERE order_id = ? ORDER BY seq",
                 (order_id,),
             ).fetchall()
         return [
@@ -200,6 +205,7 @@ class AuditStore:
                 "detail": json.loads(r["detail_json"]),
                 "ref": r["ref"],
                 "at": r["at"],
+                "reason_code": r["reason_code"],
             }
             for r in rows
         ]

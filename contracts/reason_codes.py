@@ -57,7 +57,7 @@ class ReasonCode(StrEnum):
 
     # settlement and fulfilment
     STOCK_UNAVAILABLE = "STOCK_UNAVAILABLE"
-    RAZORPAY_CAPTURE_FAILED = "RAZORPAY_CAPTURE_FAILED"
+    RAIL_CAPTURE_FAILED = "RAIL_CAPTURE_FAILED"
     SAGA_ROLLED_BACK = "SAGA_ROLLED_BACK"
 
     # settlement token
@@ -127,7 +127,7 @@ REASON_TEXT: dict[ReasonCode, str] = {
     ReasonCode.QUOTE_EXPIRED: "That quote has expired",
     ReasonCode.QUOTE_AMOUNT_MISMATCH: "The payment amount does not match the quote",
     ReasonCode.STOCK_UNAVAILABLE: "Out of stock",
-    ReasonCode.RAZORPAY_CAPTURE_FAILED: "The payment could not be captured",
+    ReasonCode.RAIL_CAPTURE_FAILED: "The payment could not be captured",
     ReasonCode.SAGA_ROLLED_BACK: "The order was rolled back and the money returned",
     ReasonCode.TOKEN_INVALID: "That settlement token is not valid",
     ReasonCode.TOKEN_ALREADY_USED: "That settlement token was already spent",

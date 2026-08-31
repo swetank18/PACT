@@ -35,6 +35,7 @@ import time
 from dataclasses import dataclass
 
 from contracts.ids import new_id
+from contracts.reason_codes import ReasonCode
 from contracts.money import Paise, rupees
 from contracts.schemas import Addon, Order, Quote, QuoteItemRequest, utcnow
 from core.audit.store import AuditStore
@@ -184,12 +185,21 @@ class SagaRunner:
         if self.step_delay_s:
             time.sleep(self.step_delay_s * multiplier)
 
-    def _step(self, order: Order, state: str, action: str, outcome: str, detail: str = "", ref: str | None = None) -> None:
+    def _step(
+        self,
+        order: Order,
+        state: str,
+        action: str,
+        outcome: str,
+        detail: str = "",
+        ref: str | None = None,
+        reason_code: ReasonCode | None = None,
+    ) -> None:
         order.state = state  # type: ignore[assignment]
         self.orders.put(order)
         self.audit.append_step(
             order_id=order.order_id, state=state, action=action, outcome=outcome,
-            detail=detail, ref=ref,
+            detail=detail, ref=ref, reason_code=reason_code,
         )
         self.audit.bus.publish("order", order.model_dump())
 
@@ -218,7 +228,9 @@ class SagaRunner:
             if not self.inventory.reserve(line.sku, line.qty):
                 for sku, qty in held:
                     self.inventory.restore(sku, qty)
-                self._step(order, "ROLLED_BACK", "reserve_stock", "FAIL", f"{line.sku} unavailable", line.sku)
+                self._step(order, "ROLLED_BACK", "reserve_stock", "FAIL",
+                           f"{line.sku} unavailable", line.sku,
+                           reason_code=ReasonCode.STOCK_UNAVAILABLE)
                 self.gate.release(decision_id)
                 return SagaResult(order.order_id, "ROLLED_BACK")
             held.append((line.sku, line.qty))
@@ -241,7 +253,8 @@ class SagaRunner:
             for sku, qty in held:
                 self.inventory.restore(sku, qty)
             self._step(order, "ROLLED_BACK", "rail.capture", "FAIL",
-                       capture.error_detail or "capture failed", capture.ref)
+                       capture.error_detail or "capture failed", capture.ref,
+                       reason_code=ReasonCode.RAIL_CAPTURE_FAILED)
             self.gate.release(decision_id)
             return SagaResult(order.order_id, "ROLLED_BACK")
 
@@ -260,7 +273,9 @@ class SagaRunner:
 
         for sku, qty in held:
             self.inventory.restore(sku, qty)
-        self._step(order, "FULFILMENT", "fulfil", "FAIL", "out of stock, concurrent sale", target.sku)
+        self._step(order, "FULFILMENT", "fulfil", "FAIL",
+                   "out of stock, concurrent sale", target.sku,
+                   reason_code=ReasonCode.STOCK_UNAVAILABLE)
         self._pause(1.5)
         return self.roll_back(order, decision_id, quote)
 
@@ -268,7 +283,11 @@ class SagaRunner:
 
     def roll_back(self, order: Order, decision_id: str, quote: Quote) -> SagaResult:
         """Compensations, in reverse order, each idempotent, each retried."""
-        self._step(order, "ROLLING_BACK", "compensate", "PENDING", "compensating in reverse")
+        # The code goes on the step that opens the rollback as well as the one
+        # that closes it, so anything filtering the trail by reason_code sees the
+        # whole compensation rather than only its last row.
+        self._step(order, "ROLLING_BACK", "compensate", "PENDING",
+                   "compensating in reverse", reason_code=ReasonCode.SAGA_ROLLED_BACK)
         self._pause(1.2)
 
         # Compensation 1: undo the capture.
@@ -294,7 +313,9 @@ class SagaRunner:
         # 4. The growth move: offer the nearest compliant alternative.
         alternative = self._find_alternative(quote, order.mandate_id)
         if alternative is None:
-            self._step(order, "ROLLED_BACK", "close", "OK", "no compliant alternative in stock")
+            self._step(order, "ROLLED_BACK", "close", "OK",
+                       "no compliant alternative in stock",
+                       reason_code=ReasonCode.SAGA_ROLLED_BACK)
             return SagaResult(order.order_id, "ROLLED_BACK")
 
         order.alternative = alternative

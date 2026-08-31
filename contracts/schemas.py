@@ -264,6 +264,11 @@ class SagaStep(Strict):
     action: str
     outcome: Literal["OK", "FAIL", "PENDING"]
     detail: str = ""
+    #: The contract's name for why a step failed, where one applies. `detail` is
+    #: prose and may be reworded freely; this is the thing Lane B asserts on and
+    #: Lane C colours by. Optional because most steps succeed, and a successful
+    #: step has no reason to give.
+    reason_code: ReasonCode | None = None
     #: The rail's id where one exists: pay_, rfnd_, order_.
     ref: str | None = None
     at: str
