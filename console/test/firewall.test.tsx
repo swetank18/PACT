@@ -401,6 +401,52 @@ describe("the firewall surface", () => {
     expect(JSON.parse(localStorage.getItem("pact.firewall.kill.v1")!).engaged).toBe(true);
   });
 
+  it("re-reads only the mandate a decision names, not every mandate it holds", async () => {
+    // At demo pace a full sweep per decision is invisible. At the ~7 decisions
+    // a second the soak sustains it is not: five mandates became ~35 headroom
+    // requests a second, almost all for mandates nothing had happened to.
+    const other: StoredMandate = {
+      ...STORED,
+      mandate: { ...MANDATE, mandate_id: "mnd_OTHER" },
+    };
+    localStorage.setItem("pact.firewall.mandates.v1", JSON.stringify([STORED, other]));
+    window.location.hash = "#/firewall";
+    await mount();
+    await flush();
+
+    const headroomCalls = () =>
+      (fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls
+        .map((c) => String(c[0]))
+        .filter((u) => u.includes("/headroom"));
+
+    const before = headroomCalls().length;
+
+    const gate = streams.find((s) => s.url.includes("/api/gate"))!;
+    await act(async () => {
+      // Ten decisions against one held mandate, and one against a mandate this
+      // device never signed.
+      for (let i = 0; i < 10; i++) {
+        gate.emit("decision", { ...BLOCKED, decision_id: `dec_${i}`, mandate_id: "mnd_TEST" });
+      }
+      gate.emit("decision", {
+        ...BLOCKED,
+        decision_id: "dec_ELSEWHERE",
+        mandate_id: "mnd_SOMEONE_ELSE",
+      });
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 600)); // past the coalescing window
+    });
+    await flush();
+
+    const added = headroomCalls().slice(before);
+    // One request, for the one mandate that actually moved.
+    expect(added.length).toBe(1);
+    expect(added[0]).toContain("mnd_TEST");
+    expect(added.some((u) => u.includes("mnd_OTHER"))).toBe(false);
+    expect(added.some((u) => u.includes("mnd_SOMEONE_ELSE"))).toBe(false);
+  });
+
   it("keeps the kill switch state across a reload", async () => {
     localStorage.setItem(
       "pact.firewall.kill.v1",

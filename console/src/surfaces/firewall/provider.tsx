@@ -36,7 +36,11 @@ import {
   type StoredMandate,
 } from "./state";
 
-const HEADROOM_POLL_MS = 8000;
+const HEADROOM_POLL_MS = 15000;
+
+/** Long enough to fold a burst of decisions into one request, short enough that
+ *  a budget bar still moves while you are looking at it. */
+const HEADROOM_COALESCE_MS = 400;
 
 export type MandateDraft = {
   intent: string;
@@ -122,35 +126,92 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
   // zero forever, so it is fetched once and then left alone.
   const settled = useRef<Set<string>>(new Set());
 
-  const refreshHeadroom = useCallback(async () => {
-    const wanted = mandates.filter(
-      (m) => !m.revoked_at || !settled.current.has(m.mandate.mandate_id),
-    );
-    if (wanted.length === 0) {
-      setReady(true);
-      return;
-    }
-    const results = await Promise.allSettled(
-      wanted.map((m) => gate.headroom(m.mandate.mandate_id)),
-    );
-    setHeadroom((prev) => {
-      const next = { ...prev };
-      results.forEach((r, i) => {
-        const id = wanted[i].mandate.mandate_id;
-        if (r.status === "fulfilled") {
+  /** Fetch a named set of envelopes. One request each, all in flight together. */
+  const fetchHeadroom = useCallback(
+    async (ids: string[]) => {
+      if (ids.length === 0) {
+        setReady(true);
+        return;
+      }
+      const results = await Promise.allSettled(ids.map((id) => gate.headroom(id)));
+      setHeadroom((prev) => {
+        const next = { ...prev };
+        results.forEach((r, i) => {
+          const id = ids[i];
+          if (r.status !== "fulfilled") return;
           next[id] = r.value;
-          if (wanted[i].revoked_at) settled.current.add(id);
-        }
+          // A revoked mandate reports zero forever. Fetch it once, then stop.
+          if (mandates.find((m) => m.mandate.mandate_id === id)?.revoked_at) {
+            settled.current.add(id);
+          }
+        });
+        return next;
       });
-      return next;
-    });
-    setReady(true);
-  }, [mandates]);
+      setReady(true);
+    },
+    [mandates],
+  );
+
+  /** Every mandate still worth asking about. */
+  const live = useCallback(
+    () =>
+      mandates
+        .filter((m) => !m.revoked_at || !settled.current.has(m.mandate.mandate_id))
+        .map((m) => m.mandate.mandate_id),
+    [mandates],
+  );
+
+  const refreshHeadroom = useCallback(() => fetchHeadroom(live()), [fetchHeadroom, live]);
 
   useEffect(() => {
     void refreshHeadroom();
-  }, [refreshHeadroom, mandateToken, decisions.length]);
+  }, [refreshHeadroom, mandateToken]);
 
+  /* ------------------------------------------------- refresh on a decision -- */
+
+  /**
+   * A decision changes what is left on exactly one mandate, so only that one is
+   * re-read — and only if this device holds it.
+   *
+   * This used to sweep every mandate whenever the decision list changed, which
+   * is fine at demo pace and is not fine under load: at the ~7 decisions/second
+   * the soak sustains, an open tab holding five mandates was issuing about
+   * thirty-five headroom requests a second, almost all of them for mandates
+   * nothing had happened to. Coalesced through a short window so a burst of
+   * decisions against one mandate is still one request.
+   */
+  const dirty = useRef<Set<string>>(new Set());
+  const seenDecisions = useRef<Set<string>>(new Set());
+  const flush = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const mine = new Set(live());
+    let queued = false;
+    for (const d of decisions) {
+      if (seenDecisions.current.has(d.decision_id)) continue;
+      seenDecisions.current.add(d.decision_id);
+      if (!mine.has(d.mandate_id)) continue;
+      dirty.current.add(d.mandate_id);
+      queued = true;
+    }
+    if (!queued || flush.current) return;
+
+    flush.current = setTimeout(() => {
+      flush.current = null;
+      const ids = [...dirty.current];
+      dirty.current.clear();
+      void fetchHeadroom(ids);
+    }, HEADROOM_COALESCE_MS);
+  }, [decisions, live, fetchHeadroom]);
+
+  useEffect(
+    () => () => {
+      if (flush.current) clearTimeout(flush.current);
+    },
+    [],
+  );
+
+  // The backstop, for spending this device did not see a decision for.
   useEffect(() => {
     const id = setInterval(() => void refreshHeadroom(), HEADROOM_POLL_MS);
     return () => clearInterval(id);
@@ -163,6 +224,8 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
     if (resetToken === 0) return;
     setHeadroom({});
     settled.current.clear();
+    seenDecisions.current.clear();
+    dirty.current.clear();
   }, [resetToken]);
 
   /* ---------------------------------------------------------- signing --- */
