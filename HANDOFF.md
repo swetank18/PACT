@@ -449,6 +449,11 @@ either file moved — which is the point of running it rather than assuming it:
 the changes were all meant to be outside the pricing, gate and upsell paths, and
 now that is measured rather than believed.
 
+Said plainly, because it is the stronger claim: a day of changes to the console,
+the container, the deployment path and the gate's error surface moved two lines,
+both timestamps. **The measured numbers are a property of the system, not of the
+day they were run on.**
+
 ---
 
 ## 7. Open work, roughly prioritised

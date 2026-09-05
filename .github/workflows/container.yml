@@ -19,9 +19,19 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Queued, not cancelled — unlike ci.yml, which should keep cancelling.
+#
+# This workflow does not only verify: it *publishes* `:latest`, and only after
+# the beats have run against that exact image. Cancelling a superseded run means
+# the image is never republished for that commit, and on 2026-09-05 eight pushes
+# in ninety minutes left `:latest` three commits stale for hours — which nearly
+# put a console with no firewall surface in it onto the deployed instance.
+#
+# A workflow whose output is an artifact wants to finish. Queueing is the price
+# of the artifact existing for each commit, and it is the cheaper mistake.
 concurrency:
   group: container-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build-run-and-publish:
