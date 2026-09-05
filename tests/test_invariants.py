@@ -378,3 +378,40 @@ def test_every_reason_code_reached_the_typescript_side():
     generated = (REPO / "contracts" / "generated.ts").read_text()
     for code in ReasonCode:
         assert f'"{code.value}"' in generated, f"{code.value} is missing from generated.ts"
+
+
+# --------------------------------------------------------------- the docs ---
+
+
+def test_every_relative_link_in_the_docs_resolves():
+    """
+    A link in a README that points at nothing.
+
+    Cheap to break and invisible until somebody follows it — `docs/RUNBOOK.md`
+    shipped pointing at `eval/results.md`, which is one directory deeper than
+    that. The documentation here carries the claims and the reading order, so a
+    dead link is the reader losing the thread at exactly the moment they went
+    looking for evidence.
+
+    Anchors are stripped rather than checked: a heading that moves is a much
+    smaller problem than a file that is not there, and checking them would mean
+    parsing every heading in every file to a slug, which is a second thing to
+    get wrong.
+    """
+    import re
+
+    skip = {".git", ".venv", "node_modules", "dist", "_private", "__pycache__"}
+    link = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+
+    dead: list[str] = []
+    for path in REPO.rglob("*.md"):
+        if any(part in skip for part in path.parts):
+            continue
+        for target in link.findall(path.read_text()):
+            if target.startswith(("http://", "https://", "mailto:", "#")):
+                continue
+            resolved = (path.parent / target.split("#")[0]).resolve()
+            if not resolved.exists():
+                dead.append(f"{path.relative_to(REPO)} -> {target}")
+
+    assert not dead, "dead links: " + ", ".join(dead)
