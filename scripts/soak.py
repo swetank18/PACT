@@ -714,19 +714,28 @@ def report(
 
     # ------------------------------------------------------------ volume ---
     sizes = [s.db_bytes for s in warm if s.db_bytes is not None]
-    if sizes and tally.settled:
+    # Orders settled *in the same window* the bytes were measured over, not all
+    # of them. Dividing post-warm-up growth by every order the run ever settled
+    # understates the rate by whatever fraction of the run the warm-up was —
+    # eight percent over two hours, and three-fold over fifteen minutes, which
+    # is how this was found: a control run reported 1,961 bytes an order against
+    # the two-hour run's 5,804, for the same code doing the same work.
+    orders_in_window = sum(s.settled for s in warm[1:])
+    if sizes and orders_in_window:
         grown = sizes[-1] - sizes[0]
-        per_order = grown / max(tally.settled, 1)
+        per_order = grown / orders_in_window
         print(f"     database {sizes[0] / 1_048_576:.1f} → {sizes[-1] / 1_048_576:.1f} MB, "
               f"peak {max(sizes) / 1_048_576:.1f} MB "
               f"({per_order:+.0f} bytes per order)")
         if per_order > 0:
             room = args.volume_mb * 1_048_576 - sizes[-1]
             orders = room / per_order
+            per_hour = tally.settled / (wall / 3600)
             print(f"     a {args.volume_mb:.0f} MB volume holds "
                   f"{orders:,.0f} more orders at this rate "
-                  f"({orders / max(tally.settled / (wall / 3600), 1):,.0f} hours "
-                  "at the rate this ran)")
+                  f"({orders / max(per_hour, 1):,.0f} hours at the "
+                  f"{per_hour / 3600:.1f}/s this ran, "
+                  f"{per_order * per_hour / 1_048_576:.0f} MB an hour)")
         else:
             print("     the database did not grow across the run")
 
