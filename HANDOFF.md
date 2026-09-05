@@ -125,7 +125,7 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **184 Python tests, 53 console
+~11k lines of Python, ~10k of TypeScript. **186 Python tests, 55 console
 tests**, all green, plus two GitHub Actions workflows that build the container
 image and drive the six demo beats and every console surface against it on
 every push.

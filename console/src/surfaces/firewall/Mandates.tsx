@@ -240,7 +240,20 @@ export function Mandates({
                           <HealthDot health={health} />
                         </td>
                         <td>
-                          <div style={{ fontWeight: 600 }}>{m.mandate.intent}</div>
+                          <div style={{ fontWeight: 600 }}>
+                            {m.registered && m.registered !== "ok" && (
+                              <span
+                                title={
+                                  m.registered === "rejected"
+                                    ? "The gate refused this mandate — payments against it are refused"
+                                    : "The gate never received this mandate — payments against it are refused"
+                                }
+                              >
+                                ⚠️{" "}
+                              </span>
+                            )}
+                            {m.mandate.intent}
+                          </div>
                           <div className={`${f.mono} ${f.cardSub}`}>{m.mandate.mandate_id}</div>
                         </td>
                         <td>{m.mandate.delegate.agent_id}</td>
@@ -294,10 +307,11 @@ function MandateDetail({
   onRevoke: () => void;
   onOpenDecision: (d: Decision) => void;
 }) {
-  const { headroom } = useFirewall();
+  const { headroom, reregister } = useFirewall();
   const { decisions } = useLive();
   const [confirming, setConfirming] = useState(false);
   const [showRaw, setShowRaw] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   const id = sm.mandate.mandate_id;
   const raw = headroom[id];
@@ -345,6 +359,33 @@ function MandateDetail({
           )}
         </div>
       </div>
+
+      {sm.registered && sm.registered !== "ok" && (
+        <div className={f.warn} style={{ marginTop: 4 }}>
+          <span>⚠️</span>
+          <span style={{ flex: 1 }}>
+            The gate {sm.registered === "rejected" ? "refused this mandate" : "never received this mandate"}
+            , so every payment made against it is refused. It is signed and held here; hand it over
+            again.
+            {sm.register_detail && (
+              <>
+                {" "}
+                <span className={f.mono}>{sm.register_detail.slice(0, 140)}</span>
+              </>
+            )}
+          </span>
+          <button
+            className={`${f.btn} ${f.small}`}
+            disabled={retrying}
+            onClick={() => {
+              setRetrying(true);
+              void reregister(id).finally(() => setRetrying(false));
+            }}
+          >
+            {retrying ? "Handing over…" : "Hand it over again"}
+          </button>
+        </div>
+      )}
 
       <div className={f.detailGrid}>
         <div className={f.card}>

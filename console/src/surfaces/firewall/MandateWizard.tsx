@@ -16,7 +16,7 @@ import { merchant as merchantApi } from "../../lib/api";
 import type { Decision } from "../../lib/contracts";
 import { inr, nowRfc3339, rupeesToPaise, stamp } from "../../lib/money";
 import { useFirewall, type MandateDraft } from "./provider";
-import { DEFAULT_AGENT_ID, TEMPLATES, type Template } from "./state";
+import { DEFAULT_AGENT_ID, TEMPLATES, type StoredMandate, type Template } from "./state";
 import f from "./firewall.module.css";
 
 const STEPS = ["Intent", "Merchants", "Spend caps", "Time window", "Review & sign"];
@@ -99,7 +99,7 @@ export function MandateWizard({
 
   const [signing, setSigning] = useState<"idle" | "signing" | "done">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [issued, setIssued] = useState<string | null>(null);
+  const [issued, setIssued] = useState<StoredMandate | null>(null);
 
   // The merchant publishes what it sells. Ask, rather than shipping a list
   // that can drift from the catalog into mandates that can never be used.
@@ -176,7 +176,7 @@ export function MandateWizard({
       const stored = await sign(draft);
       if (t) noteTemplateUse(t.id);
       if (asTemplate) noteTemplateUse(`custom:${stored.mandate.mandate_id}`);
-      setIssued(stored.mandate.mandate_id);
+      setIssued(stored);
       setSigning("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -567,11 +567,28 @@ export function MandateWizard({
                 </div>
               )}
 
-              {signing === "done" && issued && (
+              {/* Signed and registered are two different claims, and only one
+                  of them is worth anything to the agent. */}
+              {signing === "done" && issued && issued.registered === "ok" && (
                 <div className={f.note} style={{ marginTop: 16 }}>
                   <span>✅</span>
                   <span>
-                    Signed and registered. Mandate <span className={f.mono}>{issued}</span>
+                    Signed on this device and accepted by the gate. Mandate{" "}
+                    <span className={f.mono}>{issued.mandate.mandate_id}</span>
+                  </span>
+                </div>
+              )}
+
+              {signing === "done" && issued && issued.registered !== "ok" && (
+                <div className={f.warn} style={{ marginTop: 16 }}>
+                  <span>⚠️</span>
+                  <span>
+                    Signed on this device, but{" "}
+                    {issued.registered === "rejected"
+                      ? "the gate refused it"
+                      : "the gate did not answer"}
+                    . Until it is accepted, every payment against this mandate is refused. It is
+                    saved here — hand it over again from the mandate's own page.
                   </span>
                 </div>
               )}
@@ -603,7 +620,10 @@ export function MandateWizard({
               Next →
             </button>
           ) : signing === "done" && issued ? (
-            <button className={`${f.btn} ${f.btnPrimary} ${f.btnBig}`} onClick={() => onDone(issued)}>
+            <button
+              className={`${f.btn} ${f.btnPrimary} ${f.btnBig}`}
+              onClick={() => onDone(issued.mandate.mandate_id)}
+            >
               View mandate →
             </button>
           ) : (

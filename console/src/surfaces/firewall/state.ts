@@ -64,6 +64,17 @@ export type StoredMandate = {
   /** The mandate this one was re-issued from after a pause. */
   replaces?: string | null;
   template_id?: string | null;
+  /**
+   * What the gate said when this device handed it over.
+   *
+   * `ok` it accepted. `rejected` it stored but will not honour — a signature it
+   * could not verify. `unreachable` it never answered. The last two both mean
+   * the agent is holding a mandate that will not authorise anything, and the
+   * screen has to say so: a mandate signed on this device is not the same as a
+   * mandate the gate will act on.
+   */
+  registered?: "ok" | "rejected" | "unreachable" | null;
+  register_detail?: string | null;
 };
 
 export type StoredAgent = {

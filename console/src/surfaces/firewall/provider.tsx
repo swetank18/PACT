@@ -73,6 +73,8 @@ type Ctx = {
   releaseKill: () => Promise<{ reissued: number; failed: number }>;
   addAgent: (name: string, agentId: string) => StoredAgent;
   setAgentStatus: (agentId: string, status: StoredAgent["status"]) => Promise<void>;
+  /** Hand a mandate to the gate again, for one it never accepted. */
+  reregister: (mandateId: string) => Promise<StoredMandate["registered"]>;
   setPrefs: (next: Prefs) => void;
   noteTemplateUse: (id: string) => void;
   dismiss: (id: string) => void;
@@ -80,6 +82,25 @@ type Ctx = {
 };
 
 const C = createContext<Ctx | null>(null);
+
+/**
+ * Hand a mandate to the gate and report what came back.
+ *
+ * Three outcomes, not two. The gate answers 200 with `accepted: false` for a
+ * signature it could not verify — it stores the mandate so the audit trail
+ * shows the attempt and so a later authorize can answer MANDATE_SIG_INVALID
+ * rather than MANDATE_NOT_FOUND. Treating that as success would put a mandate
+ * on screen as live that refuses every payment made against it.
+ */
+async function register(mandate: Mandate): Promise<[StoredMandate["registered"], string | null]> {
+  try {
+    const res = await gate.registerMandate(mandate);
+    if (res?.accepted) return ["ok", null];
+    return ["rejected", res?.reason_code ?? "the gate did not accept it"];
+  } catch (e) {
+    return ["unreachable", e instanceof Error ? e.message : String(e)];
+  }
+}
 
 export function FirewallProvider({ children }: { children: ReactNode }) {
   const { decisions, mandateToken, resetToken } = useLive();
@@ -256,13 +277,17 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
       );
       const mandate: Mandate = { ...unsigned, signature };
 
-      // The gate is told, but the mandate is signed either way. A gate that is
-      // not up does not make an unsigned mandate.
-      await gate.registerMandate(mandate).catch(() => undefined);
+      // The gate is told, but the mandate is signed either way — a gate that is
+      // not up does not make an unsigned mandate. What it said is kept, though,
+      // because "signed" and "the gate will honour this" are different claims
+      // and only one of them is worth anything to the agent.
+      const [registered, detail] = await register(mandate);
 
       return {
         mandate,
         signature,
+        registered,
+        register_detail: detail,
         created_at: nowRfc3339(),
         template_id: draft.template_id ?? null,
         replaces: replaces ?? null,
@@ -415,6 +440,22 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
     return { reissued: created.length, failed };
   }, [device, mandates, kill, buildAndSign, persistMandates, persistAgents, agents, refreshHeadroom]);
 
+  const reregister = useCallback(
+    async (mandateId: string) => {
+      const sm = mandates.find((m) => m.mandate.mandate_id === mandateId);
+      if (!sm) return null;
+      const [registered, detail] = await register(sm.mandate);
+      persistMandates(
+        mandates.map((m) =>
+          m.mandate.mandate_id === mandateId ? { ...m, registered, register_detail: detail } : m,
+        ),
+      );
+      await refreshHeadroom();
+      return registered;
+    },
+    [mandates, persistMandates, refreshHeadroom],
+  );
+
   /* ---------------------------------------------------------- agents ---- */
 
   const addAgent = useCallback(
@@ -496,6 +537,7 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
       releaseKill,
       addAgent,
       setAgentStatus,
+      reregister,
       setPrefs,
       noteTemplateUse,
       dismiss,
@@ -517,6 +559,7 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
       releaseKill,
       addAgent,
       setAgentStatus,
+      reregister,
       setPrefs,
       noteTemplateUse,
       dismiss,

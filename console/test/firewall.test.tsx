@@ -113,11 +113,16 @@ class FakeEventSource {
 
 const posted: Array<{ url: string; init?: RequestInit }> = [];
 
+/** Flipped by the test that checks what happens when the gate refuses one. */
+let acceptMandates = true;
+
 function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = String(input);
   if (init?.method === "POST") posted.push({ url, init });
 
-  const body = url.includes("/headroom")
+  const body = url.endsWith("/v1/mandates") && init?.method === "POST"
+    ? { mandate_id: "mnd_NEW", accepted: acceptMandates, reason_code: "MANDATE_SIG_INVALID" }
+    : url.includes("/headroom")
     ? HEADROOM
     : url.includes("/v1/decisions")
       ? { decisions: [BLOCKED] }
@@ -149,6 +154,7 @@ beforeEach(() => {
   vi.stubGlobal("EventSource", FakeEventSource);
   vi.stubGlobal("fetch", vi.fn(fakeFetch));
   localStorage.clear();
+  acceptMandates = true;
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -171,6 +177,24 @@ const flush = async () => {
     await Promise.resolve();
     await new Promise((r) => setTimeout(r, 0));
   });
+};
+
+/**
+ * Type into a controlled input the way a person does.
+ *
+ * Assigning `.value` directly is invisible to React — it tracks the last value
+ * it set and skips the change event when the DOM already agrees. Going through
+ * the prototype setter is what makes onChange fire.
+ */
+const type = async (selector: string, value: string) => {
+  const el = container.querySelector(selector) as HTMLInputElement | HTMLTextAreaElement | null;
+  if (!el) throw new Error(`no element matching ${selector}`);
+  const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
+  Object.getOwnPropertyDescriptor(proto.prototype, "value")!.set!.call(el, value);
+  await act(async () => {
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await flush();
 };
 
 const click = async (text: string) => {
@@ -456,6 +480,55 @@ describe("the firewall surface", () => {
     await mount();
     await flush();
     expect(container.textContent).toContain("RESUME ALL");
+  });
+
+  it("does not call a mandate registered when the gate refused it", async () => {
+    // The gate answers 200 with accepted:false for a signature it cannot
+    // verify — it stores the mandate so the audit trail shows the attempt.
+    // Reading that as success puts a mandate on screen as live that refuses
+    // every payment made against it.
+    acceptMandates = false;
+    window.location.hash = "#/firewall/mandates";
+    await mount();
+    await flush();
+
+    await click("+ Create mandate");
+    await type("#fw-intent", "restock office supplies");
+
+    await click("Next →"); // scope
+    await type("#fw-vpa", "deskkit@razorpay");
+    await click("Add");
+    await click("Next →"); // caps
+    await click("Next →"); // window
+    await click("Next →"); // review
+    await click("Sign & activate");
+    await flush();
+
+    expect(container.textContent).toContain("the gate refused it");
+    expect(container.textContent).not.toContain("accepted by the gate");
+
+    // And it stays visible afterwards, rather than only at the moment of signing.
+    const stored = JSON.parse(localStorage.getItem("pact.firewall.mandates.v1")!);
+    expect(stored[0].registered).toBe("rejected");
+  });
+
+  it("says so on the mandate itself when the gate never received it", async () => {
+    localStorage.setItem(
+      "pact.firewall.mandates.v1",
+      JSON.stringify([{ ...STORED, registered: "unreachable", register_detail: "503" }]),
+    );
+    window.location.hash = "#/firewall/mandates";
+    await mount();
+    await flush();
+
+    // The table marks it, so a row that will refuse every payment does not read
+    // like an ordinary one.
+    expect(container.querySelector("tbody")!.textContent).toContain("⚠️");
+
+    await act(async () => (container.querySelector("tbody tr") as HTMLElement).click());
+    await flush();
+    expect(container.textContent).toContain("never received this mandate");
+    expect(container.textContent).toContain("Hand it over again");
   });
 
   it("builds the ablation matrix out of the measured run, not a hand written table", async () => {
