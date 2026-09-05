@@ -223,6 +223,27 @@ Added 2026-08-31, and all of it runs on every push rather than once by hand:
   path returns `unavailable` and steps up, never approval.
 - **The harness's tally agrees with the merchant's ledger to the paise.**
 
+Added 2026-09-05:
+
+- **The demo runs end to end, repeatably, and there is a video of it.**
+  `console/demo-video.mjs` drives the real console — grant, sign on device,
+  checkout, six beats, the principal's console, the audit trail, six slides —
+  and fails the take on any console error, failed request, 4xx, or beat that
+  does not finish. Six consecutive takes at 65.6–65.7 s with phase times
+  identical run to run. The committed take is `docs/demo/pact-demo.webm`; CI
+  records one against the image it publishes on every push.
+- **Two hours of steady load, and the ledger still agrees to the paise.** 49,501
+  purchases at 6.9/s: no transport or server errors, 593,961 SSE frames to one
+  subscriber held open throughout with zero reconnects, descriptors ending lower
+  than they started, p50 flat at 66–67 ms, the saga draining the instant the
+  load stopped, and ₹4,86,50,572.82 matching the merchant's own count exactly.
+  **One thing failed and it is real** — see the memory bullet below.
+  `docs/soak.md` has all of it.
+- **The deployment manifests agree with the image.** `fly.toml`, `render.yaml`,
+  `docker-compose.yml` and the Dockerfile are cross-checked on port, health
+  path, the `/data` mount for both the database and the signing key, one
+  instance, and no credential in any of them. Mutation-checked.
+
 ### NOT verified — the honest boundary
 
 - **The Razorpay client has never run against the *real* API.** Still true, and
@@ -263,8 +284,26 @@ Added 2026-08-31, and all of it runs on every push rather than once by hand:
   degrades by *refusing* rather than by settling without live authority. The
   ceiling holds throughout: twenty buyers racing one mandate spend ₹13,564.10
   against a ceiling of ₹13,564.10, exact in both directions.
-  What has **not** been measured: a long soak, memory over hours, or behaviour
-  when the volume fills.
+- **Memory climbs under sustained load, and nothing here has run long enough to
+  say where it stops.** The two-hour soak is the first run to look: RSS goes
+  from 88 MB cold to 154 MB and is still climbing at **21 MB/hour** at the end,
+  which reaches the 512 MB `fly.toml` asks for in about seventeen hours of
+  continuous load. A control run separates it from the comfortable explanation:
+  a *fresh* process against the same 306 MB database sits flat at 111–114 MB, so
+  roughly 40 MB of the 154 is process history rather than working set and a
+  restart reclaims it. It is anonymous heap — `smaps_rollup` says 107 of 132 MB
+  anonymous, `VmData` 336 MB against 133 MB resident, which is the shape of an
+  allocator holding freed memory. **That is a hypothesis, not a finding**, and
+  the mechanism is unidentified. A 66-second demo is nowhere near it; leaving an
+  instance deployed over a weekend is.
+- **The volume grows at 5,900 bytes an order and nothing reclaims it.** 139 MB
+  an hour at the rate the soak ran, so the 1 GB both manifests ask for holds
+  about five hours of continuous load. A third of that is `decisions`, the audit
+  trail, which is the part that must not be pruned. `docs/soak.md` has the
+  per-table anatomy and the reason the one prunable table is not worth going
+  near the replay defence for.
+  Still **not** measured: what happens at the moment the volume is actually
+  full, a run of more than two hours, and a restart under load.
 
 ---
 
@@ -414,12 +453,22 @@ chaos, ablation, the sweep. Only the timestamp and the cross-check line moved.
    the expectations in that file.
 2. Run the auditor with a key, then re-run `--suite ablation` so `atk_06`
    reports a real result instead of N/A.
-3. **Actually deploy it.** `fly.toml` or `render.yaml`, one command, then
-   `python3 scripts/smoke.py --base https://… --skip-beats` against the result.
-   Do not run the beats against a public instance without meaning to.
-4. Rehearsals and the backup video. Not started.
-5. A soak. `scripts/load.py` covers a burst; nothing has watched memory or the
-   volume over hours.
+3. **A deploy with a disk on it.** Render is live but on the free plan, which
+   has no disk — so its ledger and signing key do not survive a restart, which
+   is most of what a deployment is for. `RENDER_API_KEY=… python3
+   scripts/render.py create --plan starter` builds the one `render.yaml`
+   describes the moment there is a card on the workspace. Fly is untouched:
+   `./scripts/deploy.sh fly` runs the preflight, the deploy and the smoke test,
+   and refuses clearly without credentials or a volume.
+4. **Find out where the memory line goes.** Section 3: 21 MB/hour, unidentified,
+   reclaimed by a restart, seventeen hours from the 512 MB the machine has. An
+   overnight run of `scripts/soak.py` answers whether it flattens; nothing here
+   has run one. It does not touch the demo, and it decides whether this can be
+   left deployed.
+5. **The human rehearsals.** The machine's are automated and green — six clean
+   takes, `docs/RUNBOOK.md` — and the backup video is recorded and committed.
+   What no script can do is six run-throughs out loud, timed, on the laptop that
+   will be used, at least one through the projector.
 
 Closed since this file was written: **the exposure in section 0** — history
 rewritten, the old repository archived private, a clean one pushed, all four
@@ -427,6 +476,13 @@ fetches verified 404; the container image is built and driven by CI on every
 push; the console has been opened in a browser and is screenshotted every run;
 the Razorpay client and the auditor are both exercised; `RAZORPAY_CAPTURE_FAILED`
 is now `RAIL_CAPTURE_FAILED` and the layering allowlist is empty.
+
+Closed on 2026-09-05: **the backup video** is recorded, committed and re-recorded
+by CI on every push, with a written run of show and six clean rehearsal takes;
+**the soak** has been run for two hours and both questions it existed to answer
+now have numbers, including one that failed; **Render is deployed**, with the
+free-plan caveat stated rather than glossed; and the deployment manifests are
+cross-checked against the image they deploy.
 
 ---
 
@@ -464,4 +520,7 @@ is now `RAIL_CAPTURE_FAILED` and the layering allowlist is empty.
 | `.github/workflows/container.yml` | What is actually proven on every push, and against what |
 | `scripts/smoke.py` | The six beats as assertions; runs against any instance, stdlib only |
 | `console/browser-check.mjs` | The console in a real browser, and what it asserts |
+| `docs/RUNBOOK.md` | The run of show: what to press, what to say, and what to do when it breaks |
+| `docs/soak.md` | Two hours under load: the memory line that failed, and what is in the volume |
+| `docs/demo/pact-demo.webm` | The backup video. Know where it is before you need it |
 | `docs/screenshots/` | What it looks like |
