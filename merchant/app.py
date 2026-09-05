@@ -340,6 +340,19 @@ async def force_stockout(payload: dict | None = None) -> dict:
     return {"ok": True, "sku": forced}
 
 
+@app.post("/admin/restock")
+async def restock() -> dict:
+    """
+    Stock back to its initial levels, without disarming a forced stockout.
+
+    For `scripts/soak.py`, which runs for hours against a catalog holding forty
+    of the SKU it buys. Deliberately not `/admin/reset`: the soak is measuring
+    how the volume grows across thousands of orders, and reset would delete the
+    rows it is watching.
+    """
+    return {"ok": True, "levels": service.inventory.restock_all()}
+
+
 @app.post("/admin/set_upsell_mode")
 async def set_upsell_mode(payload: dict) -> dict:
     """

@@ -375,3 +375,28 @@ def test_an_unknown_token_is_refused(gate):
     ok, code, _ = gate.redeem_token("stl_NOTREAL", amount_paise=1)
     assert not ok
     assert code is ReasonCode.TOKEN_INVALID
+
+
+# ------------------------------------------------------------- restocking ---
+
+
+def test_restock_refills_stock_without_disarming_a_forced_stockout(merchant):
+    """
+    `restock_all` exists for `scripts/soak.py`, which buys for hours against a
+    catalog holding forty of one SKU.
+
+    It is deliberately not `reset`. Reset also clears the armed stockout, and
+    the soak restocks every five seconds — so if these were the same call, a
+    soak running while somebody pressed `s` on the console would silently
+    disarm beat 5 between the press and the purchase.
+    """
+    merchant.inventory.reserve("FUR-LMP-01", 20)
+    merchant.inventory.force_stockout("FUR-LMP-01")
+    assert merchant.inventory.level("FUR-LMP-01") == 0
+
+    levels = merchant.inventory.restock_all()
+
+    assert levels["FUR-LMP-01"] == 20
+    assert merchant.inventory.level("FUR-LMP-01") == 20
+    # Still armed: the next fulfilment of that SKU must still fail.
+    assert merchant.inventory.consume_forced("FUR-LMP-01") is True

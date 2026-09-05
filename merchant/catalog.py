@@ -141,6 +141,23 @@ class Inventory:
                 return True
             return False
 
+    def restock_all(self) -> dict[str, int]:
+        """
+        Levels back to where they started, leaving the forced-stockout switch
+        alone.
+
+        `reset` clears both, which is right for the demo and wrong for a soak:
+        stock is finite — 40 notebooks — so an hour of buying exhausts it in the
+        first minute and every purchase after that captures, fails to fulfil and
+        refunds. That path is worth soaking, but it is not the one a soak is
+        supposed to be measuring, and it makes the merchant's own GMV disagree
+        with what the harness settled for a reason that says nothing about the
+        instance.
+        """
+        with self._lock:
+            self._stock = {p.sku: p.initial_stock for p in CATALOG}
+            return dict(self._stock)
+
     def reset(self) -> None:
         with self._lock:
             self._stock = {p.sku: p.initial_stock for p in CATALOG}
