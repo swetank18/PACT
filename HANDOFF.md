@@ -463,8 +463,13 @@ day they were run on.**
    The client is now driven against a fake built from `API_NOTES.md`, so what
    remains is whatever the notes themselves got wrong. Run it and diff against
    the expectations in that file.
-2. Run the auditor with a key, then re-run `--suite ablation` so `atk_06`
-   reports a real result instead of N/A.
+2. **Run the auditor with a key, then re-run `--suite ablation` so `atk_06`
+   reports a real result instead of N/A.** The cheapest item on this list by a
+   distance, and the only one that needs no code and no money: everything around
+   it is built and tested — the wiring, all three failure paths, the three-way
+   mapping onto verdicts. Set `ANTHROPIC_API_KEY`, rerun one suite, and a **N/A**
+   becomes a measured number in `results.md` and in the console's analytics
+   matrix. Everything else here needs a card, a vendor's test keys, or a night.
 3. **A deploy with a disk on it.** Render is live but on the free plan, which
    has no disk — so its ledger and signing key do not survive a restart, which
    is most of what a deployment is for. `RENDER_API_KEY=… python3
