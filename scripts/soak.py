@@ -650,15 +650,24 @@ def report(
         return failures + 1
 
     # ------------------------------------------------------------ memory ---
-    # The first sample is discarded everywhere below: the process is still
-    # warming its connection pools and importing lazily, so including it turns
-    # ordinary start-up into "a leak" and would make this fail every run.
-    warm = samples[1:] or samples
+    # Start-up is discarded before anything is judged. The first two-hour run
+    # climbed 84 → 110 MB over ten minutes and then sat between 109 and 113 for
+    # the remaining hundred: `read_tx` opens a SQLite connection per thread,
+    # lazily, and each one takes its own page cache, so RSS legitimately steps
+    # up until every worker thread has been used once. A line fitted through
+    # that reports a leak that is not there — which is the same mistake the
+    # first-sample-against-last version of this made, one order of magnitude
+    # further out.
+    #
+    # The peak is still taken over every sample, warm-up included: a machine
+    # that OOMs during start-up is just as dead.
+    warm = [s for s in samples if s.at >= args.warmup_minutes * 60] or samples[1:] or samples
     rss = [s.rss_mb for s in warm if s.rss_mb is not None]
+    every_rss = [s.rss_mb for s in samples if s.rss_mb is not None]
     if not rss:
         print("     memory not sampled — remote instance")
     else:
-        floor, ceiling = min(rss), max(rss)
+        floor, ceiling = min(rss), max(every_rss)
         per_hour = slope_per_hour(warm)
         trend = f"{per_hour:+.1f} MB/hour" if per_hour is not None else "too few samples to fit"
 
@@ -766,6 +775,44 @@ def report(
     return failures
 
 
+def replay(args: argparse.Namespace) -> int:
+    """Re-render the verdict for a saved run.
+
+    The samples are the run. Everything `report` says is derived from them, so a
+    threshold that turns out to be wrong — or a warm-up window that turns out to
+    be too short — can be re-judged against a two-hour run that already
+    happened.
+    """
+    saved = json.loads(Path(args.replay).read_text())
+
+    tally = Tally()
+    tally.settled = saved["settled"]
+    tally.settled_paise = saved["settled_paise"]
+    tally.reasons = saved["reasons"]
+    tally.sse_frames = saved["sse_frames"]
+    tally.sse_reconnects = saved["sse_reconnects"]
+    tally.polls = saved["console_polls"]
+
+    samples = [
+        Sample(
+            at=s["at_seconds"], rss_mb=s["rss_mb"], threads=s["threads"], fds=s["fds"],
+            db_bytes=s["db_bytes"], settled=s["settled"],
+            # Only the median and the 99th are recovered, so the window is
+            # reconstructed as the two numbers that were kept rather than
+            # pretending to the samples that were not.
+            latencies=([s["p50_ms"] / 1000] * 99 + [s["p99_ms"] / 1000])
+            if s["p50_ms"] is not None else [],
+        )
+        for s in saved["samples"]
+    ]
+
+    args.base = saved["base"]
+    print(f"replaying {args.replay}: {saved['base']}, "
+          f"{saved['wall_seconds'] / 60:.0f} minutes, {saved['settled']} purchases\n")
+    return report(args, tally, samples, saved["stats_before"], saved["stats_after"],
+                  saved["wall_seconds"], saved["drained_seconds"])
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -790,11 +837,22 @@ def main() -> int:
     ap.add_argument("--max-fd-growth", type=int, default=64)
     ap.add_argument("--max-thread-growth", type=int, default=16)
     ap.add_argument("--max-latency-drift", type=float, default=3.0)
+    ap.add_argument("--warmup-minutes", type=float, default=10.0,
+                    help="samples before this are excluded from the trend, though not "
+                         "from the peak; RSS climbs while each worker thread opens its "
+                         "first database connection")
     ap.add_argument("--min-trend-minutes", type=float, default=15.0,
                     help="below this the memory trend is reported and not judged")
     ap.add_argument("--json", default=None, help="also write every sample here")
+    ap.add_argument("--replay", default=None, metavar="FILE",
+                    help="re-judge a finished run from its --json file, without running "
+                         "anything. A two-hour soak is expensive; changing a threshold "
+                         "and wanting to know what it would have said is not a reason "
+                         "to spend another two hours.")
     args = ap.parse_args()
 
+    if args.replay:
+        return min(replay(args), 125)
     return min(soak(args), 125)
 
 
