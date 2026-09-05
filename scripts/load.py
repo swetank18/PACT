@@ -135,13 +135,18 @@ def ceiling_mode(base: str, allowed: int, racers_each: int) -> int:
             agent.create_order(q["quote_id"], decision)
             return "SETTLED", q["total_paise"], elapsed
         except httpx.HTTPStatusError as exc:
-            # A 503 from the gate is the ledger refusing to wait longer than its
-            # busy timeout for the write lock, which under twenty racing buyers
-            # is the design working rather than a defect. It carries
-            # GATE_UNAVAILABLE, so the classification below counts it as
-            # capacity — as it already did for the same code arriving any other
-            # way. Every other status is still an error: a 500 here means
-            # something broke.
+            # Classified by the reason code, not by the status.
+            #
+            # Under twenty racing buyers the ledger's write lock is contended
+            # past its busy timeout, and that arrives at this caller by two
+            # different routes with two different statuses. The gate refusing an
+            # authorize is a 503. The gate refusing to redeem a *settlement
+            # token* is a 503 the merchant catches, which then refuses the order
+            # with its own 403 — correctly, because there is no order without a
+            # redeemed token. Both carry GATE_UNAVAILABLE and both are capacity.
+            # Keying on 503 alone caught the first and failed the build on the
+            # second, while the line underneath was already calling it
+            # "saturated, not wrong".
             code = ""
             try:
                 detail = exc.response.json().get("detail", {})
@@ -149,7 +154,10 @@ def ceiling_mode(base: str, allowed: int, racers_each: int) -> int:
             except Exception:  # noqa: BLE001
                 pass
             label = f"HTTP {exc.response.status_code} {code}".strip()
-            return (label if exc.response.status_code == 503 else f"ERROR {label}"), 0, elapsed
+            capacity = exc.response.status_code == 503 or code in (
+                "GATE_UNAVAILABLE", "TOKEN_EXPIRED",
+            )
+            return (label if capacity else f"ERROR {label}"), 0, elapsed
         except Exception as exc:  # noqa: BLE001 - counted, not raised
             return f"ERROR {type(exc).__name__}", 0, 0.0
         finally:
