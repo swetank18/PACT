@@ -138,27 +138,76 @@ def test_unknown_mandate_returns_nothing(gate):
     assert gate.headroom_service.for_mandate("mnd_NOPE") is None
 
 
-def test_the_gate_refuses_a_signing_key_that_is_public(tmp_path):
+def test_the_gate_refuses_a_signing_key_on_the_denylist(tmp_path, monkeypatch):
     """
-    `fixtures/keys/gate_signing_key.hex` was committed and is fetchable from the
-    repository's history at HTTP 200. A clone made after it was untracked has no
-    such file and the gate generates its own; a clone made before still has it
-    on disk and would boot with it silently.
+    The refusal itself, exercised on every clone.
 
-    That is the case worth failing loudly for. An envelope signed with a key
-    anyone can download proves nothing, and the entire point of the envelope is
-    that a merchant can trust it without asking the gate.
+    This used to check the real file at the default path and skip when it was
+    absent — which is every fresh clone, so the refusal path was never actually
+    run. Worse, the moment anyone started the gate the check went the other way:
+    the gate generates its own key *at that same path* on first boot, so a run
+    of ./scripts/dev.sh followed by ./scripts/test.sh failed with DID NOT RAISE
+    and pointed at a compromised key that was not there. A check that fires on
+    the normal case and stays silent on the case it exists for is worse than no
+    check.
+
+    So: generate a key, put its fingerprint on the denylist, and assert the
+    refusal. The private half of the key that actually leaked is not here and
+    must never be, and a fingerprint is all the mechanism needs.
     """
-    from core.ledger.headroom import COMPROMISED_PUBLIC_KEYS, load_or_create_gate_key
+    import hashlib
 
-    compromised = Path("fixtures/keys/gate_signing_key.hex")
-    if not compromised.exists():
-        pytest.skip("this clone does not carry the compromised key, which is the point")
+    from core.ledger import headroom as headroom_module
+
+    path = tmp_path / "gate_signing_key.hex"
+    key = headroom_module.load_or_create_gate_key(str(path))
+    fingerprint = hashlib.sha256(key.public_key().public_bytes_raw()).hexdigest()
+
+    monkeypatch.setattr(
+        headroom_module, "COMPROMISED_PUBLIC_KEYS", frozenset({fingerprint})
+    )
+    with pytest.raises(RuntimeError, match="public repository"):
+        headroom_module.load_or_create_gate_key(str(path))
+
+
+def test_the_denylist_still_carries_the_key_that_leaked():
+    """The mechanism above is worth nothing if the list it reads is empty."""
+    from core.ledger.headroom import COMPROMISED_PUBLIC_KEYS
+
+    assert "1b12f696b6de17d0e9a50f8cda09e02038b513df2d37465dcec8b3a6a3487d90" in (
+        COMPROMISED_PUBLIC_KEYS
+    ), "the fingerprint of the key that was published must stay on the denylist"
+
+
+def test_a_clone_that_still_holds_the_leaked_key_refuses_to_boot():
+    """
+    The original case, gated on the file actually being that key.
+
+    A clone predating the purge still has the published key on disk with
+    DEFAULT_KEY_PATH pointing at it, and would otherwise boot with it silently.
+    A clone that has merely run the gate has a locally generated key at the same
+    path, which is the normal case and not a finding.
+    """
+    import hashlib
+
+    from contracts.crypto import private_key_from_seed
+    from core.ledger.headroom import (
+        COMPROMISED_PUBLIC_KEYS,
+        DEFAULT_KEY_PATH,
+        load_or_create_gate_key,
+    )
+
+    on_disk = Path(DEFAULT_KEY_PATH)
+    if not on_disk.exists():
+        pytest.skip("no key at the default path, so there is nothing to check")
+
+    key = private_key_from_seed(bytes.fromhex(on_disk.read_text().strip()))
+    fingerprint = hashlib.sha256(key.public_key().public_bytes_raw()).hexdigest()
+    if fingerprint not in COMPROMISED_PUBLIC_KEYS:
+        pytest.skip("the key at the default path was generated locally, which is fine")
 
     with pytest.raises(RuntimeError, match="public repository"):
-        load_or_create_gate_key(str(compromised))
-
-    assert COMPROMISED_PUBLIC_KEYS, "the denylist must not be silently emptied"
+        load_or_create_gate_key(str(on_disk))
 
 
 def test_a_freshly_generated_key_is_accepted(tmp_path):
