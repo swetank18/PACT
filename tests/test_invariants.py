@@ -415,3 +415,64 @@ def test_every_relative_link_in_the_docs_resolves():
                 dead.append(f"{path.relative_to(REPO)} -> {target}")
 
     assert not dead, "dead links: " + ", ".join(dead)
+
+
+# ------------------------------------------------------- the console build ---
+
+
+def test_every_console_import_that_escapes_console_is_copied_into_the_image():
+    """
+    An import the console makes outside its own directory, with no `COPY` for it.
+
+    The Dockerfile builds the console in a stage that holds `console/` and
+    whatever else is copied in by name, and the layout is mirrored so a relative
+    import like `../../../contracts/generated` resolves. Add a second one — the
+    firewall tab's `../../../../eval/results/raw.json` — without adding the
+    `COPY`, and nothing local complains: `npm run build` runs at the repo root,
+    where the whole tree is present. The container build is the only thing that
+    sees the difference, and it fails at the registry push, three minutes after
+    the commit that broke it.
+
+    The Dockerfile's own comment predicted this exact failure and it happened
+    anyway, which is the argument for a test rather than a comment.
+    """
+    console_src = REPO / "console" / "src"
+    dockerfile = (REPO / "Dockerfile").read_text()
+
+    # The console build stage only, so a COPY into the runtime stage does not
+    # satisfy an import that has to resolve at `vite build` time.
+    stage = dockerfile.split("AS console", 1)[1].split("\nFROM ", 1)[0]
+    copied = [
+        line.split()[1]
+        for line in stage.splitlines()
+        if line.startswith("COPY ") and not line.startswith("COPY --from")
+    ]
+
+    # `import x from "../../foo"` and `from "../../foo"` alike.
+    spec = re.compile(r"""from\s+["']((?:\.\./)+[^"']+)["']""")
+
+    missing: list[str] = []
+    for path in list(console_src.rglob("*.ts")) + list(console_src.rglob("*.tsx")):
+        for raw in spec.findall(path.read_text()):
+            target = (path.parent / raw).resolve()
+            try:
+                rel = target.relative_to(REPO)
+            except ValueError:
+                continue  # Not under the repo at all; npm's problem, not ours.
+            if rel.parts[0] == "console":
+                continue  # Still inside the stage's own tree.
+
+            # TypeScript omits the extension; the COPY cannot.
+            candidates = {str(rel), *(f"{rel}{ext}" for ext in (".ts", ".tsx", ".json"))}
+            if any(
+                c == src or c.startswith(src.rstrip("/") + "/")
+                for c in candidates
+                for src in copied
+            ):
+                continue
+            missing.append(f"{path.relative_to(REPO)} imports {raw}")
+
+    assert not missing, (
+        "these reach outside console/ but nothing copies them into the console "
+        "build stage, so the image builds without them: " + "; ".join(sorted(set(missing)))
+    )

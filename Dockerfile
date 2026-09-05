@@ -7,9 +7,15 @@
 FROM node:20-slim AS console
 
 # The repo layout is mirrored rather than flattened. The console imports
-# `../../../contracts/generated`, which only resolves if console/ sits beside
-# contracts/ exactly as it does in the repo. Flattening it here would work until
-# someone adds a second cross-directory import.
+# `../../../contracts/generated` and `../../../../eval/results/raw.json`, which
+# only resolve if console/ sits beside contracts/ and eval/ exactly as it does
+# in the repo.
+#
+# The second of those was added without a COPY beside it, and the container
+# build was the only thing that noticed — `npm run build` at the repo root sees
+# the whole tree and passes either way. `tests/test_invariants.py` now asserts
+# that every import escaping console/ is copied in here, so the next one fails
+# in the suite rather than in the registry push.
 WORKDIR /build/console
 
 # Manifests first, so `npm ci` stays cached until a dependency actually changes.
@@ -17,6 +23,12 @@ COPY console/package.json console/package-lock.json ./
 RUN npm ci
 
 COPY contracts/generated.ts /build/contracts/generated.ts
+
+# The measured attack matrix the analytics tab renders. Copied rather than
+# duplicated into console/, for the same reason the contracts are: two copies of
+# a number that has to agree with results.md is a drift waiting to happen.
+COPY eval/results/raw.json /build/eval/results/raw.json
+
 COPY console/ ./
 RUN npx vite build
 
