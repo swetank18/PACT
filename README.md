@@ -30,7 +30,7 @@ Or for development, with hot reload and the services on separate ports:
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh          # gate :8000, merchant :8100, webhooks :8110, beats :8300
-./scripts/test.sh         # 170 tests
+./scripts/test.sh         # 185 tests
 
 cd console && npm install && npm run dev    # http://localhost:5173
 ```
@@ -46,6 +46,10 @@ typed on stage.
 python sim/run.py --all --sessions 200 --seeds 3    # regenerates eval/results/
 ```
 
+The stage script — what to press, what to say, and what to do when it breaks —
+is [`docs/RUNBOOK.md`](docs/RUNBOOK.md), and the backup video it is a script for
+is [`docs/demo/pact-demo.webm`](docs/demo/pact-demo.webm).
+
 Deployment notes, and the two traps in the single-port build, are in
 [`deploy/README.md`](deploy/README.md). It needs a host that runs a persistent
 process — the pollers, the background saga and the SQLite write lock all outlive
@@ -59,8 +63,8 @@ driven:
 
 | | |
 | --- | --- |
-| `ci` | 170 Python tests, 33 console tests, typecheck, and a contract-drift check |
-| `container` | builds the image, waits for its healthcheck, runs the six demo beats against it over HTTP, asserts the SSE stream is live, restarts it with the volume attached and checks the orders and the gate's signing key survived, then drives all four console surfaces in Chromium |
+| `ci` | 185 Python tests, 52 console tests, typecheck, and a contract-drift check |
+| `container` | builds the image, waits for its healthcheck, runs the six demo beats against it over HTTP, asserts the SSE stream is live, restarts it with the volume attached and checks the orders and the gate's signing key survived, drives every console surface in Chromium, records the demo video against that image, and soaks it for three minutes |
 
 The beats are asserted on what they are meant to prove, not on a 200 — beat 3
 has to *fail* to complete, or the contrast it exists to draw is not there.
@@ -247,8 +251,23 @@ reconciliation poller resolves anything pending and older than 30 seconds.
   path returns `unavailable` and steps up, never approval — but nothing has
   measured how well the model actually answers, so `atk_06` is reported **N/A**
   rather than as a pass.
-- `fly.toml` and `render.yaml` are written and unexecuted. No credentials. The
-  image they deploy is not unexecuted.
+- **Deployed, but not with a disk.** Render is live at
+  `pact-9btr.onrender.com` on the free plan, which has none — so `/data` is
+  ephemeral, a restart issues a new signing key and empties the ledger, and the
+  instance sleeps when idle. `render.yaml` describes a 1 GB disk and a card is
+  all that stands between the two. `fly.toml` is unexecuted; there are no Fly
+  credentials. Both manifests are cross-checked against the image on every push.
+- **Memory climbs about 21 MB an hour under sustained load and nobody knows
+  why.** Two hours at 6.9 purchases/s takes RSS from 88 MB to 154 MB with no
+  sign of flattening, which reaches the 512 MB machine `fly.toml` asks for in
+  roughly seventeen hours. A restart reclaims about 40 MB of it — a fresh
+  process serving the same 306 MB database sits flat at 114 MB — so it is not
+  the working set, and it is anonymous heap rather than anything file-backed.
+  That is as far as the evidence goes. `docs/soak.md`.
+- **The volume fills.** 5,900 bytes an order, 139 MB an hour at that rate,
+  nothing reclaims any of it, and the 1 GB both manifests ask for holds about
+  five hours of continuous load. A third of it is the audit trail, which is the
+  part that must not be pruned.
 - **One instance saturates at somewhere between 32 and 64 concurrent buyers.**
   At 32: 200/200 purchases complete, 53/s, p50 396 ms. At 64: p50 20 s and a
   third complete. It degrades by refusing to settle rather than by settling
