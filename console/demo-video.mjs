@@ -31,10 +31,12 @@ const out = process.argv[3] ?? "video";
 const captions = !process.argv.includes("--no-captions");
 mkdirSync(out, { recursive: true });
 
-// 1280x800 rather than the browser-check's 1600x1000. The video is for a
-// projector and a phone, in that order, and every extra pixel is a megabyte
-// nobody watching a backup video is grateful for.
-const SIZE = { width: 1280, height: 800 };
+// 1440x900. Smaller than the browser-check's 1600x1000, because the video is
+// for a projector and a phone in that order and every pixel is a megabyte
+// nobody watching a backup is grateful for — but above the firewall's 1400
+// breakpoint, below which its sidebar collapses to icons and a caption naming a
+// tab would point at a word that is not on screen.
+const SIZE = { width: 1440, height: 900 };
 
 const browser = await chromium.launch();
 const context = await browser.newContext({
@@ -83,6 +85,11 @@ async function caption(text) {
       bar.id = "__pact_caption";
       Object.assign(bar.style, {
         position: "fixed", left: "0", right: "0", bottom: "0", zIndex: "99999",
+        // Decorative, and over the bottom of the page: without this it eats the
+        // click on the firewall's "← merchant console" link, which sits at the
+        // foot of its sidebar. The recorder then fails a take for a reason that
+        // exists only in the recorder.
+        pointerEvents: "none",
         padding: "10px 18px", font: "500 15px/1.4 Inter, system-ui, sans-serif",
         letterSpacing: "0.02em", color: "#f8fafc",
         background: "rgba(9, 12, 20, 0.88)",
@@ -177,9 +184,45 @@ const BEATS = {
   5: "Beat 5 — the payment succeeds and fulfilment fails. Refund, budget released, sale recovered.",
   6: "Beat 6 — the rail delivers the same webhook twice. The second one does nothing.",
 };
-for (const n of [1, 2, 3, 4, 5, 6]) {
+for (const n of [1, 2, 3, 4, 5]) {
   await phase(BEATS[n], () => beat(Number(n)));
 }
+
+// After the rollback, deliberately. Beat 5 is the moment the audience is
+// thinking about whose money just moved, and this is the screen that answers
+// from that side. One drawer, not a tour of six tabs.
+await phase("The same decision from the other side: the principal's own console.", async () => {
+  await page.getByRole("button", { name: "Firewall", exact: true }).click();
+  await page.waitForTimeout(900);
+  await page.locator("nav button").filter({ hasText: "Transactions" }).first().click();
+  await page.waitForTimeout(1200);
+
+  // A blocked one. Beats 3 and 4 put several on the board; the drawer on an
+  // ALLOW is a receipt, and the drawer on a BLOCK is the argument.
+  const blocked = page.locator("tbody tr").filter({ hasText: /BLOCK/ }).first();
+  if (!(await blocked.count())) {
+    // Beats 3 and 4 have already run, so there are blocked decisions on the
+    // board. Finding none means the feed is not reaching this surface, and a
+    // take that quietly skips the one screen this phase exists for is a take
+    // that looks fine and argues nothing.
+    problems.push("firewall/Transactions has no blocked decision to open");
+  } else {
+    await blocked.click();
+    await page.waitForTimeout(1500);
+    // Walks the check chain one at a time and lands on the one that failed.
+    await page.getByRole("button", { name: /Replay this decision/ }).click();
+    await page.waitForTimeout(4500);
+    // The drawer is modal and its scrim covers the sidebar, including the way
+    // out. Escape rather than the close button, because it is what a person
+    // would press and it exercises the handler.
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(700);
+  }
+  await page.getByRole("button", { name: /merchant console/ }).click();
+  await page.waitForTimeout(900);
+});
+
+await phase(BEATS[6], () => beat(6));
 
 await phase("The audit trail: every decision, every saga step, in order.", async () => {
   await page.waitForTimeout(3000);
