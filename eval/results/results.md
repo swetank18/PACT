@@ -1,6 +1,6 @@
 # Results
 
-Generated 2026-08-31T08:00:47+00:00 by `python sim/run.py --all`.
+Generated 2026-09-05T13:56:57+00:00 by `python sim/run.py --all`.
 200 sessions per arm, 3 seed(s), weighted personas.
 
 Every number here comes from a run. Nothing is typed in by hand.

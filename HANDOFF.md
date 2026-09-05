@@ -125,7 +125,7 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **183 Python tests, 52 console
+~11k lines of Python, ~10k of TypeScript. **184 Python tests, 53 console
 tests**, all green, plus two GitHub Actions workflows that build the container
 image and drive the six demo beats and every console surface against it on
 every push.
@@ -441,6 +441,13 @@ than the old line was, and it is now the one printed.
 the single-port build, a topology it had never run against. Every measured
 number is byte identical to the previous run: four arms, seed ranges, attacks,
 chaos, ablation, the sweep. Only the timestamp and the cross-check line moved.
+
+Regenerated again on **2026-09-05**, after a day of changes to the console, the
+merchant's admin surface, the deployment and the test suite. `git diff` on
+`eval/results/` is **two lines, both the generated timestamp**. Nothing else in
+either file moved — which is the point of running it rather than assuming it:
+the changes were all meant to be outside the pricing, gate and upsell paths, and
+now that is measured rather than believed.
 
 ---
 
