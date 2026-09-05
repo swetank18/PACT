@@ -87,3 +87,45 @@ export function shortId(id: string | null | undefined, tail = 6): string {
   }
   return id;
 }
+
+/**
+ * `2 min ago`. The feed and every table read at a glance, so relative time is
+ * the default and the exact stamp lives in a title attribute beside it.
+ */
+export function ago(rfc3339: string | null | undefined, from = Date.now()): string {
+  if (!rfc3339) return "—";
+  const t = new Date(rfc3339).getTime();
+  if (Number.isNaN(t)) return "—";
+  const s = Math.round((from - t) / 1000);
+  if (s < 0) return until(rfc3339, from);
+  if (s < 10) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return d < 30 ? `${d}d ago` : new Date(t).toLocaleDateString("en-IN");
+}
+
+/** The full local timestamp. Goes behind every relative one as a tooltip. */
+export function stamp(rfc3339: string | null | undefined): string {
+  if (!rfc3339) return "";
+  const d = new Date(rfc3339);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+}
+
+/** `1:42`, for a countdown that has to be read in peripheral vision. */
+export function mmss(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}

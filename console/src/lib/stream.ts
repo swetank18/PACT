@@ -139,5 +139,6 @@ export const STREAM_EVENTS = [
   "quote",
   "addon_offer",
   "step_up",
+  "mandate",
   "reset",
 ] as const;

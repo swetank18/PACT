@@ -125,10 +125,16 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~4.6k of TypeScript. **170 Python tests, 33 console
+~11k lines of Python, ~10k of TypeScript. **182 Python tests, 52 console
 tests**, all green, plus two GitHub Actions workflows that build the container
-image and drive the six demo beats and all four console surfaces against it on
+image and drive the six demo beats and every console surface against it on
 every push.
+
+Added 2026-09-05: a fifth console surface, `#/firewall` — the **principal's**
+console, built to `userUI(1).md`. The other four answer the merchant's
+questions; this one answers the person whose money it is. Six tabs, light mode,
+its own kill switch. `console/README.md` has the detail; the two decisions
+worth carrying are in section 4.
 
 ---
 
@@ -288,6 +294,26 @@ and never with a `DEFAULT` (silently backfills every historical row with a value
 that was never true of it — in an audit trail that is a fabricated record, which
 is worse than a null). Both are asserted.
 
+**The principal's kill switch revokes; it does not set a flag.** There is no
+pause in the mandate lifecycle, and a flag held in the browser would be a
+client-side control — the thing `eval/results/results.md` spends a paragraph
+explaining is not a control. So "pause all agents" revokes every live mandate at
+the gate. Because a revoked mandate reports **zero** headroom by design, the
+remainder on each one is read *before* the revoke; that is the only moment it
+exists. Resume re-signs each mandate with exactly what was left, never with what
+it started with, and skips any whose window has closed. The same reading applies
+on screen: a paused mandate shows the captured remainder rather than the
+envelope's zero, because rendering the zero would claim it was fully spent.
+
+**The firewall never shows a number the engine did not produce.** The health
+score, the threat card and the budget bars are all functions of the headroom
+envelope and the decision list. Where there is no answer the screen says so. The
+sharpest case is the intent meter: `userUI(1).md` asks for a confidence
+percentage, and `core/gate/auditor.py` answers `matches_intent` as a **boolean**.
+The meter renders the engine's actual answer and says on screen that the auditor
+answers yes or no — inventing a percentage to fill the bar would have been the
+one thing on that screen a judge could not check.
+
 **Contracts are generated, not duplicated.** `scripts/gen_ts_contracts.py`
 produces `contracts/generated.ts` from the Python enum; the console re-exports
 it. A Python test regenerates and fails if the committed copy is stale. A drift
@@ -319,6 +345,7 @@ reading code. Each is listed with what would have gone wrong on stage.
 | Three reason codes declared and emitted by nothing | `STOCK_UNAVAILABLE`, the capture failure and `SAGA_ROLLED_BACK` were in the frozen enum while the saga wrote English into `detail`. The console had branches that had never rendered and Lane B had assertions that could never fire — a rollback on stage was prose, where the pitch claims a machine-readable trail. |
 | The parity vector 404s in the deployed build | Served by a Vite dev-server middleware that does not exist in a built bundle. The badge degraded honestly to "unavailable" rather than claiming a failure, which is correct and is exactly why no test caught it. **It took opening a browser.** The one claim on screen a judge can check by looking was silently absent from the only build anyone would demo. |
 | The gate's signing key was committed | Section 0. |
+| Both SSE streams tore down and resynced every fifteen seconds | `sse_starlette`'s keepalive is an SSE **comment**, and a comment fires no event in the browser — so `stream.ts`'s idle watchdog was never fed and treated a healthy pipe as dead, forever. The console survived it, because a visible reconnect is what that module is built for, but the "live" dot flickered and every reconnect refetched. Both streams now send a named `heartbeat`, which the console has always listened for. Found on 2026-09-05 only because the browser check grew long enough to run past fifteen seconds; a harness with no watchdog counted 7,395 frames and zero reconnects over the same window. |
 | The simulation harness measured a different system than it reset | `BuyerAgent` hardcoded the dev ports while `sim/run.py` read `PACT_GATE_URL` for its reset and ablate calls. With a dev topology *and* a deployed instance both up, it would reset one, measure the other, and still print numbers. |
 | The cross-check was itself the wrong number | It compared a three-seed harness total against a merchant counter that is reset each seed, got a ratio near three, and shipped "the harness has a bug" in `results.md` for the life of the project. Neither was wrong. Fixed, it agrees to the paise. |
 | A missing webhook signature passed verification | Found by mutating `compare_digest` to return True on an empty signature — the whole suite still passed. Nothing covered a delivery with no `X-Razorpay-Signature` while a secret was configured: the cheapest possible forgery. |

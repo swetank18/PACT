@@ -5,6 +5,19 @@
   min-height: 0;
 }
 
+/* A surface that brings its own chrome. Only the demo strip survives. */
+.appFull {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+  min-height: 0;
+}
+
+.fullMain {
+  position: relative;
+  min-height: 0;
+}
+
 /* ---- top bar ------------------------------------------------------------- */
 
 .bar {

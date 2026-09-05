@@ -1,7 +1,7 @@
 # console
 
-The three surfaces a judge sees, plus the one piece of real cryptography that
-runs on the buyer's device.
+The surfaces a judge sees, plus the one piece of real cryptography that runs on
+the buyer's device.
 
 ```bash
 npm install
@@ -12,14 +12,53 @@ npm test             # signature parity and render smoke tests
 `npm run dev` starts the dev mock alongside Vite. To run against the real
 services instead, start them and run `npm run vite` on its own.
 
-## The three surfaces
+## The surfaces
 
-| Route        | What it is                                                                  |
-| ------------ | --------------------------------------------------------------------------- |
-| `#/grant`    | The human writes a delegation and signs it on this device.                    |
-| `#/checkout` | The conversation with the buyer agent: quote, headroom, upsell, gate result.  |
-| `#/console`  | The merchant console: revenue, live orders, gate decisions, audit trail.      |
-| `#/slides`   | Six slides, in the app so there is no window switch on stage.                 |
+| Route         | What it is                                                                   |
+| ------------- | ---------------------------------------------------------------------------- |
+| `#/grant`     | The human writes a delegation and signs it on this device.                     |
+| `#/checkout`  | The conversation with the buyer agent: quote, headroom, upsell, gate result.   |
+| `#/console`   | The merchant console: revenue, live orders, gate decisions, audit trail.       |
+| `#/firewall`  | The principal's own console. Six tabs, light mode, its own kill switch.        |
+| `#/slides`    | Six slides, in the app so there is no window switch on stage.                  |
+
+## The firewall surface
+
+`src/surfaces/firewall/`. The other four surfaces answer the merchant's
+questions; this one answers the person whose money it is — what are my agents
+doing, what was refused on my behalf, and how do I stop it. It takes the whole
+viewport, brings its own light palette (declared on one class, so it and the
+dark console cannot bleed into each other), and hash routes its own tabs at
+`#/firewall/<tab>`.
+
+Three rules it is built around, and each of them shows up as something the
+screen refuses to say:
+
+**Nothing on screen is a number the engine did not produce.** The health score,
+the threat summary and the budget bars are all functions of the headroom
+envelope and the decision list. Where the engine has no answer the screen says
+so — a mandate whose envelope did not arrive reads "the gate did not answer"
+rather than showing zero spend, and the intent meter says the auditor answers
+yes or no rather than inventing a confidence percentage to fill a bar.
+
+**The kill switch is server side.** "Pause all agents" revokes every live
+mandate at the gate. A flag held in this browser would be a client-side control,
+and `../eval/results/results.md` spends a paragraph on why those are not
+controls. Because there is no pause in the mandate lifecycle, the remaining
+authority on each mandate is read *before* the revoke — a revoked mandate
+reports zero headroom, so that is the only moment the remainder can be captured
+— and resume re-signs each one with exactly what was left, never with what it
+started with.
+
+**The ablation matrix is the measured run.** It is rendered straight out of
+`../eval/results/raw.json`; a cell is green because the attack *leaked* with
+that check switched off, not because someone decided it ought to. `atk_06`
+reads `n/a` rather than as a pass, because it needs the model auditor and there
+is no key in this build.
+
+What lives on the device rather than at the gate is the mandate bodies this
+browser signed, the agent names, and the preferences — in `localStorage`, with
+the same caveat the device key carries and the settings page states outright.
 
 ## Signature parity is the blocking gate
 
@@ -50,16 +89,20 @@ before checking the crypto.
 ## Looking at it
 
 ```bash
-npm test                                          # 33 tests, including a jsdom mount
-npm run browser -- http://localhost:8080 shots    # a real browser, four surfaces
+npm test                                          # 49 tests, including a jsdom mount
+npm run browser -- http://localhost:8080 shots    # a real browser, every surface
 ```
 
 The unit tests prove the components do not throw. They cannot prove a stylesheet
 loaded, a font resolved, an asset path is right, or that a fetch made at boot
 returns anything — and until 2026-08-31 nobody had ever seen this rendered.
-`browser-check.mjs` runs beats 1, 2 and 5 so the board is populated, visits all
-four surfaces, and fails on any console error, any failed request, any surface
-that renders nothing, or a missing parity badge. CI runs it against the
+`browser-check.mjs` runs beats 1, 2 and 5 so the board is populated, visits every
+surface and all six firewall tabs, and fails on any console error, any failed
+request, any surface that renders nothing, or a missing parity badge. It found
+one thing on its own: run long enough, and both SSE connections were tearing
+themselves down every fifteen seconds, because sse_starlette's keepalive is an
+SSE *comment* and a comment fires no event in the browser, so the idle watchdog
+in `src/lib/stream.ts` was never fed. Both streams now send a named `heartbeat`. CI runs it against the
 container on every push and uploads the screenshots; the committed ones are in
 `../docs/screenshots/`.
 

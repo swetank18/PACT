@@ -99,6 +99,46 @@ for (const name of SURFACES) {
   console.log(`ok    ${name} — ${text.length} chars`);
 }
 
+/**
+ * The firewall, last, because it takes the viewport — once it is open the
+ * header the loop above clicks through is gone.
+ *
+ * Driven by clicking its own sidebar rather than by navigating to each hash: a
+ * full navigation aborts the open SSE connection, which this check would then
+ * report as a failed request that is entirely its own fault.
+ *
+ * Light mode over a dark console is exactly the kind of thing that looks fine
+ * in jsdom and wrong on a projector, so every tab gets a screenshot.
+ */
+const FIREWALL_TABS = [
+  ["Dashboard", ["Threat summary", "Live activity"]],
+  ["Mandates", ["Create mandate"]],
+  ["Transactions", ["All transactions", "Pending approvals"]],
+  ["Analytics", ["Which check catches which attack", "sim/run.py"]],
+  ["Agents", ["Add agent"]],
+  ["Settings", ["Signing key fingerprint", "Auto-approve threshold"]],
+];
+
+await page.getByRole("button", { name: "Firewall", exact: true }).click();
+await page.waitForTimeout(800);
+
+for (const [label, needles] of FIREWALL_TABS) {
+  await page.locator("nav button").filter({ hasText: label }).first().click();
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: `${out}/firewall-${label.toLowerCase()}.png` });
+
+  const text = await page.innerText("body");
+  if (text.length < 200) problems.push(`firewall/${label} rendered ${text.length} characters`);
+  for (const needle of [label, ...needles]) {
+    if (!text.includes(needle)) problems.push(`firewall/${label} is missing ${JSON.stringify(needle)}`);
+  }
+  // The kill switch is the one control that must be on screen everywhere.
+  if (!/PAUSE ALL AGENTS|RESUME ALL/.test(text)) {
+    problems.push(`firewall/${label} has no kill switch`);
+  }
+  console.log(`ok    firewall/${label} — ${text.length} chars`);
+}
+
 await browser.close();
 
 if (problems.length) {

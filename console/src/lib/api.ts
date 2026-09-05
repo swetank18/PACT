@@ -129,6 +129,19 @@ export const gate = {
     ),
 
   reset: () => post<{ ok: boolean }>(`${GATE}/v1/admin/reset`),
+
+  /**
+   * What the gate says about itself. The firewall's connection test calls this
+   * rather than a mock endpoint, so a green tick means the gate answered.
+   */
+  health: () =>
+    get<{
+      ok: boolean;
+      auditor: "enabled" | "deterministic";
+      disabled_checks: string[];
+      subscribers: number;
+      at: string;
+    }>(`${GATE}/v1/health`),
 };
 
 /* ----------------------------------------------------------- merchant ----- */

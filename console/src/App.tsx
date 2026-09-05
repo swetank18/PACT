@@ -15,22 +15,26 @@ import { LiveDataProvider, useLive } from "./lib/store";
 import { shortId } from "./lib/money";
 import { Checkout } from "./surfaces/checkout/Checkout";
 import { Console } from "./surfaces/console/Console";
+import { Firewall } from "./surfaces/firewall/Firewall";
 import { Grant, type GrantResult } from "./surfaces/grant/Grant";
 import { Slides } from "./surfaces/slides/Slides";
 import s from "./App.module.css";
 
-type Route = "grant" | "checkout" | "console" | "slides";
+type Route = "grant" | "checkout" | "console" | "slides" | "firewall";
 
 const ROUTES: Array<{ id: Route; label: string }> = [
   { id: "grant", label: "Grant" },
   { id: "checkout", label: "Checkout" },
   { id: "console", label: "Merchant console" },
+  { id: "firewall", label: "Firewall" },
   { id: "slides", label: "Pitch" },
 ];
 
 function useHashRoute(): [Route, (r: Route) => void] {
+  // Only the first segment names the surface. The firewall keeps its own tab
+  // in the second one, so #/firewall/mandates still routes here.
   const read = (): Route => {
-    const raw = window.location.hash.replace(/^#\/?/, "");
+    const raw = window.location.hash.replace(/^#\/?/, "").split("/")[0];
     return (ROUTES.find((r) => r.id === raw)?.id ?? "console") as Route;
   };
   const [route, setRoute] = useState<Route>(read);
@@ -94,6 +98,22 @@ function Shell() {
     },
     [go],
   );
+
+  // The firewall is the principal's own product, not a panel in the merchant
+  // console: it takes the viewport, brings its own light theme and its own
+  // navigation, and handles a step up in place rather than through the shell's
+  // modal. The demo strip stays, because it is the only way to put traffic on
+  // the screen without typing on stage.
+  if (route === "firewall") {
+    return (
+      <div className={s.appFull}>
+        <main className={s.fullMain}>
+          <Firewall onExit={() => go("console")} />
+        </main>
+        <DemoBar />
+      </div>
+    );
+  }
 
   return (
     <div className={s.app}>

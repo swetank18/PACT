@@ -291,7 +291,7 @@ describe("the app mounts and wires the streams", () => {
   });
 
   it("routes to every surface without throwing", async () => {
-    for (const route of ["#/grant", "#/checkout", "#/console", "#/slides"]) {
+    for (const route of ["#/grant", "#/checkout", "#/console", "#/slides", "#/firewall"]) {
       window.location.hash = route;
       await mount();
       await flush();

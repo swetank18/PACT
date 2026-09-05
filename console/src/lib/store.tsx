@@ -50,6 +50,12 @@ type Store = {
   refetchAll: () => Promise<void>;
   /** Bumped on a server reset so views can drop local selection state. */
   resetToken: number;
+  /**
+   * Bumped whenever the gate says a mandate changed — today that is only a
+   * revocation. Headroom is fetched per mandate rather than streamed, so views
+   * that show remaining authority watch this instead of polling.
+   */
+  mandateToken: number;
 };
 
 const Ctx = createContext<Store | null>(null);
@@ -73,6 +79,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
   const [merchantConn, setMerchantConn] = useState<ConnState>("connecting");
   const [pendingStepUp, setPendingStepUp] = useState<Decision | null>(null);
   const [resetToken, setResetToken] = useState(0);
+  const [mandateToken, setMandateToken] = useState(0);
 
   // Which orders have a timeline open. Only those get saga events applied
   // eagerly; everything else is fetched on demand.
@@ -117,6 +124,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
     setPendingStepUp(null);
     watched.current.clear();
     setResetToken((n) => n + 1);
+    setMandateToken((n) => n + 1);
   }, []);
 
   /* ------------------------------------------------------- gate stream --- */
@@ -132,6 +140,8 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
           if (d.verdict === "STEP_UP") setPendingStepUp(d);
         } else if (type === "step_up") {
           setPendingStepUp(data as Decision);
+        } else if (type === "mandate") {
+          setMandateToken((n) => n + 1);
         } else if (type === "reset") {
           onReset();
         }
@@ -211,6 +221,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
       loadSaga,
       refetchAll,
       resetToken,
+      mandateToken,
     }),
     [
       decisions,
@@ -224,6 +235,7 @@ export function LiveDataProvider({ children }: { children: ReactNode }) {
       loadSaga,
       refetchAll,
       resetToken,
+      mandateToken,
     ],
   );
 
