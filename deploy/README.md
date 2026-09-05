@@ -132,10 +132,28 @@ the healthcheck to go green, then:
 ~208 MB, 22 layers. Published to `ghcr.io/swetank18/pact:latest` only after all
 of that passes, so what ships is the artefact that was tested.
 
-**Not verified: any actual hosted deployment.** `fly.toml` and `render.yaml` are
-written and unexecuted — there are no Fly or Render credentials in the
-environment this was built in. Expect to iterate on machine size and health
-check grace periods, not on the app. Smoke-test whatever comes up:
+**Render is deployed and checked. Fly is not.**
+`https://pact-9btr.onrender.com`, created 2026-09-05 with:
+
+```bash
+RENDER_API_KEY=rnd_… python3 scripts/render.py create --plan starter
+```
+
+Live on the first attempt, no iteration on machine size or health check grace
+periods. 5/5 smoke checks, and every console surface plus all six firewall tabs
+rendered in Chromium with no console error and no failed request.
+
+**The live instance is on the free plan, which is not what `render.yaml` says.**
+Starter was refused with a 402 — no payment method on the workspace — and Render
+allows a disk only on a paid instance. So `/data` is ephemeral there: a restart
+issues a new gate signing key and empties the ledger, and headroom envelopes
+already handed out stop verifying. It also sleeps after ~15 minutes idle, and
+asleep it is not running the sweeper or the reconciler. `render.yaml` remains
+the blueprint for the deploy this should have; `scripts/render.py` refuses to
+send anything that disagrees with it.
+
+`fly.toml` is still unexecuted — there are no Fly credentials here. Smoke-test
+whatever comes up:
 
 ```bash
 python3 scripts/smoke.py --base https://your-instance --skip-beats

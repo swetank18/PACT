@@ -239,9 +239,24 @@ Added 2026-08-31, and all of it runs on every push rather than once by hand:
   failure path, and the three-way mapping onto verdicts through the gate — but
   nothing has measured how well the model answers. `atk_06` stays **N/A**, not a
   pass. Run the ablation suite with a key to change that.
-- **Neither deployment target has been deployed.** `fly.toml` and `render.yaml`
-  are written and unexecuted; there are no Fly or Render credentials here. The
-  image they point at is not unexecuted.
+- **Render has now been deployed. Fly has not.** `https://pact-9btr.onrender.com`,
+  created 2026-09-05 through `scripts/render.py` against Render's API. Live on
+  the first attempt: `/healthz` green with all four sub-apps mounted, 5/5 smoke
+  checks — including the two that bit before, the parity vector *is* served and
+  the signing key is *not* — and every console surface plus all six firewall
+  tabs driven in Chromium with no console error and no failed request. Beat 4
+  ran against it: four attacks, four blocks, each on a different check.
+  `fly.toml` is still unexecuted; there are no Fly credentials here.
+
+  **It is on the free plan, which is not what `render.yaml` describes.** Starter
+  was refused with a 402 — no card on the workspace — so it runs with no disk.
+  That is a materially different thing and the difference is not cosmetic:
+  `/data` is ephemeral, so a restart issues a **new gate signing key** and
+  empties the ledger, and every headroom envelope already handed out stops
+  verifying. The instance also sleeps after ~15 minutes idle, and asleep it is
+  not running the reservation sweeper or the reconciliation poller. Add a card
+  and `RENDER_API_KEY=… python3 scripts/render.py create --plan starter` builds
+  the one the blueprint actually specifies.
 - **Load has now been run, and the limit is known rather than guessed.**
   `scripts/load.py` at 32 concurrent buyers: 200/200 purchases, 53/s, p50 396
   ms, p99 1.6 s. At 64 it saturates — p50 20 s, a third complete — and it
