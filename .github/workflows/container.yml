@@ -120,6 +120,39 @@ jobs:
           path: console/shots/
           if-no-files-found: warn
 
+      # The backup video, recorded against the image that is about to be
+      # published rather than against a laptop three weeks ago. It drives the
+      # whole run of show — grant, sign, checkout, six beats, the audit trail,
+      # the slides — and fails the take on any console error, any failed
+      # request, any 4xx, or any beat that does not finish. A backup video with
+      # a silently broken beat in it is worse than none, because nobody watches
+      # it closely at the moment they need it.
+      - name: Record the demo
+        working-directory: console
+        run: node demo-video.mjs http://localhost:8080 video
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: demo-video
+          path: console/video/pact-demo.webm
+          if-no-files-found: warn
+
+      # A short soak. The real one is hours long and local — see docs/soak.md —
+      # but three minutes against the container still asserts the things that
+      # break slowly: no 5xx, no descriptor accumulation, no latency drift, the
+      # saga draining after the load stops, and the merchant's ledger agreeing
+      # to the paise with what the harness settled.
+      #
+      # --pid because the process holding the published port is docker-proxy;
+      # the container's main process is the one whose memory means anything.
+      # The volume is inside the container, so the database is not sampled here.
+      - name: Soak the container for three minutes
+        run: |
+          pid=$(docker inspect -f '{{.State.Pid}}' "$(docker compose ps -q pact)")
+          python3 scripts/soak.py --base http://localhost:8080 \
+            --minutes 3 --sample 30 --concurrency 3 --pid "$pid"
+
       # A failing run is only useful if you can see why. Always, not on success.
       - name: Container logs
         if: always()

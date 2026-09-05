@@ -37,3 +37,6 @@ eval/results/sessions/
 
 # Browser-check output. docs/screenshots/ holds the committed ones.
 console/shots/
+
+# The demo recorder writes here. docs/demo/ holds the committed take.
+console/video/

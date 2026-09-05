@@ -109,6 +109,23 @@ def listening_pid(port: int) -> int | None:
     return None
 
 
+def looks_like_the_app(pid: int) -> str | None:
+    """
+    The command line of `pid`, if it plausibly is this app.
+
+    Behind Docker the process listening on the published port is `docker-proxy`,
+    not uvicorn, and sampling its RSS would produce a flat, meaningless line
+    reported with total confidence. Better to say nothing: pass `--pid` (the
+    container's main process, from `docker inspect -f '{{.State.Pid}}'`) when
+    the instance is containerised.
+    """
+    try:
+        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode()
+    except OSError:
+        return None
+    return cmdline if ("python" in cmdline or "uvicorn" in cmdline) else None
+
+
 @dataclass
 class Process:
     """What /proc can say about the instance, or nothing if it is not local."""
@@ -459,15 +476,29 @@ def soak(args: argparse.Namespace) -> int:
         client.post(f"{base}/api/merchant/admin/restock")
         before = client.get(f"{base}/api/merchant/v1/stats").json()
 
-    process = Process(listening_pid(port) if httpx.URL(base).host in ("localhost", "127.0.0.1") else None)
+    if args.pid:
+        process = Process(args.pid)
+        found = f"process {args.pid}, given with --pid"
+    elif httpx.URL(base).host in ("localhost", "127.0.0.1"):
+        pid = listening_pid(port)
+        if pid and looks_like_the_app(pid):
+            process, found = Process(pid), f"process {pid}"
+        elif pid:
+            process = Process(None)
+            found = (f"pid {pid} holds the port but is not this app — a container's "
+                     "published port, most likely. Pass --pid.")
+        else:
+            process, found = Process(None), "nothing on this machine owns that port"
+    else:
+        process, found = Process(None), "the instance is not on this machine"
     db_path = database_path(args.db)
 
     print(f"soak: {base}")
     print(f"  {args.minutes} minutes, {args.concurrency} buyers, {args.think}s between purchases")
     if process.pid:
-        print(f"  process {process.pid}, sampled from /proc every {args.sample}s")
+        print(f"  {found}, sampled from /proc every {args.sample}s")
     else:
-        print("  memory NOT sampled — the instance is not a local process this user owns")
+        print(f"  memory NOT sampled — {found}")
     if db_path:
         print(f"  database {db_path} (+ -wal, -shm)")
     else:
@@ -737,6 +768,9 @@ def main() -> int:
     ap.add_argument("--sample", type=float, default=30, help="seconds between samples")
     ap.add_argument("--restock", type=float, default=5.0,
                     help="seconds between restocks; stock is finite and this outruns it")
+    ap.add_argument("--pid", type=int, default=None,
+                    help="the instance's process; needed when it is in a container, where "
+                         "the port is held by docker-proxy rather than by uvicorn")
     ap.add_argument("--db", default=None, help="sqlite file to watch; defaults to PACT_DB_URL")
     ap.add_argument("--volume-mb", type=float, default=1024,
                     help="the volume this would deploy onto (fly.toml and render.yaml say 1 GB)")
