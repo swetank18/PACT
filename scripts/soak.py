@@ -661,36 +661,46 @@ def report(
         floor, ceiling = min(rss), max(rss)
         per_hour = slope_per_hour(warm)
         trend = f"{per_hour:+.1f} MB/hour" if per_hour is not None else "too few samples to fit"
-        print(f"OK   RSS {floor:.0f}–{ceiling:.0f} MB, ended {rss[-1]:.0f} MB ({trend})")
+
         # Two ways to fail, because either alone is wrong. A flat 480 MB does
         # not survive a 512 MB machine, and 40 MB/hour is a leak even though
-        # every sample is small.
-        if ceiling > args.max_rss_mb:
-            print(f"FAIL RSS reached {ceiling:.0f} MB against a "
-                  f"{args.max_rss_mb:.0f} MB machine")
+        # every sample is small. Judged before anything is printed, so the line
+        # never says OK above a FAIL about the same number.
+        judged = per_hour is not None and wall >= args.min_trend_minutes * 60
+        too_big = ceiling > args.max_rss_mb
+        climbing = judged and per_hour > args.max_growth_mb_hour
+
+        print(f"{'FAIL' if too_big or climbing else 'OK  '} RSS {floor:.0f}–{ceiling:.0f} MB, "
+              f"ended {rss[-1]:.0f} MB ({trend})")
+        if too_big:
+            print(f"     over the {args.max_rss_mb:.0f} MB the machine has")
             failures += 1
-        if per_hour is None or wall < args.min_trend_minutes * 60:
+        if climbing:
+            headroom = (args.max_rss_mb - rss[-1]) / per_hour
+            print(f"     climbing at {per_hour:.1f} MB/hour — at this rate it reaches "
+                  f"{args.max_rss_mb:.0f} MB in {headroom:.1f} hours")
+            failures += 1
+        elif not judged:
             print(f"     the trend is not judged under {args.min_trend_minutes:.0f} minutes — "
                   "start-up dominates a short run and would be reported as a leak")
-        elif per_hour > args.max_growth_mb_hour:
-            headroom = (args.max_rss_mb - rss[-1]) / per_hour
-            print(f"FAIL RSS is climbing at {per_hour:.1f} MB/hour — at this rate it "
-                  f"reaches {args.max_rss_mb:.0f} MB in {headroom:.1f} hours")
-            failures += 1
 
     # ------------------------------------------- descriptors and threads ---
     fds = [s.fds for s in warm if s.fds is not None]
     if fds:
-        print(f"OK   file descriptors {min(fds)}–{max(fds)}, ended {fds[-1]}")
-        if fds[-1] > fds[0] + args.max_fd_growth:
-            print(f"FAIL {fds[-1] - fds[0]} descriptors accumulated — a listener or a "
-                  "connection is not being closed")
+        leaked = fds[-1] > fds[0] + args.max_fd_growth
+        print(f"{'FAIL' if leaked else 'OK  '} file descriptors {min(fds)}–{max(fds)}, "
+              f"ended {fds[-1]}")
+        if leaked:
+            print(f"     {fds[-1] - fds[0]} accumulated — a listener or a connection is "
+                  "not being closed")
             failures += 1
     threads = [s.threads for s in warm if s.threads is not None]
     if threads:
-        print(f"OK   threads {min(threads)}–{max(threads)}, ended {threads[-1]}")
-        if threads[-1] > threads[0] + args.max_thread_growth:
-            print(f"FAIL {threads[-1] - threads[0]} threads accumulated")
+        leaked = threads[-1] > threads[0] + args.max_thread_growth
+        print(f"{'FAIL' if leaked else 'OK  '} threads {min(threads)}–{max(threads)}, "
+              f"ended {threads[-1]}")
+        if leaked:
+            print(f"     {threads[-1] - threads[0]} accumulated")
             failures += 1
 
     # ------------------------------------------------------------ volume ---
@@ -698,7 +708,7 @@ def report(
     if sizes and tally.settled:
         grown = sizes[-1] - sizes[0]
         per_order = grown / max(tally.settled, 1)
-        print(f"OK   database {sizes[0] / 1_048_576:.1f} → {sizes[-1] / 1_048_576:.1f} MB, "
+        print(f"     database {sizes[0] / 1_048_576:.1f} → {sizes[-1] / 1_048_576:.1f} MB, "
               f"peak {max(sizes) / 1_048_576:.1f} MB "
               f"({per_order:+.0f} bytes per order)")
         if per_order > 0:
@@ -715,10 +725,10 @@ def report(
     first, last = warm[0], warm[-1]
     if first.p50() and last.p50():
         drift = last.p50() / first.p50()
-        print(f"OK   p50 {first.p50() * 1000:.0f} ms at the start, "
-              f"{last.p50() * 1000:.0f} ms at the end ({drift:.2f}x)")
-        if drift > args.max_latency_drift and last.p50() > 0.25:
-            print(f"FAIL latency degraded {drift:.1f}x over the run")
+        degraded = drift > args.max_latency_drift and last.p50() > 0.25
+        print(f"{'FAIL' if degraded else 'OK  '} p50 {first.p50() * 1000:.0f} ms at the "
+              f"start, {last.p50() * 1000:.0f} ms at the end ({drift:.2f}x)")
+        if degraded:
             failures += 1
 
     # --------------------------------------------------------- the ledger ---
@@ -728,7 +738,7 @@ def report(
     gmv_delta = after["gmv_paise"] - before["gmv_paise"]
     order_delta = after["orders"] - before["orders"]
     print()
-    print(f"OK   the saga drained the in-flight orders in {drained_in:.1f}s after the "
+    print(f"     the saga drained the in-flight orders in {drained_in:.1f}s after the "
           "load stopped")
     if gmv_delta == tally.settled_paise and order_delta == tally.settled:
         print(f"OK   the merchant's ledger agrees to the paise: {order_delta} orders, "
