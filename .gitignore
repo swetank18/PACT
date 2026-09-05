@@ -7,6 +7,11 @@ dist/
 pact.db
 pact.db-wal
 pact.db-shm
+# A second instance needs a second database: scripts/soak.py and the demo
+# recorder are both run against one while the dev stack holds pact.db.
+pact-*.db
+pact-*.db-wal
+pact-*.db-shm
 __pycache__/
 *.pyc
 .pytest_cache/
