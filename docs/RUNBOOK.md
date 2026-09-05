@@ -122,20 +122,21 @@ any 4xx, or any beat that does not finish.
 cd console && node demo-video.mjs http://localhost:8080 ../docs/demo
 ```
 
-Six takes on 2026-09-05, back to back against the single-port build:
+Six takes on 2026-09-05, back to back against the single-port build, with the
+twelve-phase sequence above:
 
-| Take | Total | |
-|---|---|---|
-| 1 | 55.9 s | clean — kept as `docs/demo/pact-demo.webm` |
-| 2 | 55.8 s | clean |
-| 3 | 55.8 s | clean |
-| 4 | 55.8 s | clean |
-| 5 | 55.7 s | clean |
-| 6 | — | **failed**, and correctly: another process on the machine killed the instance mid-take, and the recorder refused it rather than saving 56 seconds of `ERR_CONNECTION_REFUSED` as the backup video |
+| Take | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| Total | 65.7 s | 65.6 s | 65.7 s | 65.6 s | 65.7 s | 65.6 s |
 
-Phase times were identical to a tenth of a second across every clean take, which
-is the property that matters: **the sequence does not drift**. The one that
-failed is the more useful result — that is exactly what the take gate is for.
+Six clean, spread of a tenth of a second, phase times identical run to run. That
+is the property that matters: **the sequence does not drift**. The committed
+video is a seventh take, recorded the same way.
+
+An earlier round of six is worth keeping in mind: five were clean and the sixth
+failed, because another process on this machine killed the instance mid-take and
+the recorder refused to save 56 seconds of `ERR_CONNECTION_REFUSED` as the thing
+you play when the live demo dies. That is exactly what the take gate is for.
 
 **The human's rehearsal is not automated and is not done by reading this.** Six
 run-throughs out loud, timed, with the laptop you will use, at least one of them
