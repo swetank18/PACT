@@ -3,10 +3,10 @@
 The stage script. What to press, what to say while it runs, and what to do when
 something breaks.
 
-Nothing here is typed on stage. The whole demo is eleven key presses, and the
-machine time between them is measured rather than estimated — the numbers below
-came out of `console/demo-video.mjs`, which drives this exact sequence against a
-real instance and records it.
+Nothing here is typed on stage. The demo is twelve phases of key presses and
+clicks, and the machine time between them is measured rather than estimated —
+the numbers below came out of `console/demo-video.mjs`, which drives this exact
+sequence against a real instance and records it.
 
 The backup video is [`docs/demo/pact-demo.webm`](demo/pact-demo.webm). **Know
 where it is before you need it.**
@@ -43,6 +43,13 @@ Then, in the browser:
 - [ ] The backup video is on this laptop, plays, and you know the shortcut for
       full screen.
 
+**Demo from localhost, not from the Render instance.** There is a deployed one
+at `pact-9btr.onrender.com` and it is useful for showing that this runs
+somewhere other than a laptop. It is on the free plan: it sleeps after about
+fifteen minutes idle, and its disk is ephemeral, so a restart issues a new
+signing key and empties the ledger. A demo that opens with a cold instance
+waking up opens with fifty seconds of nothing.
+
 **The venue's network is not on the critical path.** Everything runs in one
 container on localhost, including the rail. Worth one sentence on stage, because
 every other demo in the room is one dropped packet from dying.
@@ -65,9 +72,10 @@ saga step delay is 0.35 s against 0.05 s — so budget a little more.
 | 5 | `3` | 2 s | The same offer, made blind, rejected | "The obvious build. Recommend, then find out. `CEILING_PER_TXN` — a failed offer and a buyer who now distrusts the agent." |
 | 6 | `4` | 2 s | Four blocks, four reason codes | "Replay, a merchant outside scope, a tampered amount, a prompt injection in a product description. Each one a machine-readable code, not prose." |
 | 7 | `5` | 7 s | Capture, fulfilment fails, refund, budget released, alternative accepted | "The money has already moved and the warehouse is empty. Refund, the ceiling gives the money back, an alternative is offered — and the buyer signs it. **The merchant cannot spend on the buyer's behalf.**" |
-| 8 | `6` | 2 s | Nothing happens, visibly | "The rail delivers the same webhook twice. The second one does nothing, because replay is a primary key rather than a check." |
-| 9 | — | 3 s | The audit trail | "Every decision and every saga step, in order, with codes." |
-| 10 | *Pitch*, `→` ×5 | 17 s | Six slides, ending on limitations | "Including what we have **not** verified." |
+| 8 | *Firewall* → *Transactions* → a blocked row → **Replay this decision** | 10 s | The drawer: a red BLOCKED banner, the check chain walked one at a time onto the one that failed | "Everything so far was the merchant's view. This is the same decision seen by the person whose money it is — every check, in order, and the one that stopped it." |
+| 9 | `6` | 2 s | Nothing happens, visibly | "The rail delivers the same webhook twice. The second one does nothing, because replay is a primary key rather than a check." |
+| 10 | — | 3 s | The audit trail | "Every decision and every saga step, in order, with codes." |
+| 11 | *Pitch*, `→` ×5 | 17 s | Six slides, ending on limitations | "Including what we have **not** verified." |
 
 **About a minute of machine time.** The rest is narration, so the pacing is
 yours; the numbers above are the floor, not the plan.
@@ -75,6 +83,12 @@ yours; the numbers above are the floor, not the plan.
 If you have to cut, cut in this order: beat 6, the audit trail pause, beat 1.
 Never cut beat 2 or beat 3 — they are the contrast the whole pitch rests on —
 and never cut beat 5, which is the brief's explicit ask.
+
+Two things about the firewall surface at projector resolution. Below 1400 px
+wide its sidebar collapses to icons, so do not say "the Mandates tab" if the
+word is not on screen — the recorder runs at 1440×900 for exactly that reason.
+And at that width the kill switch is a red button with a ⏹ glyph and no label,
+so point at it rather than reading it out.
 
 ---
 
