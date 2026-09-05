@@ -136,4 +136,4 @@ with the projector. The lines above are a script to adapt, not to read.
 | [`../HANDOFF.md`](../HANDOFF.md) | What is verified and what is not. Read section 3 before answering a judge's question about coverage. |
 | [`../scripts/smoke.py`](../scripts/smoke.py) | The preflight, and the six beats as assertions |
 | [`../console/demo-video.mjs`](../console/demo-video.mjs) | The recorder, and the run-of-show timings |
-| [`../eval/results.md`](../eval/results.md) | Every number that appears on the results slide |
+| [`../eval/results/results.md`](../eval/results/results.md) | Every number that appears on the results slide |
