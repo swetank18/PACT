@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from sse_starlette.sse import EventSourceResponse
+from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from contracts.schemas import (
     AgentCommerceManifest,
@@ -319,6 +319,15 @@ async def stats() -> MerchantStats:
     return await asyncio.to_thread(service.stats.compute)
 
 
+# sse_starlette's default keepalive is an SSE *comment*, and a comment fires no
+# event in the browser — so the console's idle watchdog was never fed by it and
+# every stream tore itself down and resynced every fifteen seconds. Named
+# instead: `heartbeat` is already on the console's listener list, where it feeds
+# the watchdog and renders nothing.
+def _heartbeat() -> ServerSentEvent:
+    return ServerSentEvent(event="heartbeat", data="{}")
+
+
 @app.get("/v1/stream")
 async def stream(request: Request) -> EventSourceResponse:
     async def gen():
@@ -327,7 +336,7 @@ async def stream(request: Request) -> EventSourceResponse:
                 break
             yield {"event": event.type, "data": json.dumps(event.data)}
 
-    return EventSourceResponse(gen(), ping=5)
+    return EventSourceResponse(gen(), ping=5, ping_message_factory=_heartbeat)
 
 
 # --------------------------------------------------------------------- admin --

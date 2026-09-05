@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sse_starlette.sse import EventSourceResponse
+from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from contracts.crypto import verify
 from contracts.reason_codes import CHECK_ORDER, ReasonCode, Verdict
@@ -213,6 +213,15 @@ async def list_decisions(limit: int = 50) -> dict:
     return {"decisions": rows}
 
 
+# sse_starlette's default keepalive is an SSE *comment*, and a comment fires no
+# event in the browser — so the console's idle watchdog was never fed by it and
+# every stream tore itself down and resynced every fifteen seconds. Named
+# instead: `heartbeat` is already on the console's listener list, where it feeds
+# the watchdog and renders nothing.
+def _heartbeat() -> ServerSentEvent:
+    return ServerSentEvent(event="heartbeat", data="{}")
+
+
 @app.get("/v1/decisions/stream")
 async def decisions_stream(request: Request) -> EventSourceResponse:
     async def gen():
@@ -221,9 +230,7 @@ async def decisions_stream(request: Request) -> EventSourceResponse:
                 break
             yield {"event": event.type, "data": json.dumps(event.data)}
 
-    # ping keeps the console's idle watchdog fed; it treats silence as a dead
-    # pipe even when the socket still looks open.
-    return EventSourceResponse(gen(), ping=5)
+    return EventSourceResponse(gen(), ping=5, ping_message_factory=_heartbeat)
 
 
 @app.get("/v1/decisions/{decision_id}")
