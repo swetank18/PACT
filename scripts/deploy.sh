@@ -83,9 +83,20 @@ case "$mode" in
 
   render)
     preflight
+
+    # There is an API, and with a key this does not have to be a dashboard
+    # action at all. `render.py` sends exactly what render.yaml describes and
+    # refuses to send anything it does not.
+    if [[ -n "${RENDER_API_KEY:-}" ]]; then
+      "$PY" scripts/render.py "${1:-create}" "${@:2}"
+      exit $?
+    fi
+
     cat <<'TEXT'
 
-── Render is a blueprint deploy, which is a dashboard action, not a CLI one.
+── No RENDER_API_KEY set, so this is a dashboard action.
+
+   With a key it is not:  RENDER_API_KEY=rnd_… ./scripts/deploy.sh render create
 
    1. render.com → New → Blueprint, point it at this repository.
    2. It reads render.yaml: one instance, a 1 GB disk at /data, the image
