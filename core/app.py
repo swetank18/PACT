@@ -11,9 +11,11 @@ import asyncio
 import json
 import logging
 import os
+import sqlite3
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
@@ -123,6 +125,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(sqlite3.OperationalError)
+async def contended_database(request: Request, exc: sqlite3.OperationalError) -> Response:
+    """
+    A write lock this request could not get within the busy timeout is a 503,
+    not a 500.
+
+    The ledger's correctness rests on SQLite's write lock, so under enough
+    concurrency some authorize will wait the full timeout and give up. That is
+    the design working — it is a request that could not be decided, not a gate
+    that is broken — and the difference is not cosmetic. `scripts/load.py` at
+    twenty racing buyers on a slow CI runner produced exactly one of these, and
+    a 500 in that position reads as a defect in the gate and fails the build.
+    A 503 says "busy, ask again", which is what happened.
+
+    This is the same mistake as the one in the bugs table: a gate timeout that
+    was reported as TOKEN_INVALID and sent someone hunting an attacker who did
+    not exist. Anything that is *not* a lock is re-raised untouched — a missing
+    table dressed up as "busy" would be far worse than the 500 it deserves.
+    """
+    message = str(exc).lower()
+    if "locked" not in message and "busy" not in message:
+        raise exc
+
+    log.warning("database contended, refusing rather than waiting: %s", exc)
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": {
+                "reason_code": str(ReasonCode.GATE_UNAVAILABLE),
+                "detail": "the ledger was contended beyond its busy timeout",
+            }
+        },
+    )
 
 
 # ------------------------------------------------------------------ mandates --

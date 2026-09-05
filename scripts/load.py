@@ -121,6 +121,10 @@ def ceiling_mode(base: str, allowed: int, racers_each: int) -> int:
 
     def one(_i: int) -> tuple[str, int, float]:
         agent = agent_for(base)
+        # Bound before the try: an exception raised in the quote, before
+        # authorize has been timed, must not turn into an UnboundLocalError in
+        # the handler that is supposed to be counting it.
+        elapsed = 0.0
         try:
             q = agent.quote([{"sku": "FUR-LMP-01", "qty": 1}], mandate.id)
             started = time.perf_counter()
@@ -130,6 +134,22 @@ def ceiling_mode(base: str, allowed: int, racers_each: int) -> int:
                 return decision["reason_code"], 0, elapsed
             agent.create_order(q["quote_id"], decision)
             return "SETTLED", q["total_paise"], elapsed
+        except httpx.HTTPStatusError as exc:
+            # A 503 from the gate is the ledger refusing to wait longer than its
+            # busy timeout for the write lock, which under twenty racing buyers
+            # is the design working rather than a defect. It carries
+            # GATE_UNAVAILABLE, so the classification below counts it as
+            # capacity — as it already did for the same code arriving any other
+            # way. Every other status is still an error: a 500 here means
+            # something broke.
+            code = ""
+            try:
+                detail = exc.response.json().get("detail", {})
+                code = detail.get("reason_code", "") if isinstance(detail, dict) else ""
+            except Exception:  # noqa: BLE001
+                pass
+            label = f"HTTP {exc.response.status_code} {code}".strip()
+            return (label if exc.response.status_code == 503 else f"ERROR {label}"), 0, elapsed
         except Exception as exc:  # noqa: BLE001 - counted, not raised
             return f"ERROR {type(exc).__name__}", 0, 0.0
         finally:
