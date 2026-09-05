@@ -180,10 +180,12 @@ function Shell({ onExit }: { onExit: () => void }) {
               : "Revoke every live mandate at the gate"
           }
         >
+          {/* The glyph is outside the label so the control is still legible
+              when the sidebar collapses to icons. */}
+          <span className={f.killIcon}>{kill.engaged ? "▶" : "⏹"}</span>
           <span className={f.killText}>
-            {kill.engaged ? "▶ RESUME ALL" : "⏹ PAUSE ALL AGENTS"}
+            {kill.engaged ? " RESUME ALL" : " PAUSE ALL AGENTS"}
           </span>
-          <span className={f.navLabel} style={{ display: "none" }} />
         </button>
         <div className={f.killNote}>
           {killNote ??
