@@ -32,7 +32,7 @@ against the single-port build. One failure, and it is a real one.**
 | | | |
 | --- | --- | --- |
 | Transport and server errors | **none** in 49,501 purchases | OK |
-| RSS | 88 MB cold → **154 MB**, climbing **+21 MB/hour** and not flattening | **FAIL** |
+| RSS | 88 MB cold → **154 MB**, climbing **+21 MB/hour** and not flattening | **FAIL** — cause found, below |
 | File descriptors | 105–110, ended on 105 | OK |
 | Threads | 27, throughout | OK |
 | Latency | p50 66 ms at the start, 67 ms at the end (1.02×) | OK |
@@ -45,6 +45,12 @@ The one failure is the memory line and it is worth having. At 21 MB/hour a
 512 MB machine is reached in about **17 hours** of continuous load at this rate.
 Nothing about a demo goes near that — the run of show is 66 seconds — but "leave
 it deployed over a weekend" does, and before this run nobody knew.
+
+**Four fifths of that line has since been found and closed**: the simulated rail
+was keeping every intent it ever created, at 663 bytes a purchase. See *Found:
+the rail remembered every purchase*, below. The table above is left as it was
+measured on the day — it is the run that found the problem, and rewriting it
+would delete the evidence.
 
 Everything else is the answer you want. The descriptor count is the one that
 would have been most expensive to get wrong: one SSE subscriber, held open for
@@ -112,7 +118,7 @@ missing orders as a ledger mismatch.
 
 ---
 
-## Memory: it climbs, then it stops
+## Memory: what this run could and could not say
 
 RSS is not flat from the first second and should not be expected to be.
 `core/db.py` opens a SQLite connection per thread, lazily, and each one takes its
@@ -131,15 +137,72 @@ run had just produced:
 A fresh process serving the *same* data needs about 114 MB. The two-hour-old
 process was holding 154 MB to do the same work, so roughly **40 MB of it is
 process history rather than working set, and a restart reclaims it**. That rules
-out the comfortable explanation — this is not simply page caches sized by the
-database — and it rules out the alarming one, a leak that grows without bound in
-live objects, at least on this evidence.
+out the comfortable explanation: this is not simply page caches sized by the
+database.
 
-What it is has not been identified. It is anonymous heap: `smaps_rollup` at 93
-minutes showed 107 MB of the 132 MB RSS as anonymous and only 3 MB file-backed,
-with `VmData` at 336 MB against 133 MB resident, which is the shape of glibc
-arenas holding freed memory rather than returning it. That is a hypothesis, not
-a finding.
+**What it did not rule out, and was read as ruling out.** This section used to
+end by saying the control run also ruled out the alarming explanation — a
+structure growing without bound in live objects. It does not, and the reasoning
+was wrong in a way worth keeping rather than quietly deleting. A control run
+starts a *fresh* process, and a fresh process has no history of either kind:
+neither allocator retention nor a live map that grows one entry per purchase.
+Both present identically as "reclaimed by a restart". The control separates
+working set from process history. It cannot separate the two kinds of history,
+and the conclusion drawn from it was the one that happened to be comfortable.
+
+The other reading offered here was that it is anonymous heap held by the
+allocator: `smaps_rollup` at 93 minutes showed 107 MB of the 132 MB RSS as
+anonymous and only 3 MB file-backed, with `VmData` at 336 MB against 133 MB
+resident. That observation is real and it is still true. It is also what a
+growing Python dictionary looks like.
+
+---
+
+## Found: the rail remembered every purchase
+
+**2026-09-06.** `rails/mock_upi/adapter.py` kept three maps — `_intents`, the
+`_by_payment` alias onto the same objects, and `_idem`, the idempotency record —
+and **nothing ever removed an entry from any of them**. One `_Intent`, one alias
+and one `RailResult` per purchase, held for the life of the process. It is the
+only unbounded per-transaction structure in the codebase: `EventBus` caps each
+subscriber queue at 256 frames, the catalog's stock map is fixed at the SKU
+list, and every other collection lives in SQLite.
+
+Measured three ways, which agree:
+
+| | | |
+| --- | --- | ---: |
+| The maps alone, quiesced, with real key shapes | 50,000 purchases | **662 bytes each** |
+| A live instance, idle RSS against purchases | 25,070 purchases | **663 bytes each** |
+| The same instance with the maps bounded | 25,070 purchases | **55 bytes each** |
+
+The isolated figure and the live figure agreeing to one byte is the part worth
+trusting. The idempotency key is a sha256 hexdigest, so 64 characters of it is
+string; the rest is the intent, its two dictionary entries and the result.
+
+At the two-hour soak's 6.9 purchases a second, 663 bytes a purchase is
+**16.5 MB an hour** — against the 21 MB an hour that run measured for the whole
+process and could not account for. So the rail is about **four fifths of the
+line**, and what is left is 4.5 MB an hour, under the 8 MB an hour this harness
+fails a run for.
+
+### The fix, and why a cap rather than a sweeper
+
+`MAX_REMEMBERED = 20_000`, oldest evicted first. A real rail does not keep your
+intents in your process, and a simulated one has no business doing it either.
+
+The two maps degrade into each other rather than off a cliff. An intent that
+outlives its idempotency record still answers a replayed capture, because its
+status is already `captured`; an idempotency record that outlives its intent
+still returns the original result. Only a purchase old enough to have lost both
+is forgotten, and by then it settled 20,000 purchases ago — forty-eight minutes
+at the soak's rate, and further past anything that replays than the saga's
+retries, which are seconds apart. The ceiling is about 13 MB.
+
+The confirmation run above used a cap of 2,000 rather than the shipped 20,000,
+so that eviction would start early enough to be measured inside 25,000
+purchases: 55 bytes a purchase, and the maps sat at exactly 2,000 entries while
+the counter behind them reached 25,070.
 
 The two runs agreeing on bytes-per-order to 0.05% — 5,900 against 5,903, from
 completely different starting states — is the strongest evidence here that both
@@ -220,10 +283,16 @@ lower than 5,897.
 
 ## What this still does not answer
 
-- **Where the memory line goes.** Two hours established that it climbs at
-  21 MB/hour and that a restart reclaims it. Whether it flattens at some level
-  below 512 MB, or reaches it in the seventeen hours the slope implies, needs a
-  run of that length. Nothing here has run overnight.
+- **Whether the line is flat now, over hours rather than minutes.** The rail
+  accounted for 663 of the 845 bytes a purchase the two-hour run implied, and
+  bounding it took the measured figure to 55. What remains is about 4.5 MB an
+  hour, under the 8 this harness fails a run for — but that is a number from a
+  twelve-minute purchase-indexed run, not from two hours against the clock. The
+  two-hour soak has not been re-run since the fix, and nothing here has run
+  overnight.
+- **What the last fifth is.** Four fifths of the line is accounted for. The
+  remainder has not been chased, and at this size it may be allocator retention
+  rather than anything holding a reference.
 - **Days, not hours.** Two hours is enough to separate warm-up from a leak. It
   is not enough to see a slow fragmentation, a log rotation, or a certificate
   expiring.
