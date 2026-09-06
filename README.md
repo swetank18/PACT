@@ -257,13 +257,13 @@ reconciliation poller resolves anything pending and older than 30 seconds.
   instance sleeps when idle. `render.yaml` describes a 1 GB disk and a card is
   all that stands between the two. `fly.toml` is unexecuted; there are no Fly
   credentials. Both manifests are cross-checked against the image on every push.
-- **Memory climbs about 21 MB an hour under sustained load and nobody knows
-  why.** Two hours at 6.9 purchases/s takes RSS from 88 MB to 154 MB with no
-  sign of flattening, which reaches the 512 MB machine `fly.toml` asks for in
-  roughly seventeen hours. A restart reclaims about 40 MB of it — a fresh
-  process serving the same 306 MB database sits flat at 114 MB — so it is not
-  the working set, and it is anonymous heap rather than anything file-backed.
-  That is as far as the evidence goes. `docs/soak.md`.
+- **Memory climbed about 21 MB an hour under sustained load. Four fifths of
+  that is found and closed.** The simulated rail kept every intent it ever
+  created — three maps, one entry each per purchase, nothing ever removed — at
+  663 bytes a purchase, which is 16.5 of the 21. It is bounded now, and the
+  drop was measured on a live instance: 663 bytes a purchase against 55. What
+  is left is about 4.5 MB an hour, and the two-hour soak has not been re-run
+  since the fix. `docs/soak.md`.
 - **The volume fills.** 5,900 bytes an order, 139 MB an hour at that rate,
   nothing reclaims any of it, and the 1 GB both manifests ask for holds about
   five hours of continuous load. A third of it is the audit trail, which is the

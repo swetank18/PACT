@@ -284,18 +284,21 @@ Added 2026-09-05:
   degrades by *refusing* rather than by settling without live authority. The
   ceiling holds throughout: twenty buyers racing one mandate spend ₹13,564.10
   against a ceiling of ₹13,564.10, exact in both directions.
-- **Memory climbs under sustained load, and nothing here has run long enough to
-  say where it stops.** The two-hour soak is the first run to look: RSS goes
-  from 88 MB cold to 154 MB and is still climbing at **21 MB/hour** at the end,
-  which reaches the 512 MB `fly.toml` asks for in about seventeen hours of
-  continuous load. A control run separates it from the comfortable explanation:
-  a *fresh* process against the same 306 MB database sits flat at 111–114 MB, so
-  roughly 40 MB of the 154 is process history rather than working set and a
-  restart reclaims it. It is anonymous heap — `smaps_rollup` says 107 of 132 MB
-  anonymous, `VmData` 336 MB against 133 MB resident, which is the shape of an
-  allocator holding freed memory. **That is a hypothesis, not a finding**, and
-  the mechanism is unidentified. A 66-second demo is nowhere near it; leaving an
-  instance deployed over a weekend is.
+- **Memory climbed under sustained load. Four fifths of it is now found and
+  closed; the rest is not chased.** The two-hour soak measured RSS going from
+  88 MB cold to 154 MB, still climbing at **21 MB/hour** at the end — seventeen
+  hours from the 512 MB `fly.toml` asks for. The mechanism was unidentified for
+  a day and is now identified: `rails/mock_upi/adapter.py` kept every intent it
+  ever created, in three maps that nothing ever removed from, at **663 bytes a
+  purchase**. Measured three ways that agree — the maps alone quiesced (662
+  bytes), a live instance's idle RSS against purchases (663), and the same
+  instance with the maps bounded (55). That is 16.5 MB of the 21. `docs/soak.md`
+  has the numbers and the correction: the control run everyone read as ruling
+  out a growing live structure could not do that, because a fresh process is
+  fresh of allocator retention *and* of a growing map, and both look like
+  "reclaimed by a restart". What remains is about 4.5 MB an hour, under the 8
+  this harness fails on, and **the two-hour soak has not been re-run since the
+  fix**.
 - **The volume grows at 5,900 bytes an order and nothing reclaims it.** 139 MB
   an hour at the rate the soak ran, so the 1 GB both manifests ask for holds
   about five hours of continuous load. A third of that is `decisions`, the audit
@@ -477,11 +480,13 @@ day they were run on.**
    describes the moment there is a card on the workspace. Fly is untouched:
    `./scripts/deploy.sh fly` runs the preflight, the deploy and the smoke test,
    and refuses clearly without credentials or a volume.
-4. **Find out where the memory line goes.** Section 3: 21 MB/hour, unidentified,
-   reclaimed by a restart, seventeen hours from the 512 MB the machine has. An
-   overnight run of `scripts/soak.py` answers whether it flattens; nothing here
-   has run one. It does not touch the demo, and it decides whether this can be
-   left deployed.
+4. **Re-run the soak against the fix, then leave one running overnight.** The
+   mechanism behind the memory line is found and bounded — section 3 — but the
+   confirmation was a twelve-minute purchase-indexed run, not two hours against
+   the clock, and `scripts/soak.py` has not judged the line since. One 40-minute
+   run turns the FAIL in `docs/soak.md` into a verdict; an overnight one answers
+   whether the remaining 4.5 MB/hour flattens. Neither touches the demo, and
+   together they decide whether this can be left deployed.
 5. **The human rehearsals.** The machine's are automated and green — six clean
    takes, `docs/RUNBOOK.md` — and the backup video is recorded and committed.
    What no script can do is six run-throughs out loud, timed, on the laptop that
@@ -493,6 +498,10 @@ fetches verified 404; the container image is built and driven by CI on every
 push; the console has been opened in a browser and is screenshotted every run;
 the Razorpay client and the auditor are both exercised; `RAZORPAY_CAPTURE_FAILED`
 is now `RAIL_CAPTURE_FAILED` and the layering allowlist is empty.
+
+Closed on 2026-09-06: **where the memory line goes** — traced to the simulated
+rail keeping every intent it ever created, bounded at 20,000, and the drop
+measured live at 663 bytes a purchase against 55.
 
 Closed on 2026-09-05: **the backup video** is recorded, committed and re-recorded
 by CI on every push, with a written run of show and six clean rehearsal takes;
