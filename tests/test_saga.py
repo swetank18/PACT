@@ -14,6 +14,7 @@ import pytest
 
 from contracts.reason_codes import ReasonCode, verdict_for
 from contracts.schemas import QuoteItemRequest
+from rails.mock_upi.adapter import MAX_REMEMBERED
 from rails.razorpay.client import idempotency_key
 
 
@@ -341,6 +342,44 @@ def test_a_double_refund_refunds_once(rail):
     assert first.ref == second.ref
     assert second.replayed
     assert rail.status(intent.intent_id).amount_refunded_paise == 100_000
+
+
+def test_the_rail_does_not_remember_every_purchase_forever(rail):
+    """
+    The mock rail keeps its intents in the merchant's process, so "remember
+    everything" is a leak with a slow fuse — three entries and about 660 bytes
+    a purchase, which the two-hour soak saw as a memory line that never
+    flattened. Memory must be a function of the cap, not of how long the
+    process has been up.
+    """
+    for i in range(MAX_REMEMBERED + 5_000):
+        idem = idempotency_key(f"ord_{i}", 100_000, 1)
+        intent = rail.create_intent(100_000, ref=f"ord_{i}", idem_key=idem)
+        rail.capture(intent.raw["payment_id"], 100_000, idem)
+
+    assert len(rail._intents) == MAX_REMEMBERED
+    assert len(rail._by_payment) == MAX_REMEMBERED, "the alias map must evict with the intent"
+    assert len(rail._idem) == MAX_REMEMBERED
+
+
+def test_a_capture_replayed_after_its_record_ages_out_still_charges_once(rail, monkeypatch):
+    """
+    The half of eviction that could cost money. Once the idempotency record is
+    gone the second capture cannot be served from it — and it must still not be
+    a second charge, because the intent it names is already captured.
+    """
+    monkeypatch.setattr("rails.mock_upi.adapter.MAX_REMEMBERED", 4)
+    intent = rail.create_intent(100_000, ref="ord_z", idem_key="k")
+    first = rail.capture(intent.raw["payment_id"], 100_000, "k")
+
+    for i in range(8):  # push "k" out of the idempotency map, keep the intent
+        rail.capture(intent.raw["payment_id"], 100_000, f"other_{i}")
+    assert "k" not in rail._idem
+
+    second = rail.capture(intent.raw["payment_id"], 100_000, "k")
+    assert second.replayed, "a captured intent is a replay however the record aged"
+    assert second.ref == first.ref
+    assert rail.status(intent.intent_id).status == "captured"
 
 
 def test_the_idempotency_key_is_the_contracts_formula():

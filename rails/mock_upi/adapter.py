@@ -56,6 +56,22 @@ class FailureSwitches:
     refund_pending: bool = False
 
 
+#: How much of the rail's history stays in memory.
+#:
+#: This is a simulated rail living inside the merchant's process, and it was
+#: remembering every purchase it ever settled: an `_Intent`, its payment alias
+#: and a `RailResult`, three entries and about 660 bytes a purchase, none of
+#: them ever removed. Measured in isolation that is 16.5 MB an hour at the
+#: soak's rate, against the 21 MB an hour `docs/soak.md` measured for the whole
+#: process and could not account for. A real rail does not keep your intents in
+#: your RAM either.
+#:
+#: 20,000 is far past anything that replays. The saga's retries are seconds
+#: apart, and even at the soak's 6.9 purchases a second this is forty-eight
+#: minutes of history. It bounds the three maps at about 13 MB.
+MAX_REMEMBERED = 20_000
+
+
 class MockUpiAdapter(RailAdapter):
     name = "mock_upi"
 
@@ -67,6 +83,36 @@ class MockUpiAdapter(RailAdapter):
         self.webhook_secret = webhook_secret
         self.failures = FailureSwitches()
 
+    # ------------------------------------------------------------ memory ---
+
+    def _remember(self, idem_key: str, result: RailResult) -> RailResult:
+        """Record an idempotency result, and drop the oldest if we are over."""
+        self._idem[idem_key] = result
+        self._forget_oldest()
+        return result
+
+    def _forget_oldest(self) -> None:
+        """
+        Called with the lock held. Dicts iterate in insertion order, so the
+        first key is the oldest, and each map gains exactly one entry per
+        purchase — so this evicts in the order the purchases arrived.
+
+        The maps degrade into each other rather than off a cliff. An intent
+        that outlives its idempotency record still answers a replayed capture,
+        from `status == "captured"`; an idempotency record that outlives its
+        intent still returns the original result. Only a purchase old enough to
+        have lost both is forgotten, and by then it settled 20,000 purchases
+        ago.
+        """
+        while len(self._intents) > MAX_REMEMBERED:
+            oldest = self._intents.pop(next(iter(self._intents)))
+            if oldest.payment_id:
+                self._by_payment.pop(oldest.payment_id, None)
+        while len(self._idem) > MAX_REMEMBERED:
+            self._idem.pop(next(iter(self._idem)))
+
+    # -------------------------------------------------------------- rail ---
+
     def create_intent(self, amount_paise: Paise, ref: str, idem_key: str) -> RailIntent:
         with self._lock:
             intent = _Intent(intent_id=new_id("ord").replace("ord_", "mupi_"), amount_paise=amount_paise)
@@ -76,6 +122,7 @@ class MockUpiAdapter(RailAdapter):
             intent.payment_id = intent.intent_id.replace("mupi_", "mpay_")
             intent.status = "authorized"
             self._by_payment[intent.payment_id] = intent
+            self._forget_oldest()
         return RailIntent(
             intent_id=intent.intent_id,
             amount_paise=amount_paise,
@@ -101,13 +148,11 @@ class MockUpiAdapter(RailAdapter):
                 # Same shape as Razorpay's behaviour: a second capture is not a
                 # new charge, and the caller sees that it was a replay.
                 result = RailResult(ok=True, ref=intent.payment_id, status="captured", replayed=True)
-                self._idem[idem_key] = result
-                return result
+                return self._remember(idem_key, result)
 
             intent.status = "captured"
             result = RailResult(ok=True, ref=intent.payment_id, status="captured")
-            self._idem[idem_key] = result
-            return result
+            return self._remember(idem_key, result)
 
     def refund(self, intent_id: str, amount_paise: Paise, idem_key: str) -> RailResult:
         with self._lock:
@@ -133,8 +178,7 @@ class MockUpiAdapter(RailAdapter):
             result = RailResult(
                 ok=True, ref=new_id("ord").replace("ord_", "mrfnd_"), status=status
             )
-            self._idem[idem_key] = result
-            return result
+            return self._remember(idem_key, result)
 
     def status(self, intent_id: str) -> RailStatus:
         with self._lock:
