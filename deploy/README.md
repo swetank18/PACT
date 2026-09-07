@@ -13,8 +13,11 @@ run against:
 docker run -p 8080:8080 -v pact-data:/data ghcr.io/swetank18/pact:latest
 ```
 
-The GHCR package is private by default. Make it public once, in the repository's
-package settings, if anonymous pulls are wanted.
+That pull works anonymously: the package was made public after it was recreated,
+and an unauthenticated manifest fetch returns 200. A GHCR package is private when
+it is first pushed, so if this ever gets recreated again it will need that one
+setting a second time — the symptom is `denied` on a `docker pull` from a machine
+that has never logged in to ghcr.io.
 
 Or without Docker, which is what was used to verify this:
 
