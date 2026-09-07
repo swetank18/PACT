@@ -557,5 +557,6 @@ cross-checked against the image they deploy.
 | `console/browser-check.mjs` | The console in a real browser, and what it asserts |
 | `docs/RUNBOOK.md` | The run of show: what to press, what to say, and what to do when it breaks |
 | `docs/soak.md` | Two hours under load: the memory line that failed, and what is in the volume |
+| `docs/HackSummit-PACT.pptx` | The submitted deck, in the organisers' template. Generated — `scripts/gen_hacksummit_deck.py` |
 | `docs/demo/pact-demo.webm` | The backup video. Know where it is before you need it |
 | `docs/screenshots/` | What it looks like |
