@@ -32,6 +32,18 @@ from fastapi.staticfiles import StaticFiles
 from contracts.schemas import utcnow
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+
+# httpx logs every request it makes at INFO, and in *this* build every call
+# between the sub-apps is one: the merchant asks the gate for headroom and
+# redeems a settlement token over HTTP against this same process. That is three
+# lines a purchase, so a soak at 6.9/s writes twenty lines a second and a
+# ten-hour run writes about 100 MB — of a log whose entire content is this
+# process talking to itself, with any real warning buried in it.
+#
+# Only here. In development the four services are four processes on four ports
+# and those lines are the trace across them, which is worth having.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 log = logging.getLogger("pact.deploy")
 
 REPO = Path(__file__).resolve().parent.parent
