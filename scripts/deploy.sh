@@ -5,10 +5,14 @@
 #     ./scripts/deploy.sh render              # prints what to do; see below
 #     ./scripts/deploy.sh check https://…     # smoke an instance already up
 #
-# Neither target has ever been deployed from here — there are no credentials in
-# this environment — so this script is the part of that job that *can* be
-# written down: the preflight, the one command, and the check afterwards. It
-# refuses clearly rather than half-deploying when something is missing.
+# Render has been deployed from here, through `render.py` and this script's
+# render target: pact-9btr.onrender.com, on the free plan, which has no disk.
+# Fly never has — there is no flyctl and no login in this environment — so for
+# that target this script is the part of the job that *can* be written down: the
+# preflight, the one command, and the check afterwards. Both paths refuse
+# clearly rather than half-deploying when something is missing, and both
+# refusals are checked: with no flyctl the fly target dies naming it, and with
+# no RENDER_API_KEY the render target prints the dashboard steps instead.
 #
 # Two things it deliberately does NOT do:
 #
