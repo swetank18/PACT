@@ -32,7 +32,7 @@ against the single-port build. One failure, and it is a real one.**
 | | | |
 | --- | --- | --- |
 | Transport and server errors | **none** in 49,501 purchases | OK |
-| RSS | 88 MB cold → **154 MB**, climbing **+21 MB/hour** and not flattening | **FAIL** — cause found, below |
+| RSS | 88 MB cold → **154 MB**, climbing **+21 MB/hour** and not flattening | **FAIL** — found and fixed, below |
 | File descriptors | 105–110, ended on 105 | OK |
 | Threads | 27, throughout | OK |
 | Latency | p50 66 ms at the start, 67 ms at the end (1.02×) | OK |
@@ -46,11 +46,12 @@ The one failure is the memory line and it is worth having. At 21 MB/hour a
 Nothing about a demo goes near that — the run of show is 66 seconds — but "leave
 it deployed over a weekend" does, and before this run nobody knew.
 
-**Four fifths of that line has since been found and closed**: the simulated rail
-was keeping every intent it ever created, at 663 bytes a purchase. See *Found:
-the rail remembered every purchase*, below. The table above is left as it was
-measured on the day — it is the run that found the problem, and rewriting it
-would delete the evidence.
+**That line has since been found and closed**, and the fix was confirmed on
+2026-09-07 by a run that crosses the fix while it is running: 620 bytes a
+purchase before, 7 after. The simulated rail was keeping every intent it ever
+created. See *Found: the rail remembered every purchase*, below. The table above
+is left as it was measured on the day — it is the run that found the problem,
+and rewriting it would delete the evidence.
 
 Everything else is the answer you want. The descriptor count is the one that
 would have been most expensive to get wrong: one SSE subscriber, held open for
@@ -174,17 +175,27 @@ Measured three ways, which agree:
 | --- | --- | ---: |
 | The maps alone, quiesced, with real key shapes | 50,000 purchases | **662 bytes each** |
 | A live instance, idle RSS against purchases | 25,070 purchases | **663 bytes each** |
-| The same instance with the maps bounded | 25,070 purchases | **55 bytes each** |
+| The same instance under `tracemalloc` | 12,022 purchases | **662.8 bytes each** |
 
-The isolated figure and the live figure agreeing to one byte is the part worth
-trusting. The idempotency key is a sha256 hexdigest, so 64 characters of it is
-string; the rest is the intent, its two dictionary entries and the result.
+Three instruments that fail differently, agreeing to a byte. The idempotency key
+is a sha256 hexdigest, so 64 characters of it is string; the rest is the intent,
+its two dictionary entries and the result.
 
-At the two-hour soak's 6.9 purchases a second, 663 bytes a purchase is
-**16.5 MB an hour** — against the 21 MB an hour that run measured for the whole
-process and could not account for. So the rail is about **four fifths of the
-line**, and what is left is 4.5 MB an hour, under the 8 MB an hour this harness
-fails a run for.
+`tracemalloc` is the one that settles what kind of memory it is. RSS cannot tell
+"something holds a reference" from "the allocator kept freed pages"; tracemalloc
+only sees live Python allocations, and it named the lines:
+
+```
++175.8 B/purchase  rails/mock_upi/adapter.py:118  _Intent(intent_id=new_id(...))
++104.9 B/purchase  rails/razorpay/client.py:81    idempotency_key(...).hexdigest()
+ +87.9 B/purchase  rails/mock_upi/adapter.py:154  RailResult(ok=True, ...)
+ +71.9 B/purchase  rails/mock_upi/adapter.py:122  intent.payment_id = ...
+ +25.9 B/purchase  ×3, the three dictionary inserts
+```
+
+with a live-object census of **+1.00 `_Intent` and +1.00 `RailResult` per
+purchase**, never released. So the allocator was never the story. It was a
+reference, held on purpose, by code that had no reason to let go.
 
 ### The fix, and why a cap rather than a sweeper
 
@@ -199,10 +210,41 @@ is forgotten, and by then it settled 20,000 purchases ago — forty-eight minute
 at the soak's rate, and further past anything that replays than the saga's
 retries, which are seconds apart. The ceiling is about 13 MB.
 
-The confirmation run above used a cap of 2,000 rather than the shipped 20,000,
-so that eviction would start early enough to be measured inside 25,000
-purchases: 55 bytes a purchase, and the maps sat at exactly 2,000 entries while
-the counter behind them reached 25,070.
+### Confirmed: 2026-09-07, two hours, the slope changing inside one run
+
+The run that settles it is a normal `scripts/soak.py` at the reference settings
+— four buyers, half a second of think time, 6.8 purchases a second — carried
+past 20,000 purchases so the cap engages **while it is running**. The same
+process, the same load, the same database, before and after:
+
+| Fitted against purchases, not the clock | | |
+| --- | ---: | ---: |
+| Before the cap, 3,000–18,000 purchases | **620 bytes a purchase** | 15.4 MB/hour at 6.9/s |
+| After the cap, 21,000 purchases on | **7 bytes a purchase** | 0.17 MB/hour |
+
+Seven bytes, against `tracemalloc`'s 8.7 measured a different way. The harness's
+own verdict on the same run is **PASS**, RSS 116–127 MB, and it no longer
+matters much what the residual is: it is not distinguishable from noise, and the
+fit over the last third of the run is very slightly *negative*.
+
+**Why this is fitted against purchases.** The laptop suspended twice mid-run, for
+ten minutes and then twenty-nine. Wall-clock time advances through a suspend and
+the process does no work, so a clock-based trend is flattered by exactly the
+dead time — the harness reported +2.0 MB/hour, and that number is too kind.
+Indexing on purchases is immune to it, and it is also what makes the before and
+after comparable when the rate wanders.
+
+**A run shorter than 20,000 purchases cannot see this fix.** Two attempts here
+measured nothing and looked like they had measured something: a forty-minute
+soak that settled 16,483 purchases, and a 25,000-purchase comparison where the
+cap only bit in the last fifth. Both reported the *old* behaviour. If you are
+checking this, count purchases, not minutes.
+
+An earlier confirmation used a cap of 2,000 rather than the shipped 20,000, so
+that eviction would start early enough to measure inside a short run: the maps
+sat at exactly 2,000 entries while the counter behind them reached 25,070, and
+`tracemalloc` fell from 662.8 to **8.7 bytes a purchase** with `_Intent` and
+`RailResult` gone from the census entirely.
 
 The two runs agreeing on bytes-per-order to 0.05% — 5,900 against 5,903, from
 completely different starting states — is the strongest evidence here that both
@@ -283,16 +325,16 @@ lower than 5,897.
 
 ## What this still does not answer
 
-- **Whether the line is flat now, over hours rather than minutes.** The rail
-  accounted for 663 of the 845 bytes a purchase the two-hour run implied, and
-  bounding it took the measured figure to 55. What remains is about 4.5 MB an
-  hour, under the 8 this harness fails a run for — but that is a number from a
-  twelve-minute purchase-indexed run, not from two hours against the clock. The
-  two-hour soak has not been re-run since the fix, and nothing here has run
-  overnight.
-- **What the last fifth is.** Four fifths of the line is accounted for. The
-  remainder has not been chased, and at this size it may be allocator retention
-  rather than anything holding a reference.
+- **Days, rather than the two hours this now passes.** The line is flat after
+  the cap — 7 bytes a purchase, and the harness passes the run — but the longest
+  clean stretch here is still one soak, and nothing has run overnight. What is
+  left to find at 7 bytes a purchase is not a leak; it is whether something else
+  appears at hour nine that two hours cannot show.
+- **The RSS floor, which is not zero.** The process settles around 116–127 MB
+  serving a 200 MB database, and that level is a property of the process rather
+  than of the data — the control run established it and the fix did not change
+  it. A 512 MB machine holds it comfortably. A smaller one would need the SQLite
+  page cache sized deliberately rather than left at its default per connection.
 - **Days, not hours.** Two hours is enough to separate warm-up from a leak. It
   is not enough to see a slow fragmentation, a log rotation, or a certificate
   expiring.
