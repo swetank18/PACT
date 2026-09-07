@@ -417,6 +417,72 @@ def test_every_relative_link_in_the_docs_resolves():
     assert not dead, "dead links: " + ", ".join(dead)
 
 
+def test_the_documented_test_counts_are_the_real_ones(request):
+    """
+    A test count written into prose, and then not updated.
+
+    On 2026-09-07 the README said 185 in one place, HANDOFF said 186, and the CI
+    job name said 114, against a suite that collects 189. The console count was
+    52 in the README and 55 in HANDOFF. Nothing was wrong with the suite: the
+    number simply lives in five files and had been updated in fewer than five.
+
+    It is worth asserting because of who reads it. "188 tests, all green" is the
+    first claim a judge can check and the cheapest one to check — run the suite
+    and count — so a number that is merely old reads exactly like a number that
+    was inflated.
+
+    What is asserted is what pytest **collects**, not what passes: one test in
+    `test_headroom.py` skips unless the clone predates the key purge, so the
+    passing count differs between machines and asserting on it would fail here
+    on some of them and not others.
+
+    The console count cannot be collected from Python without running vitest, so
+    the three places that state it are asserted to agree with *each other* —
+    which is the drift that actually happened.
+    """
+    collected = {item.location[0].replace("\\", "/") for item in request.session.items}
+    on_disk = {f"tests/{p.name}" for p in (REPO / "tests").glob("test_*.py")}
+    if collected != on_disk:
+        pytest.skip("only part of the suite was collected; this needs ./scripts/test.sh")
+
+    total = len(request.session.items)
+    readme = (REPO / "README.md").read_text()
+    handoff = (REPO / "HANDOFF.md").read_text()
+    ci = (REPO / ".github" / "workflows" / "ci.yml").read_text()
+
+    def stated(where: str, text: str, pattern: str) -> int:
+        found = re.search(pattern, text)
+        assert found is not None, (
+            f"{where}: the line this asserts on is gone. Either restore it or drop "
+            f"the claim here — pattern was {pattern!r}"
+        )
+        return int(found.group(1))
+
+    both = r"(\d+)\s+Python\s+tests,\s+(\d+)\s+console\s+tests"
+    python_claims = {
+        "README.md, the quickstart": stated(
+            "README.md", readme, r"scripts/test\.sh\s+#\s*(\d+)\s+tests"
+        ),
+        "README.md, what CI proves": stated("README.md", readme, both),
+        "HANDOFF.md, section 1": stated("HANDOFF.md", handoff, both),
+        "ci.yml, the job name": stated("ci.yml", ci, r"name:\s+python\s+\((\d+)\s+tests"),
+    }
+    wrong = [f"{where} says {n}" for where, n in python_claims.items() if n != total]
+    assert not wrong, (
+        f"the suite collects {total} tests but " + ", ".join(wrong) + ". Update them."
+    )
+
+    console_claims = {
+        "README.md": int(re.search(both, readme).group(2)),  # type: ignore[union-attr]
+        "HANDOFF.md": int(re.search(both, handoff).group(2)),  # type: ignore[union-attr]
+        "ci.yml": stated("ci.yml", ci, r"name:\s+console\s+\((\d+)\s+tests"),
+    }
+    assert len(set(console_claims.values())) == 1, (
+        "the console test count disagrees with itself: "
+        + ", ".join(f"{where} says {n}" for where, n in console_claims.items())
+    )
+
+
 # ------------------------------------------------------- the console build ---
 
 

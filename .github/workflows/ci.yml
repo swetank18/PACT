@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   python:
-    name: python (114 tests, layering, contract drift)
+    name: python (190 tests, layering, contract drift)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +48,7 @@ jobs:
             || { echo "::error::contracts/generated.ts is stale. Run scripts/gen_ts_contracts.py and commit it."; exit 1; }
 
   console:
-    name: console (32 tests, typecheck, build)
+    name: console (55 tests, typecheck, build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

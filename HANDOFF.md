@@ -125,16 +125,17 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **186 Python tests, 55 console
-tests**, all green, plus two GitHub Actions workflows that build the container
-image and drive the six demo beats and every console surface against it on
-every push.
+~11k lines of Python, ~10k of TypeScript. **190 Python tests, 55 console
+tests**, all green — one Python test skips unless the clone predates the key
+purge, so a run reports 189 passed and 1 skipped — plus two GitHub Actions
+workflows that build the container image and drive the six demo beats and every
+console surface against it on every push.
 
 Added 2026-09-05: a fifth console surface, `#/firewall` — the **principal's**
-console, built to `userUI(1).md`. The other four answer the merchant's
-questions; this one answers the person whose money it is. Six tabs, light mode,
-its own kill switch. `console/README.md` has the detail; the two decisions
-worth carrying are in section 4.
+console, built to [`docs/user-ui-spec.md`](docs/user-ui-spec.md). The other four
+answer the merchant's questions; this one answers the person whose money it is.
+Six tabs, light mode, its own kill switch. `console/README.md` has the detail;
+the two decisions worth carrying are in section 4.
 
 ---
 
@@ -373,7 +374,7 @@ envelope's zero, because rendering the zero would claim it was fully spent.
 **The firewall never shows a number the engine did not produce.** The health
 score, the threat card and the budget bars are all functions of the headroom
 envelope and the decision list. Where there is no answer the screen says so. The
-sharpest case is the intent meter: `userUI(1).md` asks for a confidence
+sharpest case is the intent meter: `docs/user-ui-spec.md` asks for a confidence
 percentage, and `core/gate/auditor.py` answers `matches_intent` as a **boolean**.
 The meter renders the engine's actual answer and says on screen that the auditor
 answers yes or no — inventing a percentage to fill the bar would have been the
