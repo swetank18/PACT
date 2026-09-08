@@ -1,20 +1,26 @@
 """
-The nine checks.
+The ten checks.
 
 Ordered cheapest and most certain first, short circuiting, each timed. The
 order is frozen in `contracts.reason_codes.CHECK_ORDER` and is the design:
 
-  1. request_signature   Ed25519 by the delegate pubkey
-  2. mandate_signature   verified at registration, re-asserted here
-  3. mandate_state       exists, not revoked
-  4. validity_window
-  5. freshness           within 60s clock skew
-  6. replay              nonce INSERT; the uniqueness violation IS the replay
-  7. scope               merchant allowlist and category allowlist
-  8. ceiling             atomic reservation
-  8b. quote_binding      the amount must equal the quote it references
-  9. intent              the model auditor, last because it is the only
-                         network call
+   1. request_signature   Ed25519 by the delegate pubkey
+   2. mandate_signature   verified at registration, re-asserted here
+   3. mandate_state       exists, not revoked
+   4. validity_window
+   5. freshness           within 60s clock skew
+   6. replay              nonce INSERT; the uniqueness violation IS the replay
+   7. scope               merchant allowlist and category allowlist
+   8. ceiling             atomic reservation
+   9. quote_binding       the amount must equal the quote it references
+  10. intent              the model auditor, last because it is the only
+                          network call
+
+Ten, counted the way the product counts them. quote_binding used to be numbered
+8b here, which made the prose say "nine" while CHECK_ORDER held ten entries and
+the firewall drawer printed "10 checks ran, 0 skipped" on screen. A private
+numbering convention is not worth a number that disagrees with the product in
+front of the person being shown it.
 
 Each check is a plain function of a context. They do not know about HTTP, they
 do not know about rails, and they return a code rather than raising, so the

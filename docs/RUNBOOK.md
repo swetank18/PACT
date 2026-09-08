@@ -67,7 +67,7 @@ saga step delay is 0.35 s against 0.05 s — so budget a little more.
 | 0 | `0` | 4 s | The board clears | "Nothing up my sleeve. This is a cold instance." |
 | 1 | *Grant* → **Grant and sign** | 4 s | A real Ed25519 signature, then the mandate chip in the header | "The human signs the delegation **on their device**. The agent never gets the key. It carries a signed envelope — ₹15,000, five purchases, three categories." |
 | 2 | *type nothing*, **Send** | 7 s | Quote card, headroom bar, gate verdict | "The agent shops. The merchant prices it server side and the gate decides on authority alone." |
-| 3 | `1` | 4 s | An order, a decision, eight checks in order | "End to end. Discovery, mandate, quote, gate, settlement — milliseconds, and every check is on screen including the ones that were skipped." |
+| 3 | `1` | 4 s | An order, a decision, ten checks in order | "End to end. Discovery, mandate, quote, gate, settlement — milliseconds, and every check is on screen including the ones that were skipped." |
 | 4 | `2` | 4 s | An addon offered and accepted, AOV rises | "**This is the product.** The merchant read the buyer's remaining authority *before* it made the offer, so the offer was provably approvable." |
 | 5 | `3` | 2 s | The same offer, made blind, rejected | "The obvious build. Recommend, then find out. `CEILING_PER_TXN` — a failed offer and a buyer who now distrusts the agent." |
 | 6 | `4` | 2 s | Four blocks, four reason codes | "Replay, a merchant outside scope, a tampered amount, a prompt injection in a product description. Each one a machine-readable code, not prose." |

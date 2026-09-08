@@ -1,5 +1,5 @@
 """
-The intent auditor. Check nine, and the only one that is not deterministic.
+The intent auditor. Check ten, and the only one that is not deterministic.
 
 Two rules govern it, both from the shared contract:
 

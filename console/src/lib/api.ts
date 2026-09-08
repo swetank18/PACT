@@ -96,7 +96,7 @@ export const gate = {
   decision: (decisionId: string) => get<Decision>(`${GATE}/v1/decisions/${decisionId}`),
 
   /**
-   * The nine checks. Returns a decision whatever happens — an error path that
+   * The ten checks. Returns a decision whatever happens — an error path that
    * throws instead of returning BLOCK would be failing open.
    */
   authorize: (req: AuthorizeRequest) => post<Decision>(`${GATE}/v1/authorize`, req),

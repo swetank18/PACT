@@ -7,7 +7,7 @@ different programs and calling it a comparison.
 
     --gate=off      no authority check at all. Arm B.
     --gate=naive    a hard client-side spend cap. Arm C.
-    --gate=pact     the full nine checks. Arm D.
+    --gate=pact     the full ten checks. Arm D.
 
     --upsell=off       never take an addon
     --upsell=naive     take whatever is offered, blind. Arm C.

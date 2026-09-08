@@ -250,7 +250,7 @@ def slide_title(slide) -> None:
     # fields. Three measured numbers sit there rather than nothing, because this
     # is the slide a judge looks at longest while the team is still walking up.
     proof = [
-        (ALLOW, "194 + 55 tests, green on every push"),
+        (ALLOW, "195 + 55 tests, green on every push"),
         (LINK, "49,501 purchases settled in a two-hour soak"),
         (STEPUP, "0% false blocks vs 28% for a client-side cap"),
     ]
@@ -384,7 +384,7 @@ def slide_technical(slide) -> None:
                  anchor=MSO_ANCHOR.MIDDLE)
     write(
         tf,
-        [("194 Python tests, 55 console tests, and the six demo beats run against the "
+        [("195 Python tests, 55 console tests, and the six demo beats run against the "
           "image itself on every push.", 15.5, True, WHITE, 0)],
         first=True,
     )
@@ -491,7 +491,7 @@ def slide_feasibility(slide) -> None:
         ("49,501", "purchases in a two-hour soak,\nzero transport or server errors", ALLOW),
         ("\u20b94.86 cr", "settled, and the ledger agreed\nwith the harness to the paise", ALLOW),
         ("53 / s", "measured ceiling, 32 buyers,\n200/200 completed", LINK),
-        ("~4 ms", "for the gate to reach ALLOW\nacross its nine checks", LINK),
+        ("~4 ms", "for the gate to reach ALLOW\nacross its ten checks", LINK),
     ]
     stat_h = Inches(2.15)
     for i, (value, label, colour) in enumerate(stats):
@@ -565,7 +565,7 @@ def slide_team(slide) -> None:
     lanes = [
         (LINK, "LANE A — BACKEND",
          "contracts/  core/  rails/  merchant/",
-         "The gate and its nine checks, the reservation ledger, the quote engine, the "
+         "The gate and its ten checks, the reservation ledger, the quote engine, the "
          "rollback saga and the settlement rails."),
         (ALLOW, "LANE B — EVIDENCE",
          "buyer/  sim/  eval/",

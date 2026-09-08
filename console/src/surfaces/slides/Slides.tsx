@@ -150,7 +150,7 @@ function SlideArchitecture() {
       </div>
 
       <div className={s.flow}>
-        mandate → quote → headroom → offer → signed authorize → 9 checks → settle → saga
+        mandate → quote → headroom → offer → signed authorize → 10 checks → settle → saga
       </div>
 
       <p className={s.lede}>

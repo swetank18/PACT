@@ -112,7 +112,7 @@ merchant can **read the buyer's remaining spending authority before it quotes**,
 so every offer it makes is provably approvable.
 
 Three planes: a merchant (catalog, deterministic quotes, checkout), a growth
-layer (headroom-aware upsell, recovery), and a trust layer (signed mandate, nine
+layer (headroom-aware upsell, recovery), and a trust layer (signed mandate, ten
 checks, audit trail, rollback saga).
 
 The work was organised as three lanes. **All three are now on `main` and all
@@ -125,7 +125,7 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **194 Python tests, 55 console
+~11k lines of Python, ~10k of TypeScript. **195 Python tests, 55 console
 tests**, all green — one Python test skips unless the clone predates the key
 purge, so a run reports 189 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every

@@ -417,6 +417,68 @@ def test_every_relative_link_in_the_docs_resolves():
     assert not dead, "dead links: " + ", ".join(dead)
 
 
+#: Only the range this project's prose actually reaches. A wider table would be
+#: pretending to a generality nothing needs.
+_WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11}
+
+
+def test_everything_that_states_how_many_checks_there_are_agrees_with_the_gate():
+    """
+    `CHECK_ORDER` is the gate. Everything else is a claim about it.
+
+    They disagreed. checks.py numbered them 1-9 with quote_binding as "8b" and
+    called it "the nine checks"; six other places repeated the nine; and
+    CHECK_ORDER held ten entries while the firewall drawer printed "10 checks
+    ran, 0 skipped" on screen, in the recorded walkthrough, next to a slide
+    saying nine.
+
+    The count is the first thing anyone reading the design counts and the
+    cheapest claim in the project to check, so a stale one reads exactly like a
+    careless one. Asserted against `len(CHECK_ORDER)` rather than against a
+    literal, so adding a check moves every claim or fails here.
+    """
+    total = len(CHECK_ORDER)
+
+    #: (file, pattern capturing the count, what it is). Prose is spelled out and
+    #: the two UI strings are digits, so both spellings are accepted.
+    claims = [
+        ("core/gate/checks.py", r"The (\w+) checks\."),
+        ("contracts/reason_codes.py", r"The (\w+) checks, in the order they run"),
+        ("core/gate/auditor.py", r"The intent auditor\. Check (\w+),"),
+        ("buyer/agent.py", r"the full (\w+) checks"),
+        ("console/src/lib/api.ts", r"The (\w+) checks\. Returns a decision"),
+        ("console/src/surfaces/slides/Slides.tsx", r"signed authorize → (\d+) checks"),
+        ("scripts/gen_hacksummit_deck.py", r"across its (\w+) checks"),
+        ("scripts/gen_hacksummit_deck.py", r"The gate and its (\w+) checks"),
+        ("docs/RUNBOOK.md", r"a decision, (\w+) checks in order"),
+    ]
+
+    wrong = []
+    for path, pattern in claims:
+        text = (REPO / path).read_text(encoding="utf-8")
+        found = re.search(pattern, text)
+        assert found is not None, (
+            f"{path}: the line this asserts on is gone. Either restore it or drop "
+            f"the claim here — pattern was {pattern!r}"
+        )
+        raw = found.group(1)
+        stated = _WORDS.get(raw.lower(), None) if not raw.isdigit() else int(raw)
+        assert stated is not None, f"{path}: cannot read {raw!r} as a number"
+        if stated != total:
+            wrong.append(f"{path} says {raw}")
+
+    assert not wrong, (
+        f"CHECK_ORDER has {total} entries but " + ", ".join(wrong) + ". Update them."
+    )
+
+    # The auditor is last for a reason — it is the only check that leaves the
+    # process — and "check ten" is only true while it stays there.
+    assert CHECK_ORDER[-1] == "intent", (
+        "the intent auditor is no longer last, so core/gate/auditor.py calling "
+        "itself the last check is now false"
+    )
+
+
 def test_the_documented_test_counts_are_the_real_ones(request):
     """
     A test count written into prose, and then not updated.

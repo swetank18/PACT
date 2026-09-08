@@ -71,7 +71,7 @@ class ReasonCode(StrEnum):
     TOKEN_EXPIRED = "TOKEN_EXPIRED"
 
 
-#: The nine checks, in the order they run: cheapest and most certain first,
+#: The ten checks, in the order they run: cheapest and most certain first,
 #: short circuiting. 8b (quote binding) sits between ceiling and intent.
 #: Never reorder. The order is the design, and Lane C renders it verbatim.
 CHECK_ORDER: tuple[str, ...] = (
