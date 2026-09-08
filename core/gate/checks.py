@@ -257,7 +257,7 @@ def check_ceiling(ctx: CheckContext) -> CheckOutcome:
     return PASS
 
 
-# -------------------------------------------------------------------- 8b ---
+# --------------------------------------------------------------------- 9 ---
 
 
 def check_quote_binding(ctx: CheckContext) -> CheckOutcome:
@@ -291,7 +291,7 @@ def check_quote_binding(ctx: CheckContext) -> CheckOutcome:
     return PASS
 
 
-# --------------------------------------------------------------------- 9 ---
+# -------------------------------------------------------------------- 10 ---
 
 #: Deterministic injection patterns. These run whether or not a model auditor is
 #: configured, so the system has a real answer with no API key — rule 2 of the

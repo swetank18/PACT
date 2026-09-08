@@ -79,9 +79,9 @@ class Auditor:
 
         if not self.api_key:
             log.warning(
-                "No auditor API key. Running in deterministic mode: checks 1 to 8b "
+                "No auditor API key. Running in deterministic mode: checks 1 to 9 "
                 "plus the injection pattern scan. This is a complete system; the "
-                "auditor is the ninth check and it is optional by design."
+                "auditor is the tenth check and it is optional by design."
             )
 
     @property

@@ -72,7 +72,9 @@ class ReasonCode(StrEnum):
 
 
 #: The ten checks, in the order they run: cheapest and most certain first,
-#: short circuiting. 8b (quote binding) sits between ceiling and intent.
+#: short circuiting. quote_binding sits between ceiling and intent because it
+#: rides on the ceiling check — which is why it used to be numbered 8b, and why
+#: the prose in three files said nine while this tuple held ten.
 #: Never reorder. The order is the design, and Lane C renders it verbatim.
 CHECK_ORDER: tuple[str, ...] = (
     "request_signature",
