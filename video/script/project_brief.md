@@ -116,17 +116,24 @@ Everything asserted in the film, and what backs it.
 
 Two things surfaced while filming, both worth acting on independently of the video.
 
-**The console's upsell attach tile does not count what it appears to count.**
-`merchant/upsell.py` increments `offers_made` whenever the merchant suggests
-add-ons, but `record_acceptance()` has exactly one caller —
-`POST /v1/orders/{id}/accept_alternative`, the *rollback recovery* path
-(`merchant/app.py:306`). An add-on accepted in the normal checkout flow is
-re-quoted into the order and settles, but never increments `offers_accepted`.
-So the tile read "0 of 7 offers accepted · 0%" on a run where an add-on had in
-fact been accepted and was visible in the order line. The film was re-cut around
-the checkout surface, where acceptance is visible as a state change (`Add` →
-`added`) rather than as a counter, and the narration claims only what that
-surface shows.
+**The console's upsell attach tile did not count what it appeared to count.**
+**Fixed 2026-09-09.** `merchant/upsell.py` increments `offers_made` whenever the
+merchant suggests add-ons, but `record_acceptance()` had exactly one caller —
+`POST /v1/orders/{id}/accept_alternative`, the *rollback recovery* path. An
+add-on accepted in the normal checkout flow is re-quoted into the order and
+settles, and never incremented `offers_accepted`. So the tile read "0 of 7
+offers accepted · 0%" on a run where an add-on had in fact been accepted and was
+visible in the order line.
+
+A re-quote now names the quote it replaces, and `record_requote()` decides what
+counts: a SKU has to be new to the basket *and* one the engine actually offered
+against that quote. Beats 1 and 2 against a cold instance put the tile at 1 of
+3, 33.3%, agreeing with the beat's own `upsell_accepted`.
+
+The film was cut around the checkout surface before the fix, where acceptance is
+visible as a state change (`Add` → `added`) rather than as a counter. That cut
+stands — it is the better shot, because a person performing the acceptance is
+the point — and the merchant board behind it now tells the truth as well.
 
 **A stale headroom poll after a reset.** The first take logged one 404:
 `GET /api/gate/v1/mandates/{id}/headroom` for a mandate the reset had just

@@ -38,9 +38,12 @@ that catches a beat left half-finished by the first.
 
 Beat `2` still runs in the take — it fills the merchant board for the beats that
 follow — but the film cuts the acceptance from the checkout surface at step 3,
-where a person performs it. The console's attach tile counts only
-`accept_alternative`, so an add-on accepted in the ordinary flow does not move
-it; see the finding in `script/project_brief.md`.
+where a person performs it, because that is the better shot.
+
+The attach tile used to read 0% behind it, counting only `accept_alternative`
+and so missing every add-on taken the ordinary way. Fixed on 2026-09-09; see the
+finding in `script/project_brief.md`. The board now moves when an add-on is
+taken, which makes step 4 read correctly on camera as well.
 
 Beat `6` (a duplicate webhook that does nothing) is exercised by CI but left out
 of the film: it is the least legible beat on camera, and the runtime is better
