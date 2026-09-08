@@ -2,8 +2,17 @@
 #
 # Blueprint deploy: point Render at this repo and it reads this file.
 #
-# NOT DEPLOYED — no Render credentials here. The image it runs is the one CI
-# builds and smoke tests on every push.
+# DEPLOYED, but not as this file describes it. pact-9btr.onrender.com has been
+# live since 2026-09-05, created through scripts/render.py, and it answers
+# /healthz with all four sub-apps mounted. It runs on the **free** plan, not the
+# `starter` below: starter was refused with a 402 for want of a card on the
+# workspace. Free has no disk, so /data is ephemeral — a restart issues a new
+# gate signing key and empties the ledger, and every headroom envelope already
+# handed out stops verifying. Add a card and
+# `RENDER_API_KEY=… python3 scripts/render.py create --plan starter` builds the
+# one this file actually specifies.
+#
+# The image it runs is the one CI builds and smoke tests on every push.
 
 services:
   - type: web

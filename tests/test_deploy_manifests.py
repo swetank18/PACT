@@ -28,6 +28,7 @@ import re
 import tomllib
 from pathlib import Path
 
+import pytest
 import yaml
 
 REPO = Path(__file__).resolve().parent.parent
@@ -188,3 +189,32 @@ def test_no_live_credential_is_baked_into_a_manifest():
         # pushed, and one of them has been in this repository's history before.
         assert not re.search(r"rzp_test_\w", text), path
         assert not re.search(r"sk-ant-\w", text), path
+
+
+def test_no_manifest_claims_a_target_is_undeployed_that_the_docs_say_is_live():
+    """
+    A deployment status written into a file that nothing re-reads.
+
+    `render.yaml` carried "NOT DEPLOYED — no Render credentials here" for four
+    days after Render was deployed, and `scripts/deploy.sh` carried the same
+    line until a commit fixed it there and missed this one. Both were written
+    when they were true. Nobody re-reads a header comment, which is exactly why
+    it is the kind of claim that rots: the file it sits in is correct, so
+    nothing about it fails.
+
+    This asserts the negative rather than the positive — that no manifest says
+    "not deployed" while README.md and HANDOFF.md give a live URL. Whether the
+    instance is up is a question for `scripts/deploy.sh check`, which makes a
+    request; this is about the tree contradicting itself.
+    """
+    docs = (REPO / "README.md").read_text() + (REPO / "HANDOFF.md").read_text()
+    live = re.findall(r"https://([a-z0-9-]+\.onrender\.com)", docs)
+    if not live:
+        pytest.skip("no deployed Render URL is claimed anywhere, so there is nothing to contradict")
+
+    for name in ("render.yaml", "scripts/deploy.sh"):
+        text = (REPO / name).read_text()
+        assert not re.search(r"NOT DEPLOYED|not been deployed|no Render credentials", text), (
+            f"{name} says the Render target is undeployed, but the docs give "
+            f"{live[0]} as live. One of them is stale."
+        )
