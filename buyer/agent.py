@@ -198,10 +198,27 @@ class BuyerAgent:
         r.raise_for_status()
         return r.json()["products"]
 
-    def quote(self, items: list[dict[str, Any]], mandate_id: str | None) -> dict[str, Any]:
+    def quote(
+        self,
+        items: list[dict[str, Any]],
+        mandate_id: str | None,
+        from_quote_id: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        `from_quote_id` is set only when this re-quote is an addon being taken.
+
+        The harness counts acceptance itself, so the arms in `results.md` never
+        depended on this. The merchant's own attach tile did, and without it
+        that tile read 0% through every demo beat that took an addon — the one
+        number on the merchant console that the growth feature exists to move.
+        """
         r = self.http.post(
             f"{self.merchant_url}/v1/quote",
-            json={"items": items, "mandate_id": mandate_id},
+            json={
+                "items": items,
+                "mandate_id": mandate_id,
+                "from_quote_id": from_quote_id,
+            },
         )
         r.raise_for_status()
         return r.json()

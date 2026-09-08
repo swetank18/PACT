@@ -161,8 +161,23 @@ export const merchant = {
 
   saga: (orderId: string) => get<{ steps: SagaStep[] }>(`${MERCHANT}/v1/orders/${orderId}/saga`),
 
-  quote: (items: Array<{ sku: string; qty: number }>, mandateId?: string) =>
-    post<Quote>(`${MERCHANT}/v1/quote`, { items, mandate_id: mandateId ?? null }),
+  /**
+   * `fromQuoteId` is set only when this re-quote is an addon being accepted.
+   * Acceptance is a re-quote here rather than an endpoint — the console does
+   * no arithmetic that reaches a payload — so naming the quote it replaces is
+   * the only way the merchant can tell an accepted offer from a fresh basket.
+   * It counts nothing on the client's say-so: it counts SKUs it offered.
+   */
+  quote: (
+    items: Array<{ sku: string; qty: number }>,
+    mandateId?: string,
+    fromQuoteId?: string,
+  ) =>
+    post<Quote>(`${MERCHANT}/v1/quote`, {
+      items,
+      mandate_id: mandateId ?? null,
+      from_quote_id: fromQuoteId ?? null,
+    }),
 
   suggestAddons: (quoteId: string, mandateId: string) =>
     post<{ addons: Addon[]; filtered_out: number }>(`${MERCHANT}/v1/suggest_addons`, {

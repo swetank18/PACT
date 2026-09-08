@@ -209,6 +209,16 @@ async def quote(request: QuoteRequest) -> dict:
         )
     except KeyError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+    # An accepted addon arrives here, as a re-quote of the same basket with the
+    # extra SKU on it, rather than at an endpoint of its own. Ask the upsell
+    # engine whether that is what this is; it only counts SKUs it actually
+    # offered against the quote named. See `UpsellEngine.record_requote`.
+    if request.from_quote_id:
+        previous = await asyncio.to_thread(service.quotes.get, request.from_quote_id)
+        if previous is not None and service.upsell.record_requote(previous, q):
+            service.publish_stats()
+
     service.bus.publish("quote", q.model_dump())
     return q.model_dump()
 

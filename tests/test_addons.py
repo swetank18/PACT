@@ -16,6 +16,8 @@ import pytest
 
 from contracts.reason_codes import Verdict
 from contracts.schemas import QuoteItemRequest
+from merchant import upsell as upsell_module
+from merchant.catalog import BY_SKU
 
 
 def _quote_and_headroom(quotes, gate, mandate, skus):
@@ -156,3 +158,89 @@ def test_the_counters_lane_b_needs_are_incremented(quotes, gate, make_mandate, m
     assert counters.offers_made == len(offers)
     assert counters.offers_filtered_by_headroom == filtered
     assert counters.offers_accepted == 1
+
+
+# ------------------------------------------------------ attach, as measured ---
+#
+# The counter these cover had exactly one caller for the life of the project —
+# the rollback recovery path — while the ordinary way to accept an addon is a
+# re-quote. So the merchant console's attach tile read "0 of 7 offers accepted ·
+# 0%" on runs where an addon had been accepted and was visible in the order line
+# on the panel beside it. The growth feature's own number, measuring nothing.
+#
+# A test that calls `record_acceptance` directly cannot catch that, because the
+# bug was that nothing called it. These drive the re-quote instead.
+
+
+def _requote_with(quotes, mandate, quote, sku):
+    return quotes.build(
+        [QuoteItemRequest(sku=line.sku, qty=line.qty) for line in quote.items]
+        + [QuoteItemRequest(sku=sku, qty=1)],
+        mandate_id=mandate.mandate_id,
+    )
+
+
+def test_accepting_an_addon_by_requoting_moves_the_attach_rate(
+    quotes, gate, make_mandate, merchant
+):
+    mandate = make_mandate()
+    q, headroom = _quote_and_headroom(quotes, gate, mandate, ["STA-NB-A5"])
+
+    offers, _ = merchant.upsell.suggest(q, headroom)
+    assert offers, "the fixture should produce at least one offer to be meaningful"
+
+    combined = _requote_with(quotes, mandate, q, offers[0].sku)
+    assert merchant.upsell.record_requote(q, combined) == 1
+    assert merchant.upsell.counters.offers_accepted == 1
+
+
+def test_a_sku_the_merchant_never_offered_does_not_count_as_an_acceptance(
+    quotes, gate, make_mandate, merchant
+):
+    """
+    The client names a quote; the merchant decides what an acceptance is. A
+    basket the buyer assembled themselves is a bigger order, not an attach.
+    """
+    mandate = make_mandate()
+    q, headroom = _quote_and_headroom(quotes, gate, mandate, ["STA-NB-A5"])
+
+    offers, _ = merchant.upsell.suggest(q, headroom)
+    offered = {a.sku for a in offers}
+    unoffered = next(sku for sku in BY_SKU if sku not in offered and sku != "STA-NB-A5")
+
+    combined = _requote_with(quotes, mandate, q, unoffered)
+    assert merchant.upsell.record_requote(q, combined) == 0
+    assert merchant.upsell.counters.offers_accepted == 0
+
+
+def test_the_same_quote_cannot_be_presented_twice(quotes, gate, make_mandate, merchant):
+    """Otherwise the attach rate is something the caller can inflate at will."""
+    mandate = make_mandate()
+    q, headroom = _quote_and_headroom(quotes, gate, mandate, ["STA-NB-A5"])
+
+    offers, _ = merchant.upsell.suggest(q, headroom)
+    combined = _requote_with(quotes, mandate, q, offers[0].sku)
+
+    assert merchant.upsell.record_requote(q, combined) == 1
+    assert merchant.upsell.record_requote(q, combined) == 0
+    assert merchant.upsell.counters.offers_accepted == 1
+
+
+def test_the_offer_memory_is_bounded(quotes, gate, make_mandate, merchant):
+    """
+    The one memory leak this project found was a map keyed by something that
+    grows with traffic and capped by nothing. This is that shape, so it is
+    capped, and the cap is asserted rather than assumed.
+    """
+    mandate = make_mandate()
+    headroom = gate.headroom_service.for_mandate(mandate.mandate_id)
+
+    for _ in range(upsell_module.OFFER_MEMORY + 50):
+        q = quotes.build(
+            [QuoteItemRequest(sku="STA-NB-A5")],
+            mandate_id=mandate.mandate_id,
+            headroom=headroom,
+        )
+        merchant.upsell.suggest(q, headroom)
+
+    assert len(merchant.upsell._offered) == upsell_module.OFFER_MEMORY

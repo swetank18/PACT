@@ -222,7 +222,7 @@ def _consider_addons(
     combined = [{"sku": i["sku"], "qty": i["qty"]} for i in quote["items"]]
     combined.append({"sku": chosen["sku"], "qty": 1})
     result.say(f"took the addon {chosen['sku']}")
-    return agent.quote(combined, mandate.id), True
+    return agent.quote(combined, mandate.id, from_quote_id=quote["quote_id"]), True
 
 
 # --------------------------------------------------------------- authorize ---

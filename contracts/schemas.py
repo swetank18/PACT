@@ -152,6 +152,14 @@ class QuoteItemRequest(Strict):
 class QuoteRequest(Strict):
     items: list[QuoteItemRequest]
     mandate_id: str | None = None
+    #: The quote this one replaces, when the caller is re-quoting because an
+    #: addon was accepted. Accepting an addon is a re-quote rather than an
+    #: endpoint — the console does no arithmetic that reaches a payload — so
+    #: without this the merchant cannot tell an accepted offer from a fresh
+    #: basket, and its attach rate reads 0% on runs where one plainly was
+    #: accepted. Naming a quote is all the client does; the merchant decides
+    #: what counts. See `UpsellEngine.record_requote`.
+    from_quote_id: str | None = None
 
 
 class Addon(Strict):

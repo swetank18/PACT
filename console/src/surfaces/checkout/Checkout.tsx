@@ -211,6 +211,7 @@ export function Checkout({
         finalQuote = await merchant.quote(
           [...q.items.map((i) => ({ sku: i.sku, qty: i.qty })), { sku: addon.sku, qty: 1 }],
           grant.mandate.mandate_id,
+          q.quote_id,
         );
         setQuote(finalQuote);
         say({ role: "card", card: { kind: "quote", quote: finalQuote } });
