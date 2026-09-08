@@ -1,0 +1,256 @@
+{
+  "meta": {
+    "project": "PACT",
+    "tagline": "The merchant reads what the buyer is allowed to spend, before it quotes.",
+    "resolution": "1920x1080",
+    "fps": 30,
+    "note": "This file is the single source of truth for the video. Narration drives the timing: each scene lasts as long as its voice-over plus lead-in and tail padding. Subtitles, scene renders and the final cut are all generated from here."
+  },
+  "scenes": [
+    {
+      "id": "S01",
+      "act": "1 - The problem",
+      "kind": "motion",
+      "template": "cold-open",
+      "onscreen": [
+        "PAYMENT: AUTHORISED",
+        "AUTHORITY: UNKNOWN"
+      ],
+      "narration": "An A I agent can now hold a payment credential and complete a checkout on your behalf. Agentic commerce standardised how that agent pays. It never gave the merchant any way to read what the agent is allowed to spend.",
+      "pad_in": 0.6,
+      "pad_out": 0.9
+    },
+    {
+      "id": "S02",
+      "act": "1 - The problem",
+      "kind": "motion",
+      "template": "three-failures",
+      "onscreen": [
+        "The upsell is made blind",
+        "A client-side cap is not a control",
+        "The gate becomes pure friction"
+      ],
+      "narration": "Three things follow. The merchant recommends and only then finds out, so the offer trips a limit it could not see. The obvious fix, a cap inside the agent, holds against the agent's own mistakes and nothing else, because a compromised agent simply does not run it. And bolted onto a blind merchant, every authority check can only subtract.",
+      "pad_in": 0.3,
+      "pad_out": 0.8
+    },
+    {
+      "id": "S03",
+      "act": "2 - The solution",
+      "kind": "motion",
+      "template": "identity",
+      "onscreen": [
+        "PACT",
+        "The merchant reads what the buyer is allowed to spend, before it quotes."
+      ],
+      "narration": "PACT closes that gap. A human signs a spending mandate in their own browser, on their own key. The agent carries that mandate and never the key. And before the merchant prices anything, it reads how much authority is left.",
+      "pad_in": 0.4,
+      "pad_out": 0.9
+    },
+    {
+      "id": "S04",
+      "act": "3 - How it works",
+      "kind": "motion",
+      "template": "architecture",
+      "onscreen": [
+        "HUMAN",
+        "AGENT",
+        "MERCHANT",
+        "GATE",
+        "LEDGER",
+        "RAIL"
+      ],
+      "narration": "The mandate is signed on the buyer's device with Ed25519. The agent carries it to the merchant, which reads the remaining headroom before it builds a quote. Every request then goes to the gate, which decides on authority alone, across ten checks in a fixed order, cheapest and most certain first. Only an allowed decision reaches a settlement rail.",
+      "pad_in": 0.3,
+      "pad_out": 0.8
+    },
+    {
+      "id": "S05",
+      "act": "3 - How it works",
+      "kind": "motion",
+      "template": "envelope",
+      "onscreen": [
+        "IN THE ENVELOPE",
+        "NEVER IN IT"
+      ],
+      "narration": "What the merchant reads is deliberately thin. Headroom remaining, purchases left, the per-transaction ceiling, allowed categories, expiry. Not the buyer's identity, not their intent, not their spend history, and never the total budget. A merchant that learns eight thousand nine hundred rupees remaining learns what it can sell. One that learns eight thousand nine hundred of fifteen thousand learns how rich the buyer is.",
+      "pad_in": 0.3,
+      "pad_out": 0.9
+    },
+    {
+      "id": "S06",
+      "act": "4 - Technical differentiation",
+      "kind": "motion",
+      "template": "race",
+      "onscreen": [
+        "BEGIN IMMEDIATE",
+        "atomic: 5 approved",
+        "naive: 20 approved"
+      ],
+      "narration": "Three things make this hold up. First, ceilings are reserved, not counted. The budget is summed over reservations inside the same immediate transaction that writes the new row. The naive read-then-write version is kept in the repository so the two can be run side by side: twenty concurrent agents against a five thousand rupee cap, and the naive ledger approves twenty of them and overspends by fifteen thousand.",
+      "pad_in": 0.3,
+      "pad_out": 0.8
+    },
+    {
+      "id": "S07",
+      "act": "4 - Technical differentiation",
+      "kind": "motion",
+      "template": "invariant",
+      "onscreen": [
+        "core/ enforces authority",
+        "rails/ moves money",
+        "no import, no vendor string"
+      ],
+      "narration": "Second, the gate decides authority and a rail moves money, and neither knows the other. Nothing in the core imports a rail. A test walks the syntax tree to enforce it, and a second test closes the loophole: no executable line in the core may even name a vendor.",
+      "pad_in": 0.3,
+      "pad_out": 0.8
+    },
+    {
+      "id": "S08",
+      "act": "4 - Technical differentiation",
+      "kind": "motion",
+      "template": "approvable",
+      "onscreen": [
+        "every suggested add-on",
+        "-> the real gate",
+        "one BLOCK fails the suite"
+      ],
+      "narration": "Third, every offer is provably approvable. The test suite puts every add-on the merchant suggests through the real gate, and a single block fails the build. That is the inversion: the same gate that refuses bad transactions now shapes good ones, so the spending limit stops being friction and becomes a conversion instrument.",
+      "pad_in": 0.3,
+      "pad_out": 1.0
+    },
+    {
+      "id": "S09",
+      "act": "5 - Live walkthrough",
+      "kind": "screen",
+      "mark": "grant",
+      "onscreen": [
+        "Granting authority",
+        "Ed25519, in the browser"
+      ],
+      "narration": "This is the running system. The human grants authority on their own device: fifteen thousand rupees, five purchases, three categories. The signature is produced in the browser, and the badge in the header is the console verifying that the browser's Ed25519 and canonical J S O N agree with the server's, byte for byte.",
+      "pad_in": 0.4,
+      "pad_out": 0.6
+    },
+    {
+      "id": "S10",
+      "act": "5 - Live walkthrough",
+      "kind": "screen",
+      "mark": "beat1",
+      "onscreen": [
+        "Discovery -> quote -> gate -> settlement"
+      ],
+      "narration": "The agent shops. The merchant prices the basket server side, the gate runs its checks in order, and the order settles. Every check is on screen, including the ones that were skipped, and the whole path takes milliseconds.",
+      "pad_in": 0.3,
+      "pad_out": 0.5
+    },
+    {
+      "id": "S11",
+      "act": "5 - Live walkthrough",
+      "kind": "screen",
+      "mark": "addon",
+      "onscreen": [
+        "The offer, made against headroom",
+        "FITS REMAINING AUTHORITY"
+      ],
+      "narration": "Now the product itself. The merchant read the remaining authority before it made this offer, which is why the badge on it says the item fits. The buyer accepts, the add-on is re-quoted into the same order, and the authority bar moves \u2014 an upsell that was approvable before it was ever shown.",
+      "pad_in": 0.3,
+      "pad_out": 0.5
+    },
+    {
+      "id": "S12",
+      "act": "5 - Live walkthrough",
+      "kind": "screen",
+      "mark": "beat3",
+      "onscreen": [
+        "The same offer, made blind",
+        "CEILING_PER_TXN"
+      ],
+      "narration": "The same offer, made the obvious way. Recommend first, find out afterwards. The gate refuses it with a per-transaction ceiling: a failed offer, and a buyer who now trusts their agent a little less.",
+      "pad_in": 0.3,
+      "pad_out": 0.6
+    },
+    {
+      "id": "S13",
+      "act": "5 - Live walkthrough",
+      "kind": "screen",
+      "mark": "beat4",
+      "onscreen": [
+        "NONCE_REPLAY",
+        "SCOPE_MERCHANT_NOT_ALLOWED",
+        "QUOTE_AMOUNT_MISMATCH",
+        "INTENT_INJECTION_SUSPECTED"
+      ],
+      "narration": "Four attacks in sequence. A captured request replayed, a payee outside the mandate's scope, a price the model invented, and an instruction hidden in a product description. Each one refused server side, and each with a machine-readable code rather than prose.",
+      "pad_in": 0.3,
+      "pad_out": 0.5
+    },
+    {
+      "id": "S14",
+      "act": "5 - Live walkthrough",
+      "kind": "screen",
+      "mark": "beat5",
+      "onscreen": [
+        "capture -> fulfilment fails -> refund -> budget released -> alternative"
+      ],
+      "narration": "Then the failure worth planning for. The money has already moved and the warehouse is empty. Compensations run in reverse: the payment is refunded, the ceiling gives the budget back, and an alternative is offered. Accepting it returns a quote the buyer signs, because the merchant holds no key and must never be able to spend on the buyer's behalf.",
+      "pad_in": 0.3,
+      "pad_out": 0.5
+    },
+    {
+      "id": "S15",
+      "act": "5 - Live walkthrough",
+      "kind": "screen",
+      "mark": "firewall",
+      "onscreen": [
+        "The same decision, from the buyer's side"
+      ],
+      "narration": "Everything so far was the merchant's view. This is the same decision seen by the person whose money it is: every check in order, and the one that stopped it.",
+      "pad_in": 0.3,
+      "pad_out": 0.6
+    },
+    {
+      "id": "S16",
+      "act": "6 - Impact",
+      "kind": "motion",
+      "template": "results",
+      "onscreen": [
+        "4 arms x 200 sessions x 3 seeds",
+        "false block 0.0% vs 27.8%",
+        "losses per 100: zero"
+      ],
+      "narration": "Four arms, two hundred sessions each, three seeds, run against the real services. Against a naive client-side cap, PACT nets about a quarter more, with a zero percent false block rate against that cap's twenty-eight. Its losses to adversarial traffic are zero, and stay zero at every adversarial rate swept, while an ungated agent channel degrades linearly.",
+      "pad_in": 0.3,
+      "pad_out": 0.8
+    },
+    {
+      "id": "S17",
+      "act": "6 - Impact",
+      "kind": "motion",
+      "template": "honesty",
+      "onscreen": [
+        "Reported anyway",
+        "crossover ~ 18%",
+        "arm A is modelled",
+        "the live rail is untested"
+      ],
+      "narration": "And the number that does not flatter us, reported anyway. Below roughly eighteen percent adversarial traffic, an ungated channel still nets more under this loss model. The baseline arm is modelled rather than simulated, and the payment client has never run against the live A P I. All three are stated in the results the harness generates, not buried.",
+      "pad_in": 0.3,
+      "pad_out": 0.9
+    },
+    {
+      "id": "S18",
+      "act": "7 - Close",
+      "kind": "motion",
+      "template": "outro",
+      "onscreen": [
+        "PACT",
+        "github.com/swetank18/PACT",
+        "pact-9btr.onrender.com"
+      ],
+      "narration": "PACT. A signed delegation the agent carries, a gate that decides on authority alone, and a merchant that only ever offers what will be approved.",
+      "pad_in": 0.4,
+      "pad_out": 1.6
+    }
+  ]
+}

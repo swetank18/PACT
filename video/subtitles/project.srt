@@ -1,0 +1,312 @@
+1
+00:00:00,600 --> 00:00:05,851
+An A I agent can now hold a payment credential
+and complete a checkout on your behalf.
+
+2
+00:00:05,911 --> 00:00:08,939
+Agentic commerce standardised how that agent
+pays.
+
+3
+00:00:08,999 --> 00:00:13,756
+It never gave the merchant any way to read
+what the agent is allowed to spend.
+
+4
+00:00:15,016 --> 00:00:16,293
+Three things follow.
+
+5
+00:00:16,353 --> 00:00:22,507
+The merchant recommends and only then finds
+out, so the offer trips a limit it could not see.
+
+6
+00:00:22,567 --> 00:00:32,464
+The obvious fix, a cap inside the agent, holds against the agent's own mistakes and nothing
+else, because a compromised agent simply does not run it.
+
+7
+00:00:32,524 --> 00:00:37,409
+And bolted onto a blind merchant, every
+authority check can only subtract.
+
+8
+00:00:38,669 --> 00:00:39,990
+PACT closes that gap.
+
+9
+00:00:40,050 --> 00:00:44,723
+A human signs a spending mandate in their own
+browser, on their own key.
+
+10
+00:00:44,783 --> 00:00:47,945
+The agent carries that mandate and never the
+key.
+
+11
+00:00:48,005 --> 00:00:53,007
+And before the merchant prices anything, it
+reads how much authority is left.
+
+12
+00:00:54,267 --> 00:00:58,057
+The mandate is signed on the buyer's device
+with Ed25519.
+
+13
+00:00:58,117 --> 00:01:04,675
+The agent carries it to the merchant, which
+reads the remaining headroom before it builds a quote.
+
+14
+00:01:04,735 --> 00:01:14,062
+Every request then goes to the gate, which decides on authority alone, across ten checks
+in a fixed order, cheapest and most certain first.
+
+15
+00:01:14,122 --> 00:01:17,506
+Only an allowed decision reaches a settlement
+rail.
+
+16
+00:01:18,666 --> 00:01:21,405
+What the merchant reads is deliberately thin.
+
+17
+00:01:21,465 --> 00:01:27,126
+Headroom remaining, purchases left, the
+per-transaction ceiling, allowed categories, expiry.
+
+18
+00:01:27,186 --> 00:01:33,097
+Not the buyer's identity, not their intent,
+not their spend history, and never the total budget.
+
+19
+00:01:33,157 --> 00:01:38,818
+A merchant that learns eight thousand nine
+hundred rupees remaining learns what it can sell.
+
+20
+00:01:38,878 --> 00:01:44,602
+One that learns eight thousand nine hundred of
+fifteen thousand learns how rich the buyer is.
+
+21
+00:01:45,862 --> 00:01:47,750
+Three things make this hold up.
+
+22
+00:01:47,810 --> 00:01:50,390
+First, ceilings are reserved, not counted.
+
+23
+00:01:50,450 --> 00:01:56,737
+The budget is summed over reservations inside
+the same immediate transaction that writes the new row.
+
+24
+00:01:56,797 --> 00:02:02,707
+The naive read-then-write version is kept in
+the repository so the two can be run side by side:
+
+25
+00:02:02,767 --> 00:02:11,505
+twenty concurrent agents against a five thousand rupee cap, and the naive ledger
+approves twenty of them and overspends by fifteen thousand.
+
+26
+00:02:12,665 --> 00:02:18,202
+Second, the gate decides authority and a rail
+moves money, and neither knows the other.
+
+27
+00:02:18,262 --> 00:02:20,454
+Nothing in the core imports a rail.
+
+28
+00:02:20,514 --> 00:02:25,730
+A test walks the syntax tree to enforce it,
+and a second test closes the loophole:
+
+29
+00:02:25,790 --> 00:02:29,205
+no executable line in the core may even name a
+vendor.
+
+30
+00:02:30,365 --> 00:02:32,927
+Third, every offer is provably approvable.
+
+31
+00:02:32,987 --> 00:02:41,417
+The test suite puts every add-on the merchant
+suggests through the real gate, and a single block fails the build. That is the inversion:
+
+32
+00:02:41,477 --> 00:02:50,469
+the same gate that refuses bad transactions now shapes good ones, so the spending limit
+stops being friction and becomes a conversion instrument.
+
+33
+00:02:51,929 --> 00:02:53,724
+This is the running system.
+
+34
+00:02:53,784 --> 00:02:56,954
+The human grants authority on their own
+device:
+
+35
+00:02:57,014 --> 00:03:00,940
+fifteen thousand rupees, five purchases, three
+categories.
+
+36
+00:03:01,000 --> 00:03:13,515
+The signature is produced in the browser, and the badge in the header is the console
+verifying that the browser's Ed25519 and canonical J S O N agree with the server's, byte for byte.
+
+37
+00:03:14,475 --> 00:03:15,467
+The agent shops.
+
+38
+00:03:15,527 --> 00:03:22,103
+The merchant prices the basket server side,
+the gate runs its checks in order, and the order settles.
+
+39
+00:03:22,163 --> 00:03:28,805
+Every check is on screen, including the ones
+that were skipped, and the whole path takes milliseconds.
+
+40
+00:03:29,665 --> 00:03:31,003
+Now the product itself.
+
+41
+00:03:31,063 --> 00:03:38,111
+The merchant read the remaining authority
+before it made this offer, which is why the badge on it says the item fits.
+
+42
+00:03:38,171 --> 00:03:47,164
+The buyer accepts, the add-on is re-quoted into the same order, and the authority bar
+moves — an upsell that was approvable before it was ever shown.
+
+43
+00:03:48,024 --> 00:03:50,450
+The same offer, made the obvious way.
+
+44
+00:03:50,510 --> 00:03:52,936
+Recommend first, find out afterwards.
+
+45
+00:03:52,996 --> 00:03:56,362
+The gate refuses it with a per-transaction
+ceiling:
+
+46
+00:03:56,422 --> 00:04:00,999
+a failed offer, and a buyer who now trusts
+their agent a little less.
+
+47
+00:04:01,959 --> 00:04:03,485
+Four attacks in sequence.
+
+48
+00:04:03,545 --> 00:04:12,689
+A captured request replayed, a payee outside the mandate's scope, a price the model
+invented, and an instruction hidden in a product description.
+
+49
+00:04:12,749 --> 00:04:18,148
+Each one refused server side, and each with a
+machine-readable code rather than prose.
+
+50
+00:04:19,008 --> 00:04:21,187
+Then the failure worth planning for.
+
+51
+00:04:21,247 --> 00:04:24,609
+The money has already moved and the warehouse
+is empty.
+
+52
+00:04:24,669 --> 00:04:26,413
+Compensations run in reverse:
+
+53
+00:04:26,473 --> 00:04:32,012
+the payment is refunded, the ceiling gives the
+budget back, and an alternative is offered.
+
+54
+00:04:32,072 --> 00:04:40,348
+Accepting it returns a quote the buyer signs,
+because the merchant holds no key and must never be able to spend on the buyer's behalf.
+
+55
+00:04:41,208 --> 00:04:43,812
+Everything so far was the merchant's view.
+
+56
+00:04:43,872 --> 00:04:47,808
+This is the same decision seen by the person
+whose money it is:
+
+57
+00:04:47,868 --> 00:04:50,980
+every check in order, and the one that stopped
+it.
+
+58
+00:04:51,940 --> 00:04:57,311
+Four arms, two hundred sessions each, three
+seeds, run against the real services.
+
+59
+00:04:57,371 --> 00:05:06,296
+Against a naive client-side cap, PACT nets about a quarter more, with a zero percent
+false block rate against that cap's twenty-eight.
+
+60
+00:05:06,356 --> 00:05:15,684
+Its losses to adversarial traffic are zero, and stay zero at every adversarial rate swept,
+while an ungated agent channel degrades linearly.
+
+61
+00:05:16,844 --> 00:05:20,239
+And the number that does not flatter us,
+reported anyway.
+
+62
+00:05:20,299 --> 00:05:26,845
+Below roughly eighteen percent adversarial
+traffic, an ungated channel still nets more under this loss model.
+
+63
+00:05:26,905 --> 00:05:33,633
+The baseline arm is modelled rather than
+simulated, and the payment client has never run against the live A P I.
+
+64
+00:05:33,693 --> 00:05:37,875
+All three are stated in the results the
+harness generates, not buried.
+
+65
+00:05:39,235 --> 00:05:39,489
+PACT.
+
+66
+00:05:39,549 --> 00:05:48,163
+A signed delegation the agent carries, a gate that decides on authority alone, and a
+merchant that only ever offers what will be approved.

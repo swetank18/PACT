@@ -45,3 +45,15 @@ console/shots/
 
 # The demo recorder writes here. docs/demo/ holds the committed take.
 console/video/
+
+# The explainer video's intermediates. video/README_VIDEO.md rebuilds all of
+# this from five commands, and none of it is a deliverable: 61 MB of narration
+# wavs, 95 MB of per-scene cuts and the mixed audio bed, and 30 MB of browser
+# takes. The film itself, the frames QA was written from, and everything that
+# generates them are committed — same rule as eval/results/, where the sessions
+# are dropped and results.md is kept.
+video/audio/vo/
+video/render/
+video/recording/
+video/assets/diagrams/*.png
+video/assets/overlays/*.png

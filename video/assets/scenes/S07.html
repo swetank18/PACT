@@ -1,0 +1,109 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<title>S07</title><style>
+@font-face { font-family:"InterV"; src:url("file:///home/swetank/PACT/console/node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2") format("woff2");
+             font-weight:100 900; font-display:block; }
+@font-face { font-family:"MonoV"; src:url("file:///home/swetank/PACT/console/node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2") format("woff2");
+             font-weight:100 800; font-display:block; }
+
+:root{
+  --bg:#06080b; --panel:#0e1319; --line:#1e262f; --ink:#e8ecef; --mute:#8d97a2;
+  --dim:#5f6a76; --allow:#5fd39b; --block:#ff7a70; --amber:#f3c375; --brand:#8aa6ff;
+  --sans:"InterV",system-ui,sans-serif; --mono:"MonoV",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden}
+body{
+  background:
+    radial-gradient(1200px 700px at 14% -10%, rgba(95,211,155,.07), transparent 60%),
+    radial-gradient(900px 600px at 92% 110%, rgba(138,166,255,.06), transparent 60%),
+    var(--bg);
+  color:var(--ink); font-family:var(--sans);
+  font-variant-numeric:tabular-nums; -webkit-font-smoothing:antialiased;
+}
+.frame{position:absolute;inset:0;padding:86px 120px 200px}
+.eyebrow{font-family:var(--mono);font-size:19px;letter-spacing:.28em;text-transform:uppercase;
+  color:var(--dim)}
+.mark{position:absolute;left:120px;bottom:118px;font-family:var(--mono);font-size:18px;
+  letter-spacing:.3em;color:#3d4650}
+.rule{position:absolute;left:120px;right:120px;top:150px;height:1px;background:var(--line)}
+
+h1{font-size:88px;line-height:1.04;letter-spacing:-.03em;font-weight:600;text-wrap:balance}
+h2{font-size:52px;line-height:1.1;letter-spacing:-.02em;font-weight:600}
+.lede{font-size:30px;line-height:1.45;color:#c3cbd4;max-width:1180px}
+.mono{font-family:var(--mono)}
+.small{font-size:22px;color:var(--mute);line-height:1.5}
+.ok{color:var(--allow)} .bad{color:var(--block)} .am{color:var(--amber)} .br{color:var(--brand)}
+
+/* Held at their from-state until something starts them: the renderer plays
+   them on the frame it starts counting, so recorded timing matches the timeline. */
+*{animation-play-state:paused}
+
+/* every element rests visible; motion only carries it in */
+@keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@keyframes wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes growx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes pop{0%{opacity:0;transform:scale(.92)}60%{transform:scale(1.02)}100%{opacity:1;transform:scale(1)}}
+@keyframes flow{from{offset-distance:0%}to{offset-distance:100%}}
+/* Chromium's screencast emits a frame when the compositor commits one, and a
+   page holding still commits nothing. A motion scene is mostly holding still —
+   between two staggered chips nothing moves for the better part of a second —
+   so the recording came out with those gaps compressed to a handful of frames,
+   and compose.py, cutting by wall clock, stretched them back out unevenly. The
+   measured effect on S04 was severe: cues written for 8.2s-10.7s landed at
+   16.3s-23.4s of a 24.4s clip, so a row of ten chips finished arriving as the
+   scene ended.
+
+   One off-screen element rotating forever fixes it at the source. A transform
+   animation runs on the compositor, so it commits a frame every tick whatever
+   else the page is doing, and the recording keeps real time. It is one device
+   pixel, outside the frame, and it renders nothing. */
+@keyframes tick{to{transform:rotate(360deg)}}
+.ticker{position:fixed;top:-8px;left:-8px;width:1px;height:1px;
+  animation:tick 1s linear infinite;will-change:transform;opacity:.01}
+
+.a-rise{animation:rise .62s cubic-bezier(.2,.7,.3,1) both}
+.a-fade{animation:fade .5s ease both}
+.a-wipe{animation:wipe .7s cubic-bezier(.3,.7,.2,1) both}
+.a-pop{animation:pop .5s cubic-bezier(.2,.7,.3,1) both}
+.a-growx{animation:growx .8s cubic-bezier(.25,.7,.25,1) both;transform-origin:left center}
+
+.card{background:linear-gradient(180deg,rgba(20,26,33,.95),rgba(12,16,21,.95));
+  border:1px solid var(--line);border-radius:14px;padding:30px 32px}
+.tag{display:inline-block;font-family:var(--mono);font-size:17px;letter-spacing:.16em;
+  text-transform:uppercase;padding:7px 14px;border-radius:999px;border:1px solid var(--line);
+  color:var(--mute)}
+.tag.ok{color:var(--allow);border-color:rgba(95,211,155,.4);background:rgba(95,211,155,.09)}
+.tag.bad{color:var(--block);border-color:rgba(255,122,112,.4);background:rgba(255,122,112,.09)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:34px}
+</style></head>
+<body><div class="ticker"></div><div class="frame"><div class="eyebrow">4 - Technical differentiation</div><div class="rule"></div>
+<div style="margin-top:96px">
+  <h2 class="a-rise" style="animation-delay:0.12s">Authority and settlement never touch.</h2>
+  <div style="display:flex;align-items:center;gap:44px;margin-top:70px">
+    <div class="card a-rise" style="animation-delay:3.62s;flex:1">
+      <div class="mono ok" style="font-size:20px;letter-spacing:.2em">core/</div>
+      <div style="font-size:30px;margin-top:16px;font-weight:600">decides authority</div>
+      <div class="small" style="margin-top:12px">gate, mandate, ledger, audit</div></div>
+    <div class="a-pop" style="animation-delay:7.94s;text-align:center;min-width:200px">
+      <div style="font-size:56px" class="bad">&#10007;</div>
+      <div class="mono small" style="margin-top:10px">no import<br>no vendor string</div></div>
+    <div class="card a-rise" style="animation-delay:5.61s;flex:1">
+      <div class="mono" style="font-size:20px;letter-spacing:.2em;color:var(--mute)">rails/</div>
+      <div style="font-size:30px;margin-top:16px;font-weight:600">moves the money</div>
+      <div class="small" style="margin-top:12px">razorpay, mock_upi</div></div>
+  </div>
+  <div class="mono a-fade" style="animation-delay:12.25s;margin-top:56px;font-size:23px;color:#c3cbd4">
+    tests/test_invariants.py &mdash; walks the syntax tree, and a second test
+    refuses a vendor name on any executable line.</div>
+</div></div>
+<div class="mark">PACT</div>
+<script>
+  // Opened by hand, the scene plays itself once the fonts are in. Under the
+  // renderer, __HOLD__ is set and the recorder starts it on a known frame.
+  document.fonts.ready.then(() => {
+    if (!window.__HOLD__) document.getAnimations().forEach((a) => a.play());
+  });
+</script>
+</body></html>

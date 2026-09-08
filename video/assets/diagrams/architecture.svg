@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1640 720" width="1640" height="720"
+     font-family="ui-sans-serif, system-ui, Inter, Helvetica, Arial, sans-serif" role="img"
+     aria-label="PACT architecture: a human signs a mandate on their device, an agent carries it to the merchant, the merchant reads remaining headroom from the gate before quoting, the gate decides on authority using eight checks against the ledger, and only an allowed decision reaches a settlement rail.">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7683"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5fd39b"/>
+    </marker>
+    <style>
+      .node   { fill:#0e1319; stroke:#1e262f; }
+      .name   { font-family:ui-monospace,"JetBrains Mono",monospace; font-size:15px;
+                letter-spacing:.18em; fill:#8d97a2; }
+      .title  { font-size:21px; font-weight:600; fill:#e8ecef; }
+      .sub    { font-size:14px; fill:#7c8794; }
+      .path   { font-family:ui-monospace,"JetBrains Mono",monospace; font-size:12.5px; fill:#5f6a76; }
+      .edge   { font-family:ui-monospace,"JetBrains Mono",monospace; font-size:13px; fill:#7c8794; }
+      .check  { font-family:ui-monospace,"JetBrains Mono",monospace; font-size:14px; fill:#5fd39b; }
+      .caption{ font-size:15px; fill:#7c8794; }
+      .h      { font-family:ui-monospace,"JetBrains Mono",monospace; font-size:13px;
+                letter-spacing:.22em; fill:#5f6a76; }
+    </style>
+  </defs>
+
+  <rect width="1640" height="720" fill="#06080b"/>
+  <text x="60" y="52" class="h">PACT · AUTHORITY BEFORE SETTLEMENT</text>
+  <line x1="60" y1="72" x2="1580" y2="72" stroke="#1e262f"/>
+
+  <!-- row one: the request path -->
+  <g>
+    <rect x="60" y="120" width="250" height="118" rx="12" class="node" stroke-width="1"/>
+    <text x="84" y="152" class="name">HUMAN</text>
+    <text x="84" y="184" class="title">Signs the mandate</text>
+    <text x="84" y="210" class="sub">Ed25519, in their own browser</text>
+    <text x="84" y="230" class="path">console/ · the key never leaves</text>
+
+    <line x1="310" y1="179" x2="386" y2="179" stroke="#6b7683" marker-end="url(#arrow)"/>
+    <text x="316" y="168" class="edge">signed</text>
+
+    <rect x="392" y="120" width="250" height="118" rx="12" class="node" stroke-width="1"/>
+    <text x="416" y="152" class="name">AGENT</text>
+    <text x="416" y="184" class="title">Carries, never holds</text>
+    <text x="416" y="210" class="sub">the mandate, not the key</text>
+    <text x="416" y="230" class="path">buyer/</text>
+
+    <line x1="642" y1="179" x2="718" y2="179" stroke="#6b7683" marker-end="url(#arrow)"/>
+    <text x="648" y="168" class="edge">intent</text>
+
+    <rect x="724" y="120" width="270" height="118" rx="12" class="node" stroke-width="1"/>
+    <text x="748" y="152" class="name">MERCHANT</text>
+    <text x="748" y="184" class="title">Reads headroom first</text>
+    <text x="748" y="210" class="sub">catalog, quote engine, upsell, saga</text>
+    <text x="748" y="230" class="path">merchant/</text>
+
+    <line x1="994" y1="179" x2="1070" y2="179" stroke="#6b7683" marker-end="url(#arrow)"/>
+    <text x="1000" y="168" class="edge">authorize</text>
+
+    <rect x="1076" y="120" width="270" height="118" rx="12" fill="#0d1714" stroke="#2f6a52" stroke-width="1.5"/>
+    <text x="1100" y="152" class="name" fill="#5fd39b">GATE</text>
+    <text x="1100" y="184" class="title">Decides on authority alone</text>
+    <text x="1100" y="210" class="sub">rail agnostic — imports no rail</text>
+    <text x="1100" y="230" class="path">core/gate</text>
+  </g>
+
+  <!-- the headroom read, drawn as the loop it is -->
+  <path d="M 860 120 C 860 76, 1210 76, 1210 120" fill="none" stroke="#5fd39b"
+        stroke-dasharray="5 5" marker-end="url(#arrow-green)"/>
+  <text x="960" y="70" class="edge" fill="#5fd39b">headroom envelope — what is left, before the quote</text>
+
+  <!-- row two: decision, ledger, rail -->
+  <g>
+    <rect x="1076" y="300" width="270" height="112" rx="12" class="node" stroke-width="1"/>
+    <text x="1100" y="332" class="name">LEDGER</text>
+    <text x="1100" y="364" class="title">Reserves, never counts</text>
+    <text x="1100" y="390" class="sub">SUM inside one BEGIN IMMEDIATE</text>
+
+    <line x1="1211" y1="238" x2="1211" y2="294" stroke="#6b7683" marker-end="url(#arrow)"/>
+
+    <rect x="724" y="300" width="270" height="112" rx="12" class="node" stroke-width="1"/>
+    <text x="748" y="332" class="name">RAIL</text>
+    <text x="748" y="364" class="title">Moves the money</text>
+    <text x="748" y="390" class="sub">razorpay · mock_upi — settles, never decides</text>
+
+    <line x1="1076" y1="356" x2="1000" y2="356" stroke="#5fd39b" marker-end="url(#arrow-green)"/>
+    <text x="1006" y="344" class="edge" fill="#5fd39b">ALLOW only</text>
+  </g>
+
+  <!-- the checks -->
+  <text x="60" y="462" class="h">THE GATE'S CHECKS, IN ORDER</text>
+  <g>
+    <rect x="60" y="484" width="1520" height="150" rx="12" class="node" stroke-width="1"/>
+    <text x="90" y="520" class="check">1  request signature</text>
+    <text x="90" y="548" class="check">2  mandate signature and state</text>
+    <text x="430" y="520" class="check">3  validity window</text>
+    <text x="430" y="548" class="check">4  freshness</text>
+    <text x="720" y="520" class="check">5  replay — a primary key, not a check</text>
+    <text x="720" y="548" class="check">6  scope — merchant, category</text>
+    <text x="1150" y="520" class="check">7  ceilings — per txn, total, count</text>
+    <text x="1150" y="548" class="check">8  quote binding, then injection</text>
+    <text x="90" y="600" class="sub">Every outcome carries a machine-readable reason code — CEILING_PER_TXN, NONCE_REPLAY, SCOPE_MERCHANT_NOT_ALLOWED, QUOTE_AMOUNT_MISMATCH …</text>
+  </g>
+
+  <text x="60" y="672" class="caption">
+    Nothing in core/ imports anything from rails/ — an AST test enforces it, and a second refuses a vendor name on any executable line.
+  </text>
+  <text x="60" y="698" class="caption">
+    The merchant learns what is left, never the budget, the intent, the identity or the spend history.
+  </text>
+</svg>

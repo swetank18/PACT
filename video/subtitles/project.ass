@@ -1,0 +1,79 @@
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Narration,DejaVu Sans,40,&H00F2EFEB,&H00F2EFEB,&HC8000000,&HB4000000,0,0,0,0,100,100,0.2,0,3,3,0,2,300,300,58,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.60,0:00:05.85,Narration,,0,0,0,,An A I agent can now hold a payment credential\Nand complete a checkout on your behalf.
+Dialogue: 0,0:00:05.91,0:00:08.93,Narration,,0,0,0,,Agentic commerce standardised how that agent\Npays.
+Dialogue: 0,0:00:08.99,0:00:13.75,Narration,,0,0,0,,It never gave the merchant any way to read\Nwhat the agent is allowed to spend.
+Dialogue: 0,0:00:15.01,0:00:16.29,Narration,,0,0,0,,Three things follow.
+Dialogue: 0,0:00:16.35,0:00:22.50,Narration,,0,0,0,,The merchant recommends and only then finds\Nout, so the offer trips a limit it could not see.
+Dialogue: 0,0:00:22.56,0:00:32.46,Narration,,0,0,0,,The obvious fix, a cap inside the agent, holds against the agent's own mistakes and nothing\Nelse, because a compromised agent simply does not run it.
+Dialogue: 0,0:00:32.52,0:00:37.40,Narration,,0,0,0,,And bolted onto a blind merchant, every\Nauthority check can only subtract.
+Dialogue: 0,0:00:38.66,0:00:39.99,Narration,,0,0,0,,PACT closes that gap.
+Dialogue: 0,0:00:40.05,0:00:44.72,Narration,,0,0,0,,A human signs a spending mandate in their own\Nbrowser, on their own key.
+Dialogue: 0,0:00:44.78,0:00:47.94,Narration,,0,0,0,,The agent carries that mandate and never the\Nkey.
+Dialogue: 0,0:00:48.00,0:00:53.00,Narration,,0,0,0,,And before the merchant prices anything, it\Nreads how much authority is left.
+Dialogue: 0,0:00:54.26,0:00:58.05,Narration,,0,0,0,,The mandate is signed on the buyer's device\Nwith Ed25519.
+Dialogue: 0,0:00:58.11,0:01:04.67,Narration,,0,0,0,,The agent carries it to the merchant, which\Nreads the remaining headroom before it builds a quote.
+Dialogue: 0,0:01:04.73,0:01:14.06,Narration,,0,0,0,,Every request then goes to the gate, which decides on authority alone, across ten checks\Nin a fixed order, cheapest and most certain first.
+Dialogue: 0,0:01:14.12,0:01:17.50,Narration,,0,0,0,,Only an allowed decision reaches a settlement\Nrail.
+Dialogue: 0,0:01:18.66,0:01:21.40,Narration,,0,0,0,,What the merchant reads is deliberately thin.
+Dialogue: 0,0:01:21.46,0:01:27.12,Narration,,0,0,0,,Headroom remaining, purchases left, the\Nper-transaction ceiling, allowed categories, expiry.
+Dialogue: 0,0:01:27.18,0:01:33.09,Narration,,0,0,0,,Not the buyer's identity, not their intent,\Nnot their spend history, and never the total budget.
+Dialogue: 0,0:01:33.15,0:01:38.81,Narration,,0,0,0,,A merchant that learns eight thousand nine\Nhundred rupees remaining learns what it can sell.
+Dialogue: 0,0:01:38.87,0:01:44.60,Narration,,0,0,0,,One that learns eight thousand nine hundred of\Nfifteen thousand learns how rich the buyer is.
+Dialogue: 0,0:01:45.86,0:01:47.75,Narration,,0,0,0,,Three things make this hold up.
+Dialogue: 0,0:01:47.81,0:01:50.39,Narration,,0,0,0,,First, ceilings are reserved, not counted.
+Dialogue: 0,0:01:50.45,0:01:56.73,Narration,,0,0,0,,The budget is summed over reservations inside\Nthe same immediate transaction that writes the new row.
+Dialogue: 0,0:01:56.79,0:02:02.70,Narration,,0,0,0,,The naive read-then-write version is kept in\Nthe repository so the two can be run side by side:
+Dialogue: 0,0:02:02.76,0:02:11.50,Narration,,0,0,0,,twenty concurrent agents against a five thousand rupee cap, and the naive ledger\Napproves twenty of them and overspends by fifteen thousand.
+Dialogue: 0,0:02:12.66,0:02:18.20,Narration,,0,0,0,,Second, the gate decides authority and a rail\Nmoves money, and neither knows the other.
+Dialogue: 0,0:02:18.26,0:02:20.45,Narration,,0,0,0,,Nothing in the core imports a rail.
+Dialogue: 0,0:02:20.51,0:02:25.73,Narration,,0,0,0,,A test walks the syntax tree to enforce it,\Nand a second test closes the loophole:
+Dialogue: 0,0:02:25.79,0:02:29.20,Narration,,0,0,0,,no executable line in the core may even name a\Nvendor.
+Dialogue: 0,0:02:30.36,0:02:32.92,Narration,,0,0,0,,Third, every offer is provably approvable.
+Dialogue: 0,0:02:32.98,0:02:41.41,Narration,,0,0,0,,The test suite puts every add-on the merchant\Nsuggests through the real gate, and a single block fails the build. That is the inversion:
+Dialogue: 0,0:02:41.47,0:02:50.46,Narration,,0,0,0,,the same gate that refuses bad transactions now shapes good ones, so the spending limit\Nstops being friction and becomes a conversion instrument.
+Dialogue: 0,0:02:51.92,0:02:53.72,Narration,,0,0,0,,This is the running system.
+Dialogue: 0,0:02:53.78,0:02:56.95,Narration,,0,0,0,,The human grants authority on their own\Ndevice:
+Dialogue: 0,0:02:57.01,0:03:00.94,Narration,,0,0,0,,fifteen thousand rupees, five purchases, three\Ncategories.
+Dialogue: 0,0:03:01.00,0:03:13.51,Narration,,0,0,0,,The signature is produced in the browser, and the badge in the header is the console\Nverifying that the browser's Ed25519 and canonical J S O N agree with the server's, byte for byte.
+Dialogue: 0,0:03:14.47,0:03:15.46,Narration,,0,0,0,,The agent shops.
+Dialogue: 0,0:03:15.52,0:03:22.10,Narration,,0,0,0,,The merchant prices the basket server side,\Nthe gate runs its checks in order, and the order settles.
+Dialogue: 0,0:03:22.16,0:03:28.80,Narration,,0,0,0,,Every check is on screen, including the ones\Nthat were skipped, and the whole path takes milliseconds.
+Dialogue: 0,0:03:29.66,0:03:31.00,Narration,,0,0,0,,Now the product itself.
+Dialogue: 0,0:03:31.06,0:03:38.11,Narration,,0,0,0,,The merchant read the remaining authority\Nbefore it made this offer, which is why the badge on it says the item fits.
+Dialogue: 0,0:03:38.17,0:03:47.16,Narration,,0,0,0,,The buyer accepts, the add-on is re-quoted into the same order, and the authority bar\Nmoves — an upsell that was approvable before it was ever shown.
+Dialogue: 0,0:03:48.02,0:03:50.45,Narration,,0,0,0,,The same offer, made the obvious way.
+Dialogue: 0,0:03:50.51,0:03:52.93,Narration,,0,0,0,,Recommend first, find out afterwards.
+Dialogue: 0,0:03:52.99,0:03:56.36,Narration,,0,0,0,,The gate refuses it with a per-transaction\Nceiling:
+Dialogue: 0,0:03:56.42,0:04:00.99,Narration,,0,0,0,,a failed offer, and a buyer who now trusts\Ntheir agent a little less.
+Dialogue: 0,0:04:01.95,0:04:03.48,Narration,,0,0,0,,Four attacks in sequence.
+Dialogue: 0,0:04:03.54,0:04:12.68,Narration,,0,0,0,,A captured request replayed, a payee outside the mandate's scope, a price the model\Ninvented, and an instruction hidden in a product description.
+Dialogue: 0,0:04:12.74,0:04:18.14,Narration,,0,0,0,,Each one refused server side, and each with a\Nmachine-readable code rather than prose.
+Dialogue: 0,0:04:19.00,0:04:21.18,Narration,,0,0,0,,Then the failure worth planning for.
+Dialogue: 0,0:04:21.24,0:04:24.60,Narration,,0,0,0,,The money has already moved and the warehouse\Nis empty.
+Dialogue: 0,0:04:24.66,0:04:26.41,Narration,,0,0,0,,Compensations run in reverse:
+Dialogue: 0,0:04:26.47,0:04:32.01,Narration,,0,0,0,,the payment is refunded, the ceiling gives the\Nbudget back, and an alternative is offered.
+Dialogue: 0,0:04:32.07,0:04:40.34,Narration,,0,0,0,,Accepting it returns a quote the buyer signs,\Nbecause the merchant holds no key and must never be able to spend on the buyer's behalf.
+Dialogue: 0,0:04:41.20,0:04:43.81,Narration,,0,0,0,,Everything so far was the merchant's view.
+Dialogue: 0,0:04:43.87,0:04:47.80,Narration,,0,0,0,,This is the same decision seen by the person\Nwhose money it is:
+Dialogue: 0,0:04:47.86,0:04:50.98,Narration,,0,0,0,,every check in order, and the one that stopped\Nit.
+Dialogue: 0,0:04:51.94,0:04:57.31,Narration,,0,0,0,,Four arms, two hundred sessions each, three\Nseeds, run against the real services.
+Dialogue: 0,0:04:57.37,0:05:06.29,Narration,,0,0,0,,Against a naive client-side cap, PACT nets about a quarter more, with a zero percent\Nfalse block rate against that cap's twenty-eight.
+Dialogue: 0,0:05:06.35,0:05:15.68,Narration,,0,0,0,,Its losses to adversarial traffic are zero, and stay zero at every adversarial rate swept,\Nwhile an ungated agent channel degrades linearly.
+Dialogue: 0,0:05:16.84,0:05:20.23,Narration,,0,0,0,,And the number that does not flatter us,\Nreported anyway.
+Dialogue: 0,0:05:20.29,0:05:26.84,Narration,,0,0,0,,Below roughly eighteen percent adversarial\Ntraffic, an ungated channel still nets more under this loss model.
+Dialogue: 0,0:05:26.90,0:05:33.63,Narration,,0,0,0,,The baseline arm is modelled rather than\Nsimulated, and the payment client has never run against the live A P I.
+Dialogue: 0,0:05:33.69,0:05:37.87,Narration,,0,0,0,,All three are stated in the results the\Nharness generates, not buried.
+Dialogue: 0,0:05:39.23,0:05:39.48,Narration,,0,0,0,,PACT.
+Dialogue: 0,0:05:39.54,0:05:48.16,Narration,,0,0,0,,A signed delegation the agent carries, a gate that decides on authority alone, and a\Nmerchant that only ever offers what will be approved.
