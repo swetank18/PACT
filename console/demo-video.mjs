@@ -177,7 +177,7 @@ await surface("Merchant console");
 await page.waitForTimeout(800);
 
 const BEATS = {
-  1: "Beat 1 — an agent discovers the merchant cold and pays. Eight checks, milliseconds.",
+  1: "Beat 1 — an agent discovers the merchant cold and pays. Ten checks, milliseconds.",
   2: "Beat 2 — the merchant reads the buyer's headroom before it offers. The upsell lands.",
   3: "Beat 3 — the same offer made blind. The gate rejects it: CEILING_PER_TXN.",
   4: "Beat 4 — four attacks, four blocks, each with a machine-readable reason.",

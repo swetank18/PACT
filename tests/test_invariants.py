@@ -451,6 +451,9 @@ def test_everything_that_states_how_many_checks_there_are_agrees_with_the_gate()
         ("scripts/gen_hacksummit_deck.py", r"across its (\w+) checks"),
         ("scripts/gen_hacksummit_deck.py", r"The gate and its (\w+) checks"),
         ("docs/RUNBOOK.md", r"a decision, (\w+) checks in order"),
+        # Burned into the backup video's captions, where it is the least
+        # correctable of the lot: fixing it means re-recording the take.
+        ("console/demo-video.mjs", r"cold and pays\. (\w+) checks"),
     ]
 
     wrong = []
