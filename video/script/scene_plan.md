@@ -18,8 +18,8 @@
 | S14 | 5 - Live walkthrough | screen | 04:18.71 | 04:40.91 | 22.20s | take mark `beat5` |
 | S15 | 5 - Live walkthrough | screen | 04:40.91 | 04:51.64 | 10.73s | take mark `firewall` |
 | S16 | 6 - Impact | motion | 04:51.64 | 05:16.54 | 24.90s | `assets/scenes/S16.html` |
-| S17 | 6 - Impact | motion | 05:16.54 | 05:38.83 | 22.29s | `assets/scenes/S17.html` |
-| S18 | 7 - Close | motion | 05:38.83 | 05:49.82 | 10.99s | `assets/scenes/S18.html` |
+| S17 | 6 - Impact | motion | 05:16.54 | 05:38.93 | 22.39s | `assets/scenes/S17.html` |
+| S18 | 7 - Close | motion | 05:38.93 | 05:49.92 | 10.99s | `assets/scenes/S18.html` |
 
 ## How the cut is decided
 

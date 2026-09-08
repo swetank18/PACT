@@ -19,7 +19,7 @@ import { createRequire } from "node:module";
 const { chromium } = createRequire(new URL("../console/package.json", import.meta.url))(
   "@playwright/test",
 );
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = resolve(process.argv[2] ?? ".");
@@ -52,6 +52,10 @@ for (const scene of timeline.scenes.filter(
   (s) => s.kind === "motion" && (!only.size || only.has(s.id)),
 )) {
   const dir = `${out}/${scene.id}`;
+  // Cleared, not just created. Playwright names a recording by a hash of the
+  // page, so a second take lands beside the first rather than replacing it, and
+  // compose.py then had a directory of equally valid videos to choose from.
+  rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   const context = await browser.newContext({
     viewport: { width: 1920, height: 1080 },

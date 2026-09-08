@@ -1,6 +1,6 @@
 # PACT — video script
 
-Generated from `script/timeline.json`. Runtime **5m 49.8s**, 1920×1080, 30 fps, 18 scenes.
+Generated from `script/timeline.json`. Runtime **5m 49.9s**, 1920×1080, 30 fps, 18 scenes.
 
 Timings are measured, not intended: each scene lasts exactly as long as its narration plus its lead-in and tail, so what is written here is what was cut.
 
@@ -392,13 +392,13 @@ Timings are measured, not intended: each scene lasts exactly as long as its narr
 
 ## S17 — 6 - Impact
 
-**TIME** 05:16.54–05:38.83  ·  **DURATION** 22.29s  ·  **VOICE IN** 05:16.84
+**TIME** 05:16.54–05:38.93  ·  **DURATION** 22.39s  ·  **VOICE IN** 05:16.84
 
 **NARRATION**
 
-> And the number that does not flatter us, reported anyway. Below roughly eighteen percent adversarial traffic, an ungated channel still nets more under this loss model. The baseline arm is modelled rather than simulated, and the payment client has never run against the live A P I. All three are stated in the results the harness generates, not buried.
+> And the number that does not flatter us, reported anyway. Below roughly twenty percent adversarial traffic, an ungated channel still nets more under this loss model. The baseline arm is modelled rather than simulated, and the payment client has never run against the live A P I. All three are stated in the results the harness generates, not buried.
 
-**ON-SCREEN** Reported anyway · crossover ~ 18% · arm A is modelled · the live rail is untested
+**ON-SCREEN** Reported anyway · crossover ~ 20% · arm A is modelled · the live rail is untested
 
 **VISUAL** Three limitations, stated in the same type as the results.
 
@@ -416,7 +416,7 @@ Timings are measured, not intended: each scene lasts exactly as long as its narr
 
 ## S18 — 7 - Close
 
-**TIME** 05:38.83–05:49.82  ·  **DURATION** 10.99s  ·  **VOICE IN** 05:39.24
+**TIME** 05:38.93–05:49.92  ·  **DURATION** 10.99s  ·  **VOICE IN** 05:39.33
 
 **NARRATION**
 

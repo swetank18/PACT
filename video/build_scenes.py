@@ -80,23 +80,6 @@ h2{font-size:52px;line-height:1.1;letter-spacing:-.02em;font-weight:600}
 @keyframes growx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes pop{0%{opacity:0;transform:scale(.92)}60%{transform:scale(1.02)}100%{opacity:1;transform:scale(1)}}
 @keyframes flow{from{offset-distance:0%}to{offset-distance:100%}}
-/* Chromium's screencast emits a frame when the compositor commits one, and a
-   page holding still commits nothing. A motion scene is mostly holding still —
-   between two staggered chips nothing moves for the better part of a second —
-   so the recording came out with those gaps compressed to a handful of frames,
-   and compose.py, cutting by wall clock, stretched them back out unevenly. The
-   measured effect on S04 was severe: cues written for 8.2s-10.7s landed at
-   16.3s-23.4s of a 24.4s clip, so a row of ten chips finished arriving as the
-   scene ended.
-
-   One off-screen element rotating forever fixes it at the source. A transform
-   animation runs on the compositor, so it commits a frame every tick whatever
-   else the page is doing, and the recording keeps real time. It is one device
-   pixel, outside the frame, and it renders nothing. */
-@keyframes tick{to{transform:rotate(360deg)}}
-.ticker{position:fixed;top:-8px;left:-8px;width:1px;height:1px;
-  animation:tick 1s linear infinite;will-change:transform;opacity:.01}
-
 .a-rise{animation:rise .62s cubic-bezier(.2,.7,.3,1) both}
 .a-fade{animation:fade .5s ease both}
 .a-wipe{animation:wipe .7s cubic-bezier(.3,.7,.2,1) both}
@@ -116,7 +99,7 @@ h2{font-size:52px;line-height:1.1;letter-spacing:-.02em;font-weight:600}
 
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>__ID__</title><style>__CSS__</style></head>
-<body><div class="ticker"></div><div class="frame">__BODY__</div>
+<body><div class="frame">__BODY__</div>
 <div class="mark">PACT</div>
 <script>
   // Opened by hand, the scene plays itself once the fonts are in. Under the
@@ -227,14 +210,12 @@ def build(scene: dict) -> str:
             if i < len(nodes) - 1:
                 cells += f"""<div class="a-fade" style="animation-delay:{at(.09 + i * .105)};
                   align-self:center;color:var(--dim);font-size:26px">&rarr;</div>"""
-        # Ten chips, revealed fast rather than paced out. A cue lands later on
-        # screen than `at()` says and by a factor rather than an offset, because
-        # Chromium's screencast stops emitting frames while the page is static —
-        # the same behaviour compose.py already compensates for at the tail of a
-        # scene — so a slow stagger, which is mostly static gaps, drifts most.
-        # At one chip per 0.8s the last two arrived in the final half second of
-        # a 24s scene. The whole row now lands inside about three seconds, which
-        # is both easier to read and too short for the drift to matter.
+        # Ten chips, revealed fast rather than paced out. The old stagger was
+        # written for eight at one chip per 0.8s; ten of those put the last one
+        # at 97% of the scene, which is the final six tenths of a second. The
+        # whole row now lands inside about two seconds and then holds, and the
+        # render tracks these delays to within half a second — measured on the
+        # delivered clip, chips at 7.7s against a first cue written for 8.2s.
         #
         # Read from the gate rather than retyped. The row is headed "THE GATE'S
         # CHECKS, IN ORDER", which is a claim of completeness, and the hand-kept
@@ -389,7 +370,7 @@ def build(scene: dict) -> str:
 </div>"""
 
     if t == "honesty":
-        pts = [("crossover ≈ 18%", "below it, an ungated channel still nets more under this loss model"),
+        pts = [("crossover ≈ 20%", "below it, an ungated channel still nets more under this loss model"),
                ("arm A is modelled", "the no-agent baseline assumes 34% completion, stated not buried"),
                ("the live rail is untested", "no test keys existed here; the client runs against a fake built from the API notes")]
         rows = "".join(

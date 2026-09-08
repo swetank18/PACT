@@ -230,11 +230,11 @@
       "template": "honesty",
       "onscreen": [
         "Reported anyway",
-        "crossover ~ 18%",
+        "crossover ~ 20%",
         "arm A is modelled",
         "the live rail is untested"
       ],
-      "narration": "And the number that does not flatter us, reported anyway. Below roughly eighteen percent adversarial traffic, an ungated channel still nets more under this loss model. The baseline arm is modelled rather than simulated, and the payment client has never run against the live A P I. All three are stated in the results the harness generates, not buried.",
+      "narration": "And the number that does not flatter us, reported anyway. Below roughly twenty percent adversarial traffic, an ungated channel still nets more under this loss model. The baseline arm is modelled rather than simulated, and the payment client has never run against the live A P I. All three are stated in the results the harness generates, not buried.",
       "pad_in": 0.3,
       "pad_out": 0.9
     },

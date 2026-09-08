@@ -26,11 +26,18 @@ import { createRequire } from "node:module";
 const { chromium } = createRequire(new URL("../console/package.json", import.meta.url))(
   "@playwright/test",
 );
-import { writeFileSync, mkdirSync } from "node:fs";
+import { writeFileSync, mkdirSync, rmSync, readdirSync } from "node:fs";
 
 const base = process.argv[2] ?? "http://127.0.0.1:8090";
 const out = process.argv[3] ?? "./recording";
 mkdirSync(out, { recursive: true });
+// The previous take, if there is one. Playwright names a recording by a hash of
+// the page, so re-recording adds a file rather than replacing it and compose.py
+// is then choosing between two valid videos of the same thing. Only the webms
+// at this level go — recording/scenes/ belongs to render_scenes.mjs.
+for (const name of readdirSync(out)) {
+  if (name.endsWith(".webm")) rmSync(`${out}/${name}`, { force: true });
+}
 
 const CURSOR = `
   const dot = document.createElement("div");

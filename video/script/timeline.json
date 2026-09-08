@@ -1,5 +1,5 @@
 {
-  "total": 349.823,
+  "total": 349.921,
   "scenes": [
     {
       "id": "S01",
@@ -287,18 +287,18 @@
       "kind": "motion",
       "onscreen": [
         "Reported anyway",
-        "crossover ~ 18%",
+        "crossover ~ 20%",
         "arm A is modelled",
         "the live rail is untested"
       ],
       "template": "honesty",
       "mark": null,
       "start": 316.544,
-      "duration": 22.291,
+      "duration": 22.39,
       "speech_at": 316.844,
-      "vo_duration": 21.091,
+      "vo_duration": 21.19,
       "vo_file": "audio/vo/S17.wav",
-      "narration": "And the number that does not flatter us, reported anyway. Below roughly eighteen percent adversarial traffic, an ungated channel still nets more under this loss model. The baseline arm is modelled rather than simulated, and the payment client has never run against the live A P I. All three are stated in the results the harness generates, not buried."
+      "narration": "And the number that does not flatter us, reported anyway. Below roughly twenty percent adversarial traffic, an ungated channel still nets more under this loss model. The baseline arm is modelled rather than simulated, and the payment client has never run against the live A P I. All three are stated in the results the harness generates, not buried."
     },
     {
       "id": "S18",
@@ -311,9 +311,9 @@
       ],
       "template": "outro",
       "mark": null,
-      "start": 338.835,
+      "start": 338.934,
       "duration": 10.988,
-      "speech_at": 339.235,
+      "speech_at": 339.334,
       "vo_duration": 8.988,
       "vo_file": "audio/vo/S18.wav",
       "narration": "PACT. A signed delegation the agent carries, a gate that decides on authority alone, and a merchant that only ever offers what will be approved."

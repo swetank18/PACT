@@ -283,30 +283,30 @@ Its losses to adversarial traffic are zero, and stay zero at every adversarial r
 while an ungated agent channel degrades linearly.
 
 61
-00:05:16,844 --> 00:05:20,239
+00:05:16,844 --> 00:05:20,275
 And the number that does not flatter us,
 reported anyway.
 
 62
-00:05:20,299 --> 00:05:26,845
-Below roughly eighteen percent adversarial
+00:05:20,335 --> 00:05:26,828
+Below roughly twenty percent adversarial
 traffic, an ungated channel still nets more under this loss model.
 
 63
-00:05:26,905 --> 00:05:33,633
+00:05:26,888 --> 00:05:33,687
 The baseline arm is modelled rather than
 simulated, and the payment client has never run against the live A P I.
 
 64
-00:05:33,693 --> 00:05:37,875
+00:05:33,747 --> 00:05:37,974
 All three are stated in the results the
 harness generates, not buried.
 
 65
-00:05:39,235 --> 00:05:39,489
+00:05:39,334 --> 00:05:39,588
 PACT.
 
 66
-00:05:39,549 --> 00:05:48,163
+00:05:39,648 --> 00:05:48,261
 A signed delegation the agent carries, a gate that decides on authority alone, and a
 merchant that only ever offers what will be approved.

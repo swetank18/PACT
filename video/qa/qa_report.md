@@ -4,14 +4,14 @@
 
 | Check | Result | Measured |
 | --- | --- | --- |
-| Runtime matches the timeline | PASS | 349.82s rendered against 349.82s planned |
+| Runtime matches the timeline | PASS | 349.92s rendered against 349.92s planned |
 | Resolution | PASS | 1920x1080 |
 | Frame rate | PASS | 30/1 fps |
 | Video codec | PASS | h264 |
 | Audio codec and rate | PASS | aac 48000Hz 2ch |
 | No black frames (no encoder gaps or dropped cuts) | PASS | none detected |
 | Integrated loudness in range | PASS | -16.0 LUFS |
-| True peak below 0 dBFS | PASS | -3.1 dBFS |
+| True peak below 0 dBFS | PASS | -3.0 dBFS |
 | No silence longer than 2.5s | PASS | none |
 | Every scene renders something | PASS | 18 frames sampled, all carry content |
 
@@ -37,8 +37,8 @@ One frame per scene, pulled at 72% through it, in `qa/frames/`. They are the evi
 | S14 | 274.7s | `qa/frames/S14.png` |
 | S15 | 288.6s | `qa/frames/S15.png` |
 | S16 | 309.6s | `qa/frames/S16.png` |
-| S17 | 332.6s | `qa/frames/S17.png` |
-| S18 | 346.7s | `qa/frames/S18.png` |
+| S17 | 332.7s | `qa/frames/S17.png` |
+| S18 | 346.8s | `qa/frames/S18.png` |
 
 ## Checks made by construction
 

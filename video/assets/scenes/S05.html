@@ -45,23 +45,6 @@ h2{font-size:52px;line-height:1.1;letter-spacing:-.02em;font-weight:600}
 @keyframes growx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes pop{0%{opacity:0;transform:scale(.92)}60%{transform:scale(1.02)}100%{opacity:1;transform:scale(1)}}
 @keyframes flow{from{offset-distance:0%}to{offset-distance:100%}}
-/* Chromium's screencast emits a frame when the compositor commits one, and a
-   page holding still commits nothing. A motion scene is mostly holding still —
-   between two staggered chips nothing moves for the better part of a second —
-   so the recording came out with those gaps compressed to a handful of frames,
-   and compose.py, cutting by wall clock, stretched them back out unevenly. The
-   measured effect on S04 was severe: cues written for 8.2s-10.7s landed at
-   16.3s-23.4s of a 24.4s clip, so a row of ten chips finished arriving as the
-   scene ended.
-
-   One off-screen element rotating forever fixes it at the source. A transform
-   animation runs on the compositor, so it commits a frame every tick whatever
-   else the page is doing, and the recording keeps real time. It is one device
-   pixel, outside the frame, and it renders nothing. */
-@keyframes tick{to{transform:rotate(360deg)}}
-.ticker{position:fixed;top:-8px;left:-8px;width:1px;height:1px;
-  animation:tick 1s linear infinite;will-change:transform;opacity:.01}
-
 .a-rise{animation:rise .62s cubic-bezier(.2,.7,.3,1) both}
 .a-fade{animation:fade .5s ease both}
 .a-wipe{animation:wipe .7s cubic-bezier(.3,.7,.2,1) both}
@@ -78,7 +61,7 @@ h2{font-size:52px;line-height:1.1;letter-spacing:-.02em;font-weight:600}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:26px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:34px}
 </style></head>
-<body><div class="ticker"></div><div class="frame"><div class="eyebrow">3 - How it works</div><div class="rule"></div>
+<body><div class="frame"><div class="eyebrow">3 - How it works</div><div class="rule"></div>
 <div style="margin-top:78px">
   <h2 class="a-rise" style="animation-delay:0.12s">The envelope is deliberately thin.</h2>
   <div class="grid2" style="margin-top:52px">

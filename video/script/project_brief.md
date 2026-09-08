@@ -82,7 +82,7 @@ cap's 27.8%, and ₹0 lost to adversarial traffic at every rate swept.
 **LIMITATIONS**
 The Razorpay client has never run against the live API (no test keys existed in
 the build environment); arm A is modelled, not simulated; the 8% adversarial
-rate is an assumption, swept across six points; below ≈18% adversarial traffic an
+rate is an assumption, swept across six points; below ≈20% adversarial traffic an
 ungated channel still nets more under this loss model; two attack variants report
 `N/A` because they target an auditor that is not running; the app needs a
 persistent process, so it is not serverless-deployable as it stands.

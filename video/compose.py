@@ -22,7 +22,36 @@ ROOT = Path(__file__).resolve().parent
 TL = json.loads((ROOT / "script" / "timeline.json").read_text())
 TAKE_MARKS = json.loads((ROOT / "recording" / "marks.json").read_text())["marks"]
 SCENE_MARKS = json.loads((ROOT / "recording" / "scenes" / "scene-marks.json").read_text())
-TAKE = next((ROOT / "recording").glob("*.webm"))
+def sole_take(directory: Path, what: str) -> Path:
+    """
+    The one take in a directory, or a loud failure.
+
+    This was `next(glob("*.webm"))`, which returns whatever the filesystem
+    hands back first. Playwright names a recording by a hash of the page, so
+    re-filming does not overwrite the previous take — it adds one. Seven had
+    accumulated in recording/scenes/S17 before anyone looked, and the composed
+    film had been cutting from an arbitrary one of them: a scene could be
+    re-rendered, the change confirmed in the HTML, and the old footage still end
+    up in the cut. Silently, because every take is a valid video of the right
+    length.
+
+    The recorders now clear their directory before filming, so more than one
+    here means something went wrong. Refuse rather than pick.
+    """
+    takes = sorted(directory.glob("*.webm"))
+    if not takes:
+        raise SystemExit(f"no take in {directory} — film {what} first")
+    if len(takes) > 1:
+        listing = "\n  ".join(t.name for t in takes)
+        raise SystemExit(
+            f"{len(takes)} takes in {directory}, and no way to tell which one you "
+            f"meant. Delete all but the one you want, or re-run the recorder, "
+            f"which clears the directory first:\n  {listing}"
+        )
+    return takes[0]
+
+
+TAKE = sole_take(ROOT / "recording", "the walkthrough")
 RENDER = ROOT / "render"
 RENDER.mkdir(exist_ok=True)
 
@@ -82,7 +111,7 @@ def build_scene(scene: dict) -> Path:
     need = scene["duration"]
 
     if scene["kind"] == "motion":
-        src = next((ROOT / "recording" / "scenes" / scene["id"]).glob("*.webm"))
+        src = sole_take(ROOT / "recording" / "scenes" / scene["id"], scene["id"])
         start = SCENE_MARKS[scene["id"]]["started"]
         # The recording ends at the last pixel change — a scene that finishes on
         # a held frame simply stops producing frames — so clone the last one out
