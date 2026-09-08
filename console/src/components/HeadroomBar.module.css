@@ -77,11 +77,30 @@
   background: var(--text-faint);
 }
 
+/* The label sits under the marker, so it has to be positioned horizontally and
+   therefore cannot be in the flow. It gets a row of its own that *is* in the
+   flow, rather than being hung off the track into reserved padding.
+
+   That was the bug: `top: calc(100% + 4px)` on a `.capRow` with
+   `padding-bottom: 18px` resolves 100% against the padding box, so the padding
+   added to reserve room for the label pushed the label down by exactly as much
+   as it reserved. The reservation cancelled itself and the label printed 10px
+   into the legend below — measured, and visible in the recorded walkthrough.
+
+   A real row cannot do that, and it does not need re-tuning when the font size
+   or the track height changes. */
+.capLabelRow {
+  position: relative;
+  height: var(--cap-label-line);
+  margin-top: 4px;
+}
+
 .capLabel {
   position: absolute;
-  top: calc(100% + 4px);
+  top: 0;
   transform: translateX(-50%);
   white-space: nowrap;
+  line-height: var(--cap-label-line);
   font-size: var(--fs-xs);
   color: var(--text-faint);
 }
@@ -125,6 +144,6 @@
 }
 
 .capRow {
+  --cap-label-line: 16px;
   position: relative;
-  padding-bottom: 18px;
 }

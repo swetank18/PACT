@@ -88,8 +88,10 @@ export function HeadroomBar({
           {capPct !== null && <div className={s.cap} style={{ left: `${capPct}%` }} />}
         </div>
         {capPct !== null && (
-          <div className={s.capLabel} style={{ left: `${capPct}%` }}>
-            per transaction cap {inr(headroom.max_per_txn_paise)}
+          <div className={s.capLabelRow}>
+            <div className={s.capLabel} style={{ left: `${capPct}%` }}>
+              per transaction cap {inr(headroom.max_per_txn_paise)}
+            </div>
           </div>
         )}
       </div>

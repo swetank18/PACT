@@ -86,6 +86,72 @@ if (!/SIGNATURE PARITY/i.test(header)) {
   problems.push(`the parity badge is not showing: header reads ${JSON.stringify(header)}`);
 }
 
+/**
+ * The checkout surface, with a real mandate on it, geometrically.
+ *
+ * The per-transaction cap marker's label was printing 10px into the legend
+ * underneath it for the life of the project. `top: calc(100% + 4px)` resolved
+ * 100% against a padding box whose `padding-bottom` existed to reserve room for
+ * that very label, so the reservation cancelled itself out. Nothing caught it:
+ * the components mount fine in jsdom, which does no layout, and every unit test
+ * passed while the label sat on top of "spent ₹0 · this purchase …" in the one
+ * screenshot a judge looks at longest.
+ *
+ * So this asserts on rectangles, which is the only kind of assertion that can
+ * see it, and it grants first because the bar does not render without a
+ * mandate — a check that silently found no label would pass forever.
+ */
+await page.getByRole("button", { name: "Grant", exact: true }).click();
+await page.waitForTimeout(600);
+await page.getByRole("button", { name: "Grant and sign", exact: true }).click();
+await page.waitForTimeout(1200);
+await page.getByRole("button", { name: "Checkout", exact: true }).click();
+await page.waitForTimeout(600);
+
+const composer = page.getByPlaceholder("What should the agent buy?");
+await composer.fill("restock office supplies for the month");
+await page.getByRole("button", { name: "Send", exact: true }).click();
+await page.waitForTimeout(4000);
+
+const geometry = await page.evaluate(() => {
+  const find = (needle) =>
+    [...document.querySelectorAll("div")].find(
+      (e) => e.children.length === 0 && e.textContent?.trim().startsWith(needle),
+    );
+  const label = find("per transaction cap");
+  if (!label) return null;
+  // The legend is the row of swatches directly under the bar.
+  const legend = [...document.querySelectorAll("div")].find((e) =>
+    /remaining after/.test(e.textContent ?? "") && !/per transaction cap/.test(e.textContent ?? ""),
+  );
+  if (!legend) return { label: label.getBoundingClientRect().toJSON(), legend: null };
+  return {
+    label: label.getBoundingClientRect().toJSON(),
+    legend: legend.getBoundingClientRect().toJSON(),
+  };
+});
+
+if (geometry === null) {
+  problems.push(
+    "the per-transaction cap label never rendered, so the overlap check proved nothing",
+  );
+} else if (geometry.legend === null) {
+  problems.push("the headroom legend never rendered, so the overlap check proved nothing");
+} else {
+  const overlap =
+    Math.min(geometry.label.bottom, geometry.legend.bottom) -
+    Math.max(geometry.label.top, geometry.legend.top);
+  if (overlap > 0) {
+    problems.push(
+      `the cap label overlaps the headroom legend by ${overlap.toFixed(1)}px`,
+    );
+  } else {
+    console.log(`ok    cap label clear of the legend by ${(-overlap).toFixed(1)}px`);
+  }
+}
+
+await page.screenshot({ path: `${out}/checkout-headroom.png` });
+
 for (const name of SURFACES) {
   await page.getByRole("button", { name, exact: true }).click();
   await page.waitForTimeout(1200);
