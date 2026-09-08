@@ -528,6 +528,19 @@ push; the console has been opened in a browser and is screenshotted every run;
 the Razorpay client and the auditor are both exercised; `RAZORPAY_CAPTURE_FAILED`
 is now `RAIL_CAPTURE_FAILED` and the layering allowlist is empty.
 
+Closed on 2026-09-09: **six bugs, all of them in what shipped rather than in
+what the tests measured** — section 5 has each one and what it would have cost.
+The two that would have been seen: the merchant console's upsell attach tile
+read 0% while an accepted add-on sat in the order line beside it, and the
+per-transaction cap label printed on top of the headroom legend on the checkout
+surface. Both are now asserted, the second on rectangles in a real browser,
+because jsdom does no layout and all 55 console tests passed while it was broken.
+The gate's ten checks are called ten everywhere, pinned to `len(CHECK_ORDER)`.
+**The explainer film and the explainer deck are committed**, both of which had
+been sitting untracked; the film's build could not actually run from a clean
+checkout and now can. `render.yaml` no longer says the Render target has never
+been deployed, which it has been since 2026-09-05.
+
 Closed on 2026-09-07: **the memory line** — traced to the simulated rail keeping
 every intent it ever created, bounded at 20,000, and confirmed by a soak that
 crosses the fix mid-run at 620 bytes a purchase before and 7 after. It is the
