@@ -449,6 +449,7 @@ def test_the_documented_test_counts_are_the_real_ones(request):
     readme = (REPO / "README.md").read_text()
     handoff = (REPO / "HANDOFF.md").read_text()
     ci = (REPO / ".github" / "workflows" / "ci.yml").read_text()
+    deck = (REPO / "scripts" / "gen_hacksummit_deck.py").read_text()
 
     def stated(where: str, text: str, pattern: str) -> int:
         found = re.search(pattern, text)
@@ -466,6 +467,16 @@ def test_the_documented_test_counts_are_the_real_ones(request):
         "README.md, what CI proves": stated("README.md", readme, both),
         "HANDOFF.md, section 1": stated("HANDOFF.md", handoff, both),
         "ci.yml, the job name": stated("ci.yml", ci, r"name:\s+python\s+\((\d+)\s+tests"),
+        # The submitted deck is generated, and the reason it is generated is so
+        # a number that moves in the repository can be carried into it without
+        # opening PowerPoint. That only holds if something notices when one
+        # does. This is the artifact a judge actually reads.
+        "gen_hacksummit_deck.py, the proof chip": stated(
+            "gen_hacksummit_deck.py", deck, r'"(\d+)\s+\+\s+\d+\s+tests'
+        ),
+        "gen_hacksummit_deck.py, the CI slide": stated(
+            "gen_hacksummit_deck.py", deck, both
+        ),
     }
     wrong = [f"{where} says {n}" for where, n in python_claims.items() if n != total]
     assert not wrong, (
@@ -476,6 +487,10 @@ def test_the_documented_test_counts_are_the_real_ones(request):
         "README.md": int(re.search(both, readme).group(2)),  # type: ignore[union-attr]
         "HANDOFF.md": int(re.search(both, handoff).group(2)),  # type: ignore[union-attr]
         "ci.yml": stated("ci.yml", ci, r"name:\s+console\s+\((\d+)\s+tests"),
+        "gen_hacksummit_deck.py": int(re.search(both, deck).group(2)),  # type: ignore[union-attr]
+        "gen_hacksummit_deck.py, the proof chip": int(
+            re.search(r'"\d+\s+\+\s+(\d+)\s+tests', deck).group(1)  # type: ignore[union-attr]
+        ),
     }
     assert len(set(console_claims.values())) == 1, (
         "the console test count disagrees with itself: "
