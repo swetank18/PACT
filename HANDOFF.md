@@ -558,5 +558,9 @@ cross-checked against the image they deploy.
 | `docs/RUNBOOK.md` | The run of show: what to press, what to say, and what to do when it breaks |
 | `docs/soak.md` | Two hours under load: the memory line that failed, and what is in the volume |
 | `docs/HackSummit-PACT.pptx` | The submitted deck, in the organisers' template. Generated — `scripts/gen_hacksummit_deck.py` |
+| `docs/PACT-explainer.pptx` | The whole system at technical depth, for someone integrating or reviewing it. Generated — `scripts/gen_explainer_deck.py` |
+| `video/README_VIDEO.md` | The six-minute explainer film, and the five commands that rebuild it from nothing |
+| `video/final/final_project_video.mp4` | That film. Distinct from the backup video below, which is the demo take alone |
+| `video/qa/qa_report.md` | What was measured on the delivered file, and the three limitations of the cut |
 | `docs/demo/pact-demo.webm` | The backup video. Know where it is before you need it |
 | `docs/screenshots/` | What it looks like |

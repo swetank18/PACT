@@ -50,6 +50,15 @@ The stage script — what to press, what to say, and what to do when it breaks �
 is [`docs/RUNBOOK.md`](docs/RUNBOOK.md), and the backup video it is a script for
 is [`docs/demo/pact-demo.webm`](docs/demo/pact-demo.webm).
 
+There is also a six-minute explainer film,
+[`video/final/final_project_video.mp4`](video/final/final_project_video.mp4).
+It is generated rather than edited — narration measured, timeline computed from
+it, motion scenes filmed in a browser and the product footage cut from one take
+of the real console — and [`video/README_VIDEO.md`](video/README_VIDEO.md)
+rebuilds it from a clean checkout in five commands, offline. What was measured
+on the delivered file is in [`video/qa/qa_report.md`](video/qa/qa_report.md),
+including the three things that are wrong with the cut.
+
 Deployment notes, and the two traps in the single-port build, are in
 [`deploy/README.md`](deploy/README.md). It needs a host that runs a persistent
 process — the pollers, the background saga and the SQLite write lock all outlive
