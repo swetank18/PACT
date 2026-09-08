@@ -240,6 +240,14 @@ Added 2026-09-05:
   load stopped, and ₹4,86,50,572.82 matching the merchant's own count exactly.
   **One thing failed and it is real** — see the memory bullet below.
   `docs/soak.md` has all of it.
+- **There is a six-minute explainer film, generated rather than edited.**
+  Narration measured, timeline computed from it, motion scenes filmed in a
+  browser and product footage cut from one continuous take of the real console.
+  `video/README_VIDEO.md` rebuilds it offline in five commands;
+  `video/qa/qa_report.md` carries what was measured on the delivered file — ten
+  rows, all passing, and the three limitations of the cut stated rather than
+  glossed. The voice is espeak-ng and is meant to be replaced; swapping it
+  re-times the film automatically.
 - **The deployment manifests agree with the image.** `fly.toml`, `render.yaml`,
   `docker-compose.yml` and the Dockerfile are cross-checked on port, health
   path, the `/data` mount for both the database and the signing key, one
@@ -416,6 +424,19 @@ reading code. Each is listed with what would have gone wrong on stage.
 | The cross-check was itself the wrong number | It compared a three-seed harness total against a merchant counter that is reset each seed, got a ratio near three, and shipped "the harness has a bug" in `results.md` for the life of the project. Neither was wrong. Fixed, it agrees to the paise. |
 | A missing webhook signature passed verification | Found by mutating `compare_digest` to return True on an empty signature — the whole suite still passed. Nothing covered a delivery with no `X-Razorpay-Signature` while a secret was configured: the cheapest possible forgery. |
 | A gate timeout was reported as `TOKEN_INVALID` | The merchant refuses the order, which is right. But that code means "that settlement token is not valid" and reads as forgery, so a load spike put 97 of them in the audit trail in one run — pointing whoever read it at an attacker who did not exist. Now `GATE_UNAVAILABLE`, which still blocks. |
+
+Found on 2026-09-09, all six by looking at what shipped rather than at what the
+tests said. Every suite was green throughout — 189 Python, 55 console, 13 smoke
+checks, and a QA report on the film that passed all ten of its own rows.
+
+| Bug | Why it mattered |
+| --- | --- |
+| The upsell attach tile counted only the rollback path | `record_acceptance()` had exactly one caller, `accept_alternative`. The ordinary way to take an addon is a re-quote, which is indistinguishable from a fresh basket, so `offers_made` climbed and `offers_accepted` never did. The merchant console read **"0 of 7 offers accepted · 0%"** on runs where an addon had been accepted and was visible in the order line beside it — the growth feature's own number, on the surface the pitch is about, measuring nothing. It is in the recorded walkthrough at 0%. The arms in `eval/results/` were never affected; the harness counts acceptance itself. |
+| The per-transaction cap label printed on top of the legend | `top: calc(100% + 4px)` resolves against the *padding* box, and `.capRow`'s `padding-bottom: 18px` existed to reserve room for that label — so the reservation cancelled itself out exactly and the label landed 10px into "spent ₹0 · this purchase …". jsdom does no layout, so all 55 console tests passed. The second time in this project the answer was "open a browser"; the check now asserts on rectangles. |
+| The gate runs ten checks and seven places said nine | `CHECK_ORDER` has ten entries and the firewall drawer prints "10 checks ran, 0 skipped" on screen. `checks.py` numbered `quote_binding` as 8b, and the nine spread from there into the deck slide sitting next to that frame in the film. The runbook said eight, which was not even the old convention's number. |
+| The video's architecture scene listed eight of the ten checks | Under a heading reading **"THE GATE'S CHECKS, IN ORDER"**, which is a claim of completeness. `mandate_signature` was folded into "signature" and `mandate_state` was absent. Now read from `CHECK_ORDER`. |
+| Every motion cue in the film landed late, and by a factor | Chromium's screencast emits a frame when the compositor commits one, and a page holding still commits nothing — so the recording compressed the gaps between cues and the cut stretched them back unevenly. Measured on S04: chips written for 8.2–10.7s arrived at **16.3–23.4s of a 24.4s clip**, so a row of ten finished appearing as the scene ended. Fixed at the source with a one-pixel element rotating off-frame forever. Two attempts to fix it by re-tuning delays failed first, which is the argument for measuring the delivered file rather than reasoning about the CSS. |
+| The documented way to build the video could not run | `node ../video/record_walkthrough.mjs` — Node resolves a bare specifier from the importing file's directory, `video/` has no `node_modules` and the repository root's is empty. Two of the build scripts also had `/home/swetank` in a font path, which made "five commands on a clean checkout produce the same film" true on exactly one laptop. |
 
 ---
 

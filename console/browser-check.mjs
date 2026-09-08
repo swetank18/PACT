@@ -102,16 +102,20 @@ if (!/SIGNATURE PARITY/i.test(header)) {
  * mandate — a check that silently found no label would pass forever.
  */
 await page.getByRole("button", { name: "Grant", exact: true }).click();
-await page.waitForTimeout(600);
 await page.getByRole("button", { name: "Grant and sign", exact: true }).click();
-await page.waitForTimeout(1200);
 await page.getByRole("button", { name: "Checkout", exact: true }).click();
-await page.waitForTimeout(600);
 
 const composer = page.getByPlaceholder("What should the agent buy?");
 await composer.fill("restock office supplies for the month");
 await page.getByRole("button", { name: "Send", exact: true }).click();
-await page.waitForTimeout(4000);
+
+// Waited on, not slept through — same reason as `beat()` above. The quote is a
+// round trip to the merchant and then to the gate for headroom, which is a few
+// hundred milliseconds here and several times that in the container CI runs
+// this against. A fixed sleep would report "the label never rendered" on a slow
+// machine, which is this check accusing the product of its own impatience.
+await page.getByText(/per transaction cap/).first().waitFor({ timeout: 60_000 });
+await page.getByText(/remaining after/).first().waitFor({ timeout: 60_000 });
 
 const geometry = await page.evaluate(() => {
   const find = (needle) =>
