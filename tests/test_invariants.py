@@ -512,6 +512,7 @@ def test_the_documented_test_counts_are_the_real_ones(request):
     handoff = (REPO / "HANDOFF.md").read_text()
     ci = (REPO / ".github" / "workflows" / "ci.yml").read_text()
     deck = (REPO / "scripts" / "gen_hacksummit_deck.py").read_text()
+    explainer = (REPO / "scripts" / "gen_explainer_deck.py").read_text()
 
     def stated(where: str, text: str, pattern: str) -> int:
         found = re.search(pattern, text)
@@ -539,6 +540,9 @@ def test_the_documented_test_counts_are_the_real_ones(request):
         "gen_hacksummit_deck.py, the CI slide": stated(
             "gen_hacksummit_deck.py", deck, both
         ),
+        "gen_explainer_deck.py, the evidence slide": stated(
+            "gen_explainer_deck.py", explainer, r"tests — (\d+) pytest"
+        ),
     }
     wrong = [f"{where} says {n}" for where, n in python_claims.items() if n != total]
     assert not wrong, (
@@ -553,11 +557,24 @@ def test_the_documented_test_counts_are_the_real_ones(request):
         "gen_hacksummit_deck.py, the proof chip": int(
             re.search(r'"\d+\s+\+\s+(\d+)\s+tests', deck).group(1)  # type: ignore[union-attr]
         ),
+        "gen_explainer_deck.py": int(
+            re.search(r"tests — \d+ pytest, (\d+) vitest", explainer).group(1)  # type: ignore[union-attr]
+        ),
     }
     assert len(set(console_claims.values())) == 1, (
         "the console test count disagrees with itself: "
         + ", ".join(f"{where} says {n}" for where, n in console_claims.items())
     )
+
+    # gen_explainer_deck.py prints a combined figure on two slides. It is the
+    # sum, so it drifts twice as easily and reads as the most confident number
+    # on the page.
+    combined = total + next(iter(console_claims.values()))
+    for found in re.finditer(r'\("(\d+)", "tests', explainer):
+        assert int(found.group(1)) == combined, (
+            f"gen_explainer_deck.py says {found.group(1)} tests but the suites "
+            f"collect {total} + {next(iter(console_claims.values()))} = {combined}"
+        )
 
 
 # ------------------------------------------------------- the console build ---

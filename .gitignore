@@ -57,3 +57,9 @@ video/render/
 video/recording/
 video/assets/diagrams/*.png
 video/assets/overlays/*.png
+
+# A hand-assembled bundle of things already tracked — the demo take from
+# docs/demo/ and the four shots from docs/screenshots/, zipped with an
+# index.html. Nothing generates it and nothing reads it, so committing it would
+# be 6.6 MB of second copies.
+pact-explainer.zip
