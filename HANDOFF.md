@@ -216,7 +216,7 @@ Added 2026-08-31, and all of it runs on every push rather than once by hand:
 - **It survives a restart with the volume attached** — orders and the gate's
   signing key both. Verified falsifiable: pointed at a fresh volume the check
   reports the new key rather than passing quietly.
-- **The console has been seen.** Chromium, all four surfaces, zero console
+- **The console has been seen.** Chromium, every surface, zero console
   errors and zero failed requests. Screenshots in `docs/screenshots/`.
 - **The Razorpay client runs**, against a fake built from `API_NOTES.md` that
   refuses what the real API refuses. 27 tests, mutation-checked.
@@ -571,7 +571,7 @@ cross-checked against the image they deploy.
 | `deploy/README.md` | The single-port build and its two silent traps |
 | `eval/README.md` | Every assumption behind the numbers, and how to vary it |
 | `rails/razorpay/API_NOTES.md` | What was verified against the live docs, dated, with unverified items marked |
-| `console/README.md` | The three surfaces, and the signature-parity gate |
+| `console/README.md` | The five surfaces, and the signature-parity gate |
 | `tests/test_invariants.py` | The rules that stop the design decaying |
 | `.github/workflows/container.yml` | What is actually proven on every push, and against what |
 | `scripts/smoke.py` | The six beats as assertions; runs against any instance, stdlib only |

@@ -94,7 +94,7 @@ merchant/    catalog, quote engine, headroom upsell, saga, MCP tools
 buyer/       the agent: one program, two flags, no forked scripts
 sim/         four-arm experiment, attacks, benign set, chaos, ablation, beats
 eval/        generated results. Never hand-edited.
-console/     the three surfaces a judge sees
+console/     the five surfaces a judge sees
 profiles/    one config file per event. Changing events is changing a flag.
 ```
 
