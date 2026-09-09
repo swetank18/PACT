@@ -66,5 +66,5 @@ database, and start again. A take costs about two minutes.
 | --- | --- | --- |
 | `Send` stays disabled | the composer is empty | the recorder types the intent first; check the placeholder text still matches the component |
 | A beat does nothing | the previous beat is still running | raise its settle time in `record_walkthrough.mjs` |
-| Headroom shows a 404 in the log | a poll for a mandate the reset cleared | harmless, and it happens before the first mark |
+| Headroom shows a 404 in the log | was a race between the first headroom poll and the mandate reaching the gate, not the reset — fixed in `Grant.tsx`, which now registers before handing the mandate to the rest of the app | if it recurs, something is actually wrong |
 | The board is not empty at the start | a previous take's data | delete the database file and restart the instance |

@@ -114,4 +114,4 @@ frame. Give a beat more room by raising its settle time in
 | `Send` never enables in the take | the composer needs text | the recorder types the intent; check the placeholder string still matches |
 | Beat 3 "fails" | it is supposed to | it is the contrast; CI asserts it does not complete |
 | Subtitles do not appear | ffmpeg built without libass | rebuild ffmpeg, or drop the `subtitles=` filter and ship `project.srt` as a sidecar |
-| The take shows a 404 | a headroom poll for a mandate cleared by the reset | it happens before the first mark and is not in the cut; QA checks the used frames |
+| The take shows a 404 | it should not any more — the grant used to hand the mandate to the rest of the app before registering it at the gate, so the first headroom poll could overtake the POST. Fixed in `Grant.tsx` | if one appears again it is a real failure, not the known benign one |

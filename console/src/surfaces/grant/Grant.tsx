@@ -108,11 +108,21 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
       );
       const mandate: Mandate = { ...unsigned, signature };
 
+      // On screen the instant it is signed. This is the moment the demo turns
+      // on and it does not wait for the network.
       setResult({ mandate, signature });
-      onGranted({ mandate, signature, totalBudgetPaise: totalPaise });
 
-      // Hand it to the gate. If the gate is not up yet the mandate is still
-      // valid and still signed — the console does not pretend otherwise.
+      // Hand it to the gate *before* telling the rest of the app. If the gate
+      // is not up the mandate is still valid and still signed — the console
+      // does not pretend otherwise, and the handoff below happens either way.
+      //
+      // The ordering is the fix for a real race. `onGranted` routes to
+      // checkout, which polls headroom straight away, and that poll used to
+      // overtake this POST: the gate 404s a mandate it has simply not been told
+      // about yet. It is intermittent, it put a failed request in the console
+      // on the principal's own screen, and it made `browser-check.mjs` flaky in
+      // CI. It had been written down as "a poll for a mandate the reset
+      // cleared", which was the wrong cause — nothing had been reset.
       setRegistered("pending");
       try {
         await gate.registerMandate(mandate);
@@ -120,6 +130,8 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
       } catch {
         setRegistered("failed");
       }
+
+      onGranted({ mandate, signature, totalBudgetPaise: totalPaise });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

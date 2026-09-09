@@ -135,7 +135,13 @@ visible as a state change (`Add` → `added`) rather than as a counter. That cut
 stands — it is the better shot, because a person performing the acceptance is
 the point — and the merchant board behind it now tells the truth as well.
 
-**A stale headroom poll after a reset.** The first take logged one 404:
+**A headroom poll that overtook the mandate.** Recorded here as "a stale poll
+after a reset", which was the wrong cause: nothing had been reset. The grant
+handed the mandate to the rest of the app before registering it at the gate, so
+the first poll could beat the POST. **Fixed 2026-09-09** in `Grant.tsx`. The
+original note follows.
+
+The first take logged one 404:
 `GET /api/gate/v1/mandates/{id}/headroom` for a mandate the reset had just
 cleared. It is harmless and happened before the first mark, but it is the only
 console error either take produced; the second take produced none.
