@@ -265,11 +265,19 @@ class Gate:
         The UPDATE ... WHERE used_at IS NULL is the whole mechanism: two
         concurrent redemptions, exactly one rowcount of 1. A SELECT-then-UPDATE
         would let both through, which would let one ALLOW pay for two orders.
+
+        Revocation is re-checked here, and that is not redundant with check 3.
+        `mandate_state` runs at authorize; this runs at the last moment before
+        money moves, and a token lives 240 seconds between the two. Without it
+        the account holder's kill switch had a four-minute hole: every mandate
+        revoked, every later authorize refused, and any token already issued
+        still settling. The principal's console tells them in as many words
+        that "the agent cannot spend in the meantime".
         """
         now = utcnow()
         with self.db.immediate_tx() as conn:
             row = conn.execute(
-                "SELECT decision_id, amount_paise, used_at, expires_at "
+                "SELECT decision_id, mandate_id, amount_paise, used_at, expires_at "
                 "FROM settlement_tokens WHERE token = ?",
                 (token,),
             ).fetchone()
@@ -281,6 +289,17 @@ class Gate:
                 return False, ReasonCode.TOKEN_EXPIRED, row["decision_id"]
             if int(row["amount_paise"]) != amount_paise:
                 return False, ReasonCode.QUOTE_AMOUNT_MISMATCH, row["decision_id"]
+
+            # Read inside the same transaction, so a revoke landing between the
+            # lookup and the UPDATE cannot slip past. Refuses without marking
+            # the token used: a pause the principal later lifts must not find
+            # the token spent on a purchase that never happened.
+            revoked = conn.execute(
+                "SELECT revoked FROM mandates WHERE mandate_id = ?",
+                (row["mandate_id"],),
+            ).fetchone()
+            if revoked is None or bool(revoked["revoked"]):
+                return False, ReasonCode.MANDATE_REVOKED, row["decision_id"]
 
             cur = conn.execute(
                 "UPDATE settlement_tokens SET used_at = ? WHERE token = ? AND used_at IS NULL",

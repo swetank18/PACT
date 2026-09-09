@@ -416,6 +416,54 @@ def test_an_unknown_token_is_refused(gate):
     assert code is ReasonCode.TOKEN_INVALID
 
 
+def test_revoking_a_mandate_kills_the_tokens_already_issued_against_it(bought, gate):
+    """
+    The kill switch has to stop money that is already in flight.
+
+    `mandate_state` is check 3, so revoking blocks every *later* authorize. It
+    said nothing about an ALLOW that had already happened: a settlement token
+    lives 240 seconds, and for that whole window the merchant could still redeem
+    one and the payment would settle against a mandate the account holder had
+    just killed.
+
+    The console's own confirm dialog tells the principal "The agent cannot spend
+    in the meantime." This is the test that makes that sentence true.
+    """
+    mandate, q, decision = bought
+    assert decision.settlement_token
+
+    assert gate.mandates.revoke(mandate.mandate_id)
+
+    ok, code, decision_id = gate.redeem_token(
+        decision.settlement_token, amount_paise=q.total_paise
+    )
+    assert not ok
+    assert code is ReasonCode.MANDATE_REVOKED
+    # Still identifies the decision, so the refusal lands in the audit trail
+    # against the order it belongs to rather than nowhere.
+    assert decision_id == decision.decision_id
+
+
+def test_a_revoked_mandates_token_stays_unspent_rather_than_being_burned(bought, gate):
+    """
+    Refusing must not mark the token used.
+
+    Otherwise the refusal is indistinguishable from a redemption afterwards, and
+    un-pausing an agent — which the console offers, and which re-issues what was
+    left — would find the token spent on a purchase that never happened.
+    """
+    mandate, q, decision = bought
+    gate.mandates.revoke(mandate.mandate_id)
+    gate.redeem_token(decision.settlement_token, amount_paise=q.total_paise)
+
+    with gate.db.read_tx() as conn:
+        row = conn.execute(
+            "SELECT used_at FROM settlement_tokens WHERE token = ?",
+            (decision.settlement_token,),
+        ).fetchone()
+    assert row["used_at"] is None
+
+
 # ------------------------------------------------------------- restocking ---
 
 
