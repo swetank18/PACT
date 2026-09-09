@@ -501,6 +501,51 @@ def test_everything_that_states_how_many_checks_there_are_agrees_with_the_gate()
     )
 
 
+def test_the_deck_and_the_console_name_the_same_people():
+    """
+    Slide 7 of the submitted deck and slide 1 of the in-app pitch both list who
+    did what. They are two files, and they are read out to the same room.
+
+    The deck had shipped with three literal "NAME" placeholders on it, and
+    "TEAM NAME -", "TEAM LEAD -", "TRACK -" on the title slide. The generator
+    printed a reminder every run, which is not a mechanism. The track and the
+    three names come out of the tree now — the track from the profile, the
+    names from the console — and this holds the two lists together.
+
+    Team name and team lead are genuinely not in this repository. They are not
+    asserted here, because a test cannot invent them; `gen_hacksummit_deck.py`
+    names them on every run instead.
+    """
+    deck = (REPO / "scripts" / "gen_hacksummit_deck.py").read_text()
+    slides = (REPO / "console" / "src" / "surfaces" / "slides" / "Slides.tsx").read_text()
+
+    in_deck = set(re.findall(r'"LANE [ABC]": "(\w+)"', deck))
+    assert len(in_deck) == 3, (
+        f"gen_hacksummit_deck.py's MEMBERS no longer reads as three lanes: {in_deck}"
+    )
+
+    in_console = set(re.findall(r"<strong>(\w+)</strong>", slides))
+    assert in_deck == in_console, (
+        f"the deck names {sorted(in_deck)} and the console's pitch names "
+        f"{sorted(in_console)}. Both are read out to the same room."
+    )
+
+    # And the committed deck actually carries them, rather than the generator
+    # having been fixed and the .pptx left with NAME on it.
+    built = _pptx_text(REPO / "docs" / "HackSummit-PACT.pptx")
+    for member in in_deck:
+        assert member.upper() in built, (
+            f"docs/HackSummit-PACT.pptx does not name {member}. Regenerate it."
+        )
+    assert "TRACK -" in built and built.count("TRACK -") == 1, (
+        "the track line is gone from the committed deck"
+    )
+    assert re.search(r"TRACK -\s*\S", built), (
+        "docs/HackSummit-PACT.pptx still has the template's empty TRACK "
+        "placeholder on it. Regenerate it."
+    )
+
+
 def test_the_documented_test_counts_are_the_real_ones(request):
     """
     A test count written into prose, and then not updated.

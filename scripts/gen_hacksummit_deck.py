@@ -230,14 +230,52 @@ def commits_on_main() -> str:
         return "many"
 
 
+# ----------------------------------------------------------------- the team ---
+#
+# The organisers' template leaves three fields blank on slide 1 and three names
+# blank on slide 7. Four of those six are facts this repository already holds,
+# so they are filled from it rather than left to be typed on the morning:
+#
+#     TRACK      profiles/razorpay-track01.yaml, first line
+#     MEMBERS    console/src/surfaces/slides/Slides.tsx, the title slide, where
+#                the same three people are listed against the same three lanes
+#
+# The committed deck had shipped with "TEAM NAME -", "TEAM LEAD -", "TRACK -"
+# and three "NAME"s on it. main() printed a reminder every run and the reminder
+# was doing no work.
+#
+# TEAM_NAME and TEAM_LEAD are not derivable from anything in this tree and are
+# not guessed. They stay as the template's own placeholders, and main() now
+# names exactly what is still missing rather than listing everything.
+
+TEAM_NAME: str | None = None
+TEAM_LEAD: str | None = None
+
+TRACK = "AI Growth & Agentic Commerce, Razorpay"
+
+#: Lane -> the person who owns it. Asserted against the console's own list by
+#: tests/test_invariants.py, so the deck and the product cannot disagree about
+#: who did what in front of the people being told.
+MEMBERS = {
+    "LANE A": "Swetank",
+    "LANE B": "Utkarsh",
+    "LANE C": "Devansh",
+}
+
+
 # -------------------------------------------------------------- the slides ---
 
 
 def slide_title(slide) -> None:
     retitle(slide, "PROJECT NAME", "PACT")
-    # The template's own placeholders, kept verbatim so whoever fills them in
-    # can see exactly what the organisers asked for.
-    retitle(slide, "TEAM NAME -", "TEAM NAME -")
+    # Filled where the repository knows the answer; left as the template's own
+    # placeholder where it does not, so whoever completes it sees exactly what
+    # the organisers asked for.
+    retitle(slide, "TRACK -", f"TRACK - {TRACK}")
+    if TEAM_NAME:
+        retitle(slide, "TEAM NAME -", f"TEAM NAME - {TEAM_NAME}")
+    if TEAM_LEAD:
+        retitle(slide, "TEAM LEAD -", f"TEAM LEAD - {TEAM_LEAD}")
     tf = textbox(slide, Inches(1.75), Inches(5.05), Inches(16.5), Inches(0.80),
                  align=PP_ALIGN.CENTER)
     write(
@@ -250,7 +288,7 @@ def slide_title(slide) -> None:
     # fields. Three measured numbers sit there rather than nothing, because this
     # is the slide a judge looks at longest while the team is still walking up.
     proof = [
-        (ALLOW, "197 + 55 tests, green on every push"),
+        (ALLOW, "198 + 55 tests, green on every push"),
         (LINK, "49,501 purchases settled in a two-hour soak"),
         (STEPUP, "0% false blocks vs 28% for a client-side cap"),
     ]
@@ -384,7 +422,7 @@ def slide_technical(slide) -> None:
                  anchor=MSO_ANCHOR.MIDDLE)
     write(
         tf,
-        [("197 Python tests, 55 console tests, and the six demo beats run against the "
+        [("198 Python tests, 55 console tests, and the six demo beats run against the "
           "image itself on every push.", 15.5, True, WHITE, 0)],
         first=True,
     )
@@ -595,7 +633,10 @@ def slide_team(slide) -> None:
         # underscores wraps at the card edge and leaves a stub on the next line.
         label = textbox(slide, x + Inches(0.30), y + Inches(0.12) + h - Inches(1.15),
                         w - Inches(0.60), Inches(0.42))
-        write(label, [("NAME", 12.5, True, MUTED, 0)], first=True)
+        # The lane's owner, from MEMBERS, rather than the word NAME. The lane
+        # heading is "LANE A — BACKEND"; key on the part before the dash.
+        member = MEMBERS.get(name.split("—")[0].strip(), "NAME")
+        write(label, [(member.upper(), 12.5, True, MUTED, 0)], first=True)
         rule = slide.shapes.add_shape(
             MSO_SHAPE.RECTANGLE,
             x + Inches(0.30), y + Inches(0.12) + h - Inches(0.62),
@@ -647,7 +688,12 @@ def main() -> int:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     prs.save(str(OUT))
     print(f"{OUT.relative_to(REPO)}  —  {len(prs.slides)} slides, limit {limit}")
-    print("   fill in on slide 1: TEAM NAME, TEAM LEAD, TRACK; and the names on slide 7")
+    missing = [n for n, v in (("TEAM NAME", TEAM_NAME), ("TEAM LEAD", TEAM_LEAD)) if not v]
+    if missing:
+        print(f"   still blank on slide 1: {', '.join(missing)} — set them at the "
+              f"top of this file. The track and all three names are filled.")
+    else:
+        print("   every template field is filled")
     return 0
 
 
