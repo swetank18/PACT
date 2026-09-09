@@ -52,7 +52,17 @@ jobs:
       # mistake in any of those is a deployment that fails in a way the image
       # alone would not show.
       - name: Build
-        run: docker compose build
+        # The build identity travels with the image. Without it a running
+        # instance cannot say which build it is, and answering "is what is
+        # deployed what I think is deployed" means fetching its stylesheet and
+        # grepping for a class name — which is how it was answered on
+        # 2026-09-09, four days and eleven fixes after the deployment was last
+        # refreshed.
+        env:
+          PACT_BUILD_REV: ${{ github.sha }}
+        run: |
+          export PACT_BUILD_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          docker compose build
 
       - name: Start
         run: docker compose up -d

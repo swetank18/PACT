@@ -7,7 +7,14 @@
 
 services:
   pact:
-    build: .
+    build:
+      context: .
+      # Empty locally, which is correct — a hand-built image is not a release.
+      # CI sets both, so what it publishes can say what it is. See the note in
+      # the Dockerfile.
+      args:
+        PACT_BUILD_REV: "${PACT_BUILD_REV:-}"
+        PACT_BUILD_AT: "${PACT_BUILD_AT:-}"
 
     # Tagged rather than left as the default compose name, so CI can retag this
     # exact image for the registry instead of building it a second time and

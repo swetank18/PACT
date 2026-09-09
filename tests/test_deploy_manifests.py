@@ -253,3 +253,57 @@ def test_the_deck_generators_dependency_is_declared_and_stays_out_of_the_image()
         assert "from pptx" in source or "import pptx" in source, (
             f"scripts/{name} no longer imports pptx, so this split is stale"
         )
+
+
+def test_the_build_identity_is_wired_from_ci_through_to_healthz():
+    """
+    Four files have to agree or a running instance cannot say what it is.
+
+    The deployed instance spent four days and eleven fixes behind `main`, and
+    answering "is what is deployed what I think is deployed" meant fetching its
+    stylesheet and grepping for a CSS class one of those fixes had added. The
+    image now carries its revision and `/healthz` reports it.
+
+    That only stays true while the chain does: CI passes the SHA, compose
+    forwards it as a build arg, the Dockerfile declares the ARG and promotes it
+    to an ENV, and the app reads that ENV. Break any link and nothing fails —
+    the field just quietly reads "source" on a real deployment, which is worse
+    than no field at all because it looks like an answer.
+    """
+    workflow = (REPO / ".github" / "workflows" / "container.yml").read_text()
+    compose = yaml.safe_load((REPO / "docker-compose.yml").read_text())
+    dockerfile = (REPO / "Dockerfile").read_text()
+    app = (REPO / "deploy" / "app.py").read_text()
+
+    assert re.search(r"PACT_BUILD_REV:\s*\$\{\{\s*github\.sha\s*\}\}", workflow), (
+        "container.yml no longer passes the commit SHA into the build"
+    )
+    assert "PACT_BUILD_AT" in workflow, "container.yml no longer stamps a build time"
+
+    args = compose["services"]["pact"]["build"]["args"]
+    for name in ("PACT_BUILD_REV", "PACT_BUILD_AT"):
+        assert name in args, f"docker-compose.yml does not forward {name}"
+        assert f"${{{name}" in str(args[name]), (
+            f"docker-compose.yml hard-codes {name} instead of taking it from the "
+            f"environment, so CI's value would be ignored"
+        )
+        assert re.search(rf"^ARG {name}=", dockerfile, re.M), (
+            f"the Dockerfile does not declare ARG {name}"
+        )
+        assert f"{name}=${name}" in dockerfile, (
+            f"the Dockerfile declares ARG {name} but never promotes it to an ENV, "
+            f"so it is gone by the time the app runs"
+        )
+        assert f'os.environ.get("{name}"' in app, (
+            f"deploy/app.py does not read {name}"
+        )
+
+    assert '"build": {"rev": BUILD_REV, "at": BUILD_AT}' in app, (
+        "/healthz no longer reports the build"
+    )
+
+    # The ARGs must come after the dependency install, or every new commit
+    # invalidates the pip layer and CI builds from scratch each push.
+    assert dockerfile.index("ARG PACT_BUILD_REV") > dockerfile.index(
+        "RUN pip install --no-cache-dir -r requirements.txt"
+    ), "the build ARGs sit above the pip layer, so every commit busts that cache"

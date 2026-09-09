@@ -70,6 +70,21 @@ ENV PACT_DB_URL=sqlite:////data/pact.db \
     PACT_PROFILE=razorpay-track01 \
     PORT=8080
 
+# What this image is, baked in at build time and reported by /healthz.
+#
+# Without it there is no way to ask a running instance which build it is. That
+# is not academic: the deployed instance was four days and eleven fixes behind
+# for most of a session, and finding that out meant fetching the console's
+# stylesheet and grepping it for a CSS class added by one of them. A deployment
+# you cannot identify is a deployment you cannot be sure you have made.
+#
+# Last, and as ARGs consumed immediately, so a new SHA invalidates no cached
+# layer above this line.
+ARG PACT_BUILD_REV=unknown
+ARG PACT_BUILD_AT=unknown
+ENV PACT_BUILD_REV=$PACT_BUILD_REV \
+    PACT_BUILD_AT=$PACT_BUILD_AT
+
 # Do not run as root. The app writes only to /data.
 RUN useradd --create-home --uid 10001 pact && chown -R pact:pact /app /data
 USER pact

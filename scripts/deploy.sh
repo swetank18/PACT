@@ -119,7 +119,26 @@ TEXT
   check)
     base="${1:-}"
     [[ -n "$base" ]] || die "usage: ./scripts/deploy.sh check https://…"
-    smoke "${base%/}"
+    base="${base%/}"
+
+    # Which build is actually answering, before anything else is asserted about
+    # it. On 2026-09-09 the deployed instance turned out to be four days and
+    # eleven fixes behind, and finding that out meant fetching its stylesheet
+    # and grepping for a CSS class. One request now.
+    rev="$(curl -fsS --max-time 30 "$base/healthz" 2>/dev/null \
+           | tr ',' '\n' | grep -o '"rev":"[^"]*"' | cut -d'"' -f4 || true)"
+    head="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+    if [[ -z "$rev" ]]; then
+      echo "build     : not reported — this instance predates the build stamp"
+    elif [[ "$rev" == "source" ]]; then
+      echo "build     : source checkout, not a published image"
+    elif [[ "$rev" == "$head" ]]; then
+      echo "build     : ${rev:0:12} — matches local HEAD"
+    else
+      echo "build     : ${rev:0:12} — local HEAD is ${head:0:12}. The deployment is NOT this working tree."
+    fi
+
+    smoke "$base"
     ;;
 
   *)

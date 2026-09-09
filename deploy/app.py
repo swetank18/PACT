@@ -150,6 +150,13 @@ async def parity_vector() -> FileResponse | JSONResponse:
     return FileResponse(PARITY_VECTOR, media_type="application/json")
 
 
+#: What this build is. Baked into the image by the Dockerfile; absent when
+#: running from a source checkout, which is itself the useful answer — "source"
+#: means nobody can tell you what this is, so do not treat it as a release.
+BUILD_REV = os.environ.get("PACT_BUILD_REV", "").strip() or "source"
+BUILD_AT = os.environ.get("PACT_BUILD_AT", "").strip() or "source"
+
+
 @app.get("/healthz")
 async def healthz() -> dict:
     """One check that covers everything, for whatever is watching the container."""
@@ -160,6 +167,9 @@ async def healthz() -> dict:
         "console": CONSOLE_DIST.is_dir(),
         "self_url": SELF,
         "mounted": [p for p, _ in MOUNTED],
+        # So "is what is deployed what I think is deployed" is one request
+        # rather than an archaeology exercise on a stylesheet.
+        "build": {"rev": BUILD_REV, "at": BUILD_AT},
         "at": utcnow(),
     }
 

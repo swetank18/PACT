@@ -122,7 +122,16 @@ def check_health(base: str, timeout: float) -> str:
             "no console build in the image. The Node stage did not produce "
             "console/dist, or it was not copied across."
         )
-    return f"rail={health['rail']} auditor={health['auditor']} console=built"
+    # Which build answered. An instance that says "source" was started from a
+    # checkout rather than the published image; one that names a revision can be
+    # compared against `git rev-parse HEAD` without guessing.
+    build = health.get("build") or {}
+    rev = str(build.get("rev", "unknown"))
+    stamp = rev if rev in ("source", "unknown") else rev[:12]
+    return (
+        f"rail={health['rail']} auditor={health['auditor']} console=built "
+        f"build={stamp}"
+    )
 
 
 def check_sub_apps(base: str) -> str:
