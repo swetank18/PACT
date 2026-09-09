@@ -22,6 +22,17 @@ Two modes.
 
 Neither is a benchmark. One container, one worker, SQLite — the numbers say
 "this does not fall over", not "this is fast".
+
+**One run is not a measurement.** Throughput here is strongly bimodal on an
+ordinary laptop: five consecutive runs against one unchanged instance gave 13.6,
+22.3, 51.2, 22.3 and 52.5 purchases/s. Nothing about the build changed between
+them. A single run is therefore useless for "did this change make it slower" —
+a fact discovered the hard way, by concluding from one 20/s run that a new query
+had halved throughput, and then finding the same spread on the build without it.
+
+`--repeat N` runs the throughput phase N times and reports the spread, which is
+the only honest way to compare two builds. Alternate between them; do not run
+all of A and then all of B.
 """
 
 from __future__ import annotations
@@ -270,9 +281,10 @@ def throughput_mode(base: str, sessions: int, concurrency: int) -> int:
     ok = [r for r in results if r[0]]
     bad = [r for r in results if not r[0]]
 
+    rate = len(results) / wall
     print(f"end to end:  {percentiles([r[1] for r in results])}")
     print(f"completed    {len(ok)}/{sessions} in {wall:.1f}s "
-          f"({len(results) / wall:.1f} purchases/s, mean "
+          f"({rate:.1f} purchases/s, mean "
           f"{statistics.fmean(r[1] for r in results) * 1000:.0f} ms)")
 
     failures = 0
@@ -305,6 +317,35 @@ def throughput_mode(base: str, sessions: int, concurrency: int) -> int:
                   "of capacity and refused rather than settling without authority")
     if not failures:
         print("\nOK   no transport or server errors under load")
+    throughput_mode.last_rate = rate  # type: ignore[attr-defined]
+    return failures
+
+
+def repeated_throughput(base: str, sessions: int, concurrency: int, times: int) -> int:
+    """
+    The throughput phase N times, with the spread.
+
+    Exists because one run cannot answer the only question anyone asks of this
+    script — "is it slower than it was" — and reporting a single number invites
+    exactly that reading.
+    """
+    failures = 0
+    rates: list[float] = []
+    for i in range(times):
+        if times > 1:
+            print(f"--- run {i + 1} of {times} ---")
+        failures += throughput_mode(base, sessions, concurrency)
+        rates.append(getattr(throughput_mode, "last_rate", 0.0))
+        print()
+
+    if times > 1:
+        rates.sort()
+        median = statistics.median(rates)
+        print(f"{times} runs: median {median:.1f} purchases/s, "
+              f"range {rates[0]:.1f}-{rates[-1]:.1f}")
+        if rates[-1] > 0 and rates[-1] / max(rates[0], 0.1) >= 2:
+            print("     the spread is over 2x, which is normal here — compare "
+                  "medians across alternating runs, never single runs")
     return failures
 
 
@@ -316,6 +357,11 @@ def main() -> int:
     ap.add_argument("--racers-each", type=int, default=4, help="ceiling mode: buyers per permitted payment")
     ap.add_argument("--sessions", type=int, default=120)
     ap.add_argument("--concurrency", type=int, default=24)
+    ap.add_argument(
+        "--repeat", type=int, default=1,
+        help="throughput mode: run it N times and report the spread. Use this "
+             "whenever the question is whether something got slower.",
+    )
     args = ap.parse_args()
     base = args.base.rstrip("/")
 
@@ -330,7 +376,9 @@ def main() -> int:
         print("=" * 66)
         print("throughput")
         print("=" * 66)
-        failures += throughput_mode(base, args.sessions, args.concurrency)
+        failures += repeated_throughput(
+            base, args.sessions, args.concurrency, max(1, args.repeat)
+        )
 
     return min(failures, 125)
 

@@ -303,6 +303,21 @@ Added 2026-09-05:
   degrades by *refusing* rather than by settling without live authority. The
   ceiling holds throughout: twenty buyers racing one mandate spend ₹13,564.10
   against a ceiling of ₹13,564.10, exact in both directions.
+
+  **Read the 53/s as a median, not a reading.** Measured again on 2026-09-09: at
+  24 concurrent it is steady — three runs at 46.9, 49.4 and 50.3/s. At 32, which
+  is near saturation, it is strongly bimodal, and five consecutive runs against
+  one unchanged instance gave 13.6, 22.3, 51.2, 22.3 and 52.5/s. So a single run
+  cannot answer "did this change make it slower". That was found out the hard
+  way: one 20/s run here looked like a regression from a query added to the
+  settlement path, and the build without that query produced the same spread.
+  `scripts/load.py --repeat N` now runs the phase N times and prints the range,
+  and its docstring says to compare medians across *alternating* runs.
+
+  These figures also need `PACT_SAGA_STEP_DELAY_S=0`. Every deployment manifest
+  sets 0.35 on purpose — the saga paces itself so its steps are legible on
+  screen — so a deployed instance settles far slower than this by design, and
+  the soak's 6.9/s is the number to compare a deployment against.
 - **Memory climbed under sustained load. It is found, fixed and confirmed.**
   The two-hour soak measured RSS going from 88 MB cold to 154 MB, still climbing
   at **21 MB/hour** at the end — seventeen hours from the 512 MB `fly.toml` asks
