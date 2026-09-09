@@ -309,6 +309,22 @@ async def resolve_step_up(decision_id: str, payload: dict) -> dict:
     if stored is None:
         raise HTTPException(404, {"reason_code": str(ReasonCode.MANDATE_NOT_FOUND)})
 
+    # Revoked since the step up was raised. `mandate_state` ran at authorize and
+    # a step up can sit on the principal's screen for as long as they take to
+    # answer it, so this is the same gap the settlement token had: the kill
+    # switch has to win against anything still in flight. The token issued below
+    # would be refused at redemption anyway — but a decision recorded as ALLOW
+    # against a revoked mandate is a lie in the audit trail, and the audit trail
+    # is the thing being sold.
+    if stored.revoked:
+        raise HTTPException(
+            403,
+            {
+                "reason_code": str(ReasonCode.MANDATE_REVOKED),
+                "detail": "this mandate was revoked while the step up was open",
+            },
+        )
+
     approval = payload.get("approval") or {}
     signature = payload.get("signature") or ""
     if not signature or not verify(approval, signature, stored.mandate.delegator.pubkey):
