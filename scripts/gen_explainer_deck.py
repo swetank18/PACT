@@ -240,7 +240,7 @@ def s01_title(prs):
         ("0.0%", "false block rate", ALLOW),
         ("13 / 13", "attack variants blocked", ALLOW),
         ("₹0", "lost to adversarial traffic", ALLOW),
-        ("251", "tests, green on every push", LINK),
+        ("252", "tests, green on every push", LINK),
     ]
     for x, (value, label, colour) in zip(xs, stats):
         stat_card(slide, x, Inches(4.62), w, Inches(1.28), value, label, colour)
@@ -840,7 +840,7 @@ def s15_verified(prs):
 
     xs, w = columns(4)
     stats = [
-        ("251", "tests — 196 pytest, 55 vitest", LINK),
+        ("252", "tests — 197 pytest, 55 vitest", LINK),
         ("49,501", "purchases in two hours, 6.9/s", ALLOW),
         ("0", "transport or server errors", ALLOW),
         ("1.02×", "p50 latency drift, 66→67 ms", ALLOW),

@@ -1,0 +1,12 @@
+# Only for the deck generators in scripts/. Deliberately not in
+# requirements.txt, because the Dockerfile installs that file into the runtime
+# image and python-pptx drags lxml and Pillow in behind it — about 30 MB added
+# to a 208 MB image for a tool that never runs in a container.
+#
+#     pip install -r requirements-docs.txt
+#     python3 scripts/gen_hacksummit_deck.py
+#     python3 scripts/gen_explainer_deck.py
+#
+# The test suite does not need this. tests/test_invariants.py reads a .pptx with
+# zipfile, so the committed decks are checked on a plain install.
+python-pptx==1.0.2

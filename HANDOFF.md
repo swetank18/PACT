@@ -125,7 +125,7 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **196 Python tests, 55 console
+~11k lines of Python, ~10k of TypeScript. **197 Python tests, 55 console
 tests**, all green — one Python test skips unless the clone predates the key
 purge, so a run reports 189 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every
@@ -592,8 +592,8 @@ cross-checked against the image they deploy.
 | `console/browser-check.mjs` | The console in a real browser, and what it asserts |
 | `docs/RUNBOOK.md` | The run of show: what to press, what to say, and what to do when it breaks |
 | `docs/soak.md` | Two hours under load: the memory line that failed, and what is in the volume |
-| `docs/HackSummit-PACT.pptx` | The submitted deck, in the organisers' template. Generated — `scripts/gen_hacksummit_deck.py` |
-| `docs/PACT-explainer.pptx` | The whole system at technical depth, for someone integrating or reviewing it. Generated — `scripts/gen_explainer_deck.py` |
+| `docs/HackSummit-PACT.pptx` | The submitted deck, in the organisers' template. Generated — `scripts/gen_hacksummit_deck.py`, which needs `pip install -r requirements-docs.txt` |
+| `docs/PACT-explainer.pptx` | The whole system at technical depth, for someone integrating or reviewing it. Generated — `scripts/gen_explainer_deck.py`, same dependency. `docs/PACT-pitch.pptx` is the third deck and the only one with no generator: edit it by hand, and `tests/test_invariants.py` reads its bytes so a stale number in it fails the suite |
 | `video/README_VIDEO.md` | The six-minute explainer film, and the five commands that rebuild it from nothing |
 | `video/final/final_project_video.mp4` | That film. Distinct from the backup video below, which is the demo take alone |
 | `video/qa/qa_report.md` | What was measured on the delivered file, and the three limitations of the cut |

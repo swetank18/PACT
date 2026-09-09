@@ -8,7 +8,9 @@ a rail into a check "just to read the payment id" and nobody notices in review.
 from __future__ import annotations
 
 import ast
+import html
 import re
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -417,6 +419,23 @@ def test_every_relative_link_in_the_docs_resolves():
     assert not dead, "dead links: " + ", ".join(dead)
 
 
+def _pptx_text(path: Path) -> str:
+    """
+    Every run of text in a .pptx, joined.
+
+    stdlib only, deliberately: a .pptx is a zip of XML and `python-pptx` is a
+    tool dependency for the generators, not something the test suite should
+    need in order to read what a committed deck says.
+    """
+    runs: list[str] = []
+    with zipfile.ZipFile(path) as z:
+        for name in sorted(z.namelist()):
+            if name.startswith("ppt/slides/slide") and name.endswith(".xml"):
+                xml = z.read(name).decode("utf-8")
+                runs.extend(re.findall(r"<a:t>(.*?)</a:t>", xml, re.S))
+    return "\n".join(html.unescape(r) for r in runs)
+
+
 #: Only the range this project's prose actually reaches. A wider table would be
 #: pretending to a generality nothing needs.
 _WORDS = {"eight": 8, "nine": 9, "ten": 10, "eleven": 11}
@@ -572,12 +591,56 @@ def test_the_documented_test_counts_are_the_real_ones(request):
     # gen_explainer_deck.py prints a combined figure on two slides. It is the
     # sum, so it drifts twice as easily and reads as the most confident number
     # on the page.
-    combined = total + next(iter(console_claims.values()))
+    console = next(iter(console_claims.values()))
+    combined = total + console
     for found in re.finditer(r'\("(\d+)", "tests', explainer):
         assert int(found.group(1)) == combined, (
             f"gen_explainer_deck.py says {found.group(1)} tests but the suites "
-            f"collect {total} + {next(iter(console_claims.values()))} = {combined}"
+            f"collect {total} + {console} = {combined}"
         )
+
+    # ------------------------------------------------- and the decks as built ---
+    #
+    # Everything above reads a generator. That is one step short of what a judge
+    # opens, and the gap is real: a number can be fixed in the generator and the
+    # .pptx left as it was, which happened twice in one afternoon. It also does
+    # not cover docs/PACT-pitch.pptx at all, which has **no** generator — it was
+    # hand rendered and the source was never committed — and had been claiming
+    # "237 tests — 185 Python, 52 console" for long enough that both numbers were
+    # two revisions stale, on the title slide as well as in the body.
+    #
+    # So these read the committed bytes. It cannot be satisfied by editing a
+    # script; the deck has to actually say it.
+    decks = {
+        "HackSummit-PACT.pptx": [
+            (r"(\d+)\s*\+\s*(\d+)\s+tests", (total, console)),
+            (r"(\d+) Python tests, (\d+) console tests", (total, console)),
+        ],
+        "PACT-explainer.pptx": [
+            (r"tests — (\d+) pytest, (\d+) vitest", (total, console)),
+            (r"(\d+)\s+tests, green on every push", (combined,)),
+        ],
+        "PACT-pitch.pptx": [
+            (r"tests — (\d+) Python, (\d+) console", (total, console)),
+            (r"(\d+)\s+tests, green on every push", (combined,)),
+        ],
+    }
+    for name, patterns in decks.items():
+        text = _pptx_text(REPO / "docs" / name)
+        for pattern, expected in patterns:
+            found = re.findall(pattern, text)
+            assert found, (
+                f"docs/{name}: nothing matches {pattern!r} any more. Either the "
+                f"slide changed shape or the claim is gone — restore it or drop "
+                f"it from this table rather than leaving the deck unchecked."
+            )
+            for match in found:
+                got = tuple(int(g) for g in (match if isinstance(match, tuple) else (match,)))
+                assert got == expected, (
+                    f"docs/{name} says {got} where the suites give {expected}. "
+                    f"Regenerate it — or, for PACT-pitch.pptx, edit it, because "
+                    f"that one has no generator."
+                )
 
 
 # ------------------------------------------------------- the console build ---

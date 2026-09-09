@@ -218,3 +218,38 @@ def test_no_manifest_claims_a_target_is_undeployed_that_the_docs_say_is_live():
             f"{name} says the Render target is undeployed, but the docs give "
             f"{live[0]} as live. One of them is stale."
         )
+
+
+def test_the_deck_generators_dependency_is_declared_and_stays_out_of_the_image():
+    """
+    Both halves matter, and they pull in opposite directions.
+
+    `scripts/gen_hacksummit_deck.py` and `gen_explainer_deck.py` import
+    `python-pptx`, and both are documented commands. It was declared nowhere, so
+    either of them was an ImportError on a clean checkout — the deck is
+    generated precisely so a number that moves can be carried into it, and that
+    is worth nothing if the generator does not run.
+
+    The obvious fix is the wrong one. The Dockerfile installs requirements.txt
+    into the runtime image, and python-pptx brings lxml and Pillow with it: some
+    30 MB added to a 208 MB image, for a tool that never runs in a container.
+    So it lives in requirements-docs.txt, and this asserts it stays there.
+    """
+    runtime = (REPO / "requirements.txt").read_text()
+    docs = (REPO / "requirements-docs.txt").read_text()
+
+    assert re.search(r"^python-pptx==", docs, re.M), (
+        "requirements-docs.txt no longer pins python-pptx, so the deck "
+        "generators have an undeclared dependency again"
+    )
+    assert not re.search(r"^python-pptx", runtime, re.M), (
+        "python-pptx is in requirements.txt, which the Dockerfile installs into "
+        "the runtime image. It is only needed to build the decks — put it back "
+        "in requirements-docs.txt"
+    )
+
+    for name in ("gen_hacksummit_deck.py", "gen_explainer_deck.py"):
+        source = (REPO / "scripts" / name).read_text()
+        assert "from pptx" in source or "import pptx" in source, (
+            f"scripts/{name} no longer imports pptx, so this split is stale"
+        )
