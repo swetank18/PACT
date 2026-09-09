@@ -125,7 +125,7 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **206 Python tests, 55 console
+~11k lines of Python, ~10k of TypeScript. **213 Python tests, 55 console
 tests**, all green — one Python test skips unless the clone predates the key
 purge, so a run reports 189 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every
@@ -254,6 +254,16 @@ Added 2026-09-05:
   instance, and no credential in any of them. Mutation-checked.
 
 ### NOT verified — the honest boundary
+
+- **The merchant now verifies the headroom envelope's signature.** It did not,
+  for the life of the project, which made the claim the design rests on — that a
+  merchant can trust a signed envelope it was handed without asking — false in
+  the implementation. `/v1/gate/pubkey` existed the whole time, with a docstring
+  saying what it was for, and nothing called it. It never affected money: every
+  ceiling is re-derived server side at `authorize`. `tests/test_envelope_trust.py`
+  drives the real client through a stub transport — tampered, foreign-signed,
+  unsigned, and a rotated gate key, which refetches rather than rejecting for
+  the life of the process.
 
 - **The Razorpay client has never run against the *real* API.** Still true, and
   still the largest gap. There are no test keys here. What changed is that it is
@@ -425,7 +435,7 @@ reading code. Each is listed with what would have gone wrong on stage.
 | A missing webhook signature passed verification | Found by mutating `compare_digest` to return True on an empty signature — the whole suite still passed. Nothing covered a delivery with no `X-Razorpay-Signature` while a secret was configured: the cheapest possible forgery. |
 | A gate timeout was reported as `TOKEN_INVALID` | The merchant refuses the order, which is right. But that code means "that settlement token is not valid" and reads as forgery, so a load spike put 97 of them in the audit trail in one run — pointing whoever read it at an attacker who did not exist. Now `GATE_UNAVAILABLE`, which still blocks. |
 
-Found on 2026-09-09, all ten by looking at what shipped rather than at what
+Found on 2026-09-09, all eleven by looking at what shipped rather than at what
 the tests said. Every suite was green throughout — 189 Python, 55 console, 13 smoke
 checks, and a QA report on the film that passed all ten of its own rows.
 
@@ -438,6 +448,7 @@ checks, and a QA report on the film that passed all ten of its own rows.
 | The film composed from footage that had been replaced | Playwright names a recording by a hash of the page, so re-filming a scene adds a take beside the old one; `compose.py` cut from `next(glob("*.webm"))`, whatever the filesystem returned first. **Seven takes had piled up in `recording/scenes/S17`**, six in most of the others. Every one is a valid video of the right length, so nothing looked wrong — a scene could be regenerated, the change confirmed in the HTML, and the old footage still reach the cut. Found only by regenerating S17, seeing the frame unchanged, and opening the directory. The recorders now clear before filming and `compose.py` refuses to guess. |
 | The kill switch had a four-minute hole | Revoking a mandate blocked every *later* authorize — `mandate_state` is check 3 — and said nothing about an ALLOW that had already happened. A settlement token lives 240 seconds, and for that whole window the merchant could still redeem one and the money moved. Measured against a running instance: authorize, revoke, settle → **HTTP 200, order accepted, ₹982.82 settled against a mandate the account holder had just killed**. The principal's console tells them in as many words that "the agent cannot spend in the meantime". Revocation is now re-checked inside the same transaction that spends the token, which refuses without burning it, so a pause the principal later lifts does not find the token spent on a purchase that never happened. Same probe now: HTTP 403 `MANDATE_REVOKED`, no order, ₹0. |
 | An order the process died on mid-saga was polled forever and never raised | The reconciler resolves exactly one case — the rail captured and the merchant never recorded it — and left everything else it found where it was. An order interrupted between capture and fulfilment reads as captured on both sides, so that branch never fires: it came back on every pass, every thirty seconds, indefinitely, while nothing anywhere said the money had moved and the goods had not. A refund that will not go through is parked in `NEEDS_ATTENTION` and raised in the console; this was the same situation and it was silent. Anything unsettled past the reservation TTL — after which the budget has been swept and it cannot complete on its own — is now parked with what the rail actually reported. Parked, not decided: a guess at what happened would be worse than a human looking. |
+| The merchant never verified the envelope it was handed | "A merchant can trust a signed envelope without asking" is the claim the whole design rests on. The gate signed every envelope and published its key at `/v1/gate/pubkey` — docstring: "So the merchant can verify the headroom envelopes it is handed" — and `HttpGateClient.headroom` parsed the JSON and believed it. No money was ever at risk, because `authorize` re-derives every ceiling server side; what was at risk was the claim, which is the thing being sold. Verified now, failing closed, with one key refetch before calling a mismatch a forgery — the gate mints a new key whenever it boots without its volume, which is every restart on the plan the deployed instance is actually on. |
 | The film's crossover was an interpolation, and a flattering one | S17 said "crossover ≈ 18%", spoken and on screen, where `results.md` says 20% — the swept point at which arm D actually wins. 18% is a straight line drawn between two swept points, which the generated results deliberately decline to draw, and it has PACT winning sooner than the evidence states. `video/assets.md` promises every figure on screen traces to a file in the tree; that one did not. |
 | The documented way to build the video could not run | `node ../video/record_walkthrough.mjs` — Node resolves a bare specifier from the importing file's directory, `video/` has no `node_modules` and the repository root's is empty. Two of the build scripts also had `/home/swetank` in a font path, which made "five commands on a clean checkout produce the same film" true on exactly one laptop. |
 
@@ -531,7 +542,7 @@ push; the console has been opened in a browser and is screenshotted every run;
 the Razorpay client and the auditor are both exercised; `RAZORPAY_CAPTURE_FAILED`
 is now `RAIL_CAPTURE_FAILED` and the layering allowlist is empty.
 
-Closed on 2026-09-09: **ten bugs, all of them in what shipped rather than in
+Closed on 2026-09-09: **eleven bugs, all of them in what shipped rather than in
 what the tests measured** — including one that mattered more than the rest, a
 four-minute window in which the account holder's kill switch did not stop money
 that was already in flight. — section 5 has each one and what it would have cost.

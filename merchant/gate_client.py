@@ -18,6 +18,7 @@ from typing import Protocol
 
 import httpx
 
+from contracts.crypto import verify
 from contracts.money import Paise
 from contracts.reason_codes import ReasonCode
 from contracts.schemas import Headroom
@@ -37,20 +38,80 @@ class GateClient(Protocol):
 class HttpGateClient(GateClient):
     def __init__(self, base_url: str | None = None, timeout: float = 5.0) -> None:
         self._client = httpx.Client(base_url=base_url or GATE_URL, timeout=timeout)
+        #: The gate's Ed25519 public key, fetched once and cached. See `_pubkey`.
+        self._gate_pubkey: str | None = None
+
+    # ------------------------------------------------------------ headroom ---
+
+    def _pubkey(self, *, refresh: bool = False) -> str | None:
+        if refresh:
+            self._gate_pubkey = None
+        if self._gate_pubkey is None:
+            try:
+                r = self._client.get("/v1/gate/pubkey")
+                r.raise_for_status()
+                self._gate_pubkey = str(r.json()["public_key_b64u"])
+            except (httpx.HTTPError, KeyError, ValueError) as exc:
+                log.warning("gate public key unavailable: %s", exc)
+                return None
+        return self._gate_pubkey
 
     def headroom(self, mandate_id: str) -> Headroom | None:
+        """
+        Fetch the envelope and **verify it**, rather than trusting the transport.
+
+        This is the claim the whole design rests on: a merchant can trust a
+        signed envelope it was handed without asking anyone. The gate has always
+        signed them and published its key at `/v1/gate/pubkey` — whose docstring
+        reads "So the merchant can verify the headroom envelopes it is handed" —
+        and nothing here ever called it. Every ceiling is re-derived server side
+        at authorize, so an unverified envelope could never move money; what it
+        could do is make the central claim untrue, which is the thing being sold.
+
+        Fails closed. An envelope that does not verify is not an envelope, and
+        the upsell gets nothing rather than falling back to offering everything.
+        """
         try:
             r = self._client.get(f"/v1/mandates/{mandate_id}/headroom")
             if r.status_code == 404:
                 return None
             r.raise_for_status()
-            return Headroom.model_validate(r.json())
+            envelope = Headroom.model_validate(r.json())
         except httpx.HTTPError as exc:
             # Fail closed for the upsell: no headroom means no offers, rather
             # than falling back to offering everything. An outage must not
             # silently downgrade us to the naive baseline.
             log.warning("headroom unavailable for %s: %s", mandate_id, exc)
             return None
+
+        return envelope if self._verified(envelope, mandate_id) else None
+
+    def _verified(self, envelope: Headroom, mandate_id: str) -> bool:
+        if not envelope.signature:
+            log.warning("headroom envelope for %s carries no signature", mandate_id)
+            return False
+
+        payload = envelope.model_dump()
+        for refresh in (False, True):
+            pubkey = self._pubkey(refresh=refresh)
+            if pubkey is None:
+                return False
+            if verify(payload, envelope.signature, pubkey):
+                return True
+            # One retry against a freshly fetched key before calling it a
+            # forgery. The gate generates a new key when it boots without its
+            # volume — which is every restart on a plan with no disk — and a
+            # cached key would then reject every envelope for the life of the
+            # process, turning the growth feature off with health checks green.
+            # That exact failure has happened here once already, from an empty
+            # merchant VPA, and it is the reason this retries rather than
+            # refusing on the first mismatch.
+        log.error(
+            "headroom envelope for %s failed signature verification against the "
+            "gate's published key — refusing to offer against it",
+            mandate_id,
+        )
+        return False
 
     def redeem(self, token: str, amount_paise: Paise) -> tuple[bool, str, str | None]:
         try:

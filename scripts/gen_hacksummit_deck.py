@@ -288,7 +288,7 @@ def slide_title(slide) -> None:
     # fields. Three measured numbers sit there rather than nothing, because this
     # is the slide a judge looks at longest while the team is still walking up.
     proof = [
-        (ALLOW, "206 + 55 tests, green on every push"),
+        (ALLOW, "213 + 55 tests, green on every push"),
         (LINK, "49,501 purchases settled in a two-hour soak"),
         (STEPUP, "0% false blocks vs 28% for a client-side cap"),
     ]
@@ -422,7 +422,7 @@ def slide_technical(slide) -> None:
                  anchor=MSO_ANCHOR.MIDDLE)
     write(
         tf,
-        [("206 Python tests, 55 console tests, and the six demo beats run against the "
+        [("213 Python tests, 55 console tests, and the six demo beats run against the "
           "image itself on every push.", 15.5, True, WHITE, 0)],
         first=True,
     )
