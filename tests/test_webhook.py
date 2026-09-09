@@ -192,3 +192,83 @@ def test_reconciliation_is_idempotent(merchant, quotes, make_mandate, authorize,
     assert merchant.saga.reconcile() == 1
     # Second pass: the order is no longer pending, so nothing to resolve.
     assert merchant.saga.reconcile() == 0
+
+
+def _age(db, order_id: str, state: str, when: str = "2000-01-01T00:00:00Z") -> None:
+    with db.immediate_tx() as conn:
+        conn.execute(
+            "UPDATE orders SET state = ?, updated_at = ? WHERE order_id = ?",
+            (state, when, order_id),
+        )
+
+
+def test_an_order_captured_but_never_fulfilled_is_parked_rather_than_polled_forever(
+    merchant, quotes, make_mandate, authorize, db
+):
+    """
+    The failure the reconciler exists for, one step further on.
+
+    It resolves exactly one case: the rail captured and the merchant never
+    recorded it. Everything else it found, it looked at and left. An order the
+    process died on between capture and fulfilment therefore sat in
+    PAYMENT_CAPTURED for good — the rail says captured, the order already says
+    captured, so the branch never fires — and it came back on every pass, every
+    thirty seconds, forever, doing nothing.
+
+    Money taken, nothing dispatched, and nothing anywhere saying so. A failed
+    refund gets parked in NEEDS_ATTENTION and raised in the console; this is the
+    same situation and it was silent.
+    """
+    mandate = make_mandate()
+    q = quotes.build([QuoteItemRequest(sku="STA-NB-A5")], mandate_id=mandate.mandate_id)
+    decision = authorize(mandate, q)
+    result = merchant.saga.run(
+        quote=q, mandate_id=mandate.mandate_id, decision_id=decision.decision_id
+    )
+
+    _age(db, result.order_id, "PAYMENT_CAPTURED")
+
+    assert merchant.saga.reconcile() == 1
+    order = merchant.orders.get(result.order_id)
+    assert order.state == "NEEDS_ATTENTION", (
+        "an order captured and never fulfilled has to end up somewhere a human "
+        f"looks, not in {order.state} on a poller"
+    )
+
+    # And it leaves the loop: NEEDS_ATTENTION is terminal for the reconciler.
+    _age(db, result.order_id, "NEEDS_ATTENTION")
+    assert merchant.saga.reconcile() == 0
+
+
+def test_an_order_that_never_captured_is_parked_too_and_says_so(
+    merchant, quotes, make_mandate, authorize, db, monkeypatch
+):
+    """
+    The other half. Nothing moved, the reservation has been swept by now, and
+    the order can never complete — so it is parked with what the rail actually
+    reported rather than left in GATE_ALLOWED being re-polled forever.
+    """
+    mandate = make_mandate()
+    q = quotes.build([QuoteItemRequest(sku="STA-NB-A5")], mandate_id=mandate.mandate_id)
+    decision = authorize(mandate, q)
+    result = merchant.saga.run(
+        quote=q, mandate_id=mandate.mandate_id, decision_id=decision.decision_id
+    )
+
+    class NotCaptured:
+        status = "created"
+        payment_id = None
+
+    monkeypatch.setattr(merchant.saga.rail, "status", lambda _ref: NotCaptured())
+    _age(db, result.order_id, "GATE_ALLOWED")
+
+    assert merchant.saga.reconcile() == 1
+    assert merchant.orders.get(result.order_id).state == "NEEDS_ATTENTION"
+
+    steps = merchant.audit.list_steps(result.order_id)
+    parked = [s for s in steps if s["state"] == "NEEDS_ATTENTION"]
+    assert parked, "parking an order must leave a step saying why"
+    assert "created" in parked[-1]["detail"], (
+        "the step has to record what the rail actually said, or a human has "
+        "nothing to go on"
+    )

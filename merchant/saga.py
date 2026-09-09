@@ -51,6 +51,16 @@ log = logging.getLogger("pact.saga")
 COMPENSATION_ATTEMPTS = 3
 COMPENSATION_BACKOFF_S = (0.2, 0.6, 1.4)
 
+#: How long an order may sit in a non-terminal state before the reconciler stops
+#: polling it and parks it for a human.
+#:
+#: Matched to the reservation TTL in core.ledger.reservations on purpose. Past
+#: that the sweeper has taken the budget back, so the order can no longer
+#: complete on its own whatever the rail eventually says — which makes it the
+#: earliest moment parking it is certainly right rather than merely impatient. A
+#: saga takes about two seconds, so nothing healthy comes near this.
+STUCK_AFTER_SECONDS = 300
+
 
 @dataclass(frozen=True, slots=True)
 class SagaResult:
@@ -110,16 +120,29 @@ class OrderStore:
             ).fetchall()
         return [self._row_to_order(r) for r in rows]
 
+    #: Non-terminal for the reconciler. NEEDS_ATTENTION is deliberately absent:
+    #: parking an order is how it leaves this loop, and re-polling something a
+    #: human has been asked to look at is just noise on the poller.
+    UNSETTLED = ("QUOTED", "RESERVED_STOCK", "GATE_ALLOWED", "PAYMENT_CAPTURED")
+
     def pending_for_reconciliation(self, older_than_seconds: int = 30) -> list[Order]:
         """Anything stuck between capture and a terminal state."""
+        return self._unsettled_older_than(older_than_seconds)
+
+    def stuck(self, older_than_seconds: int) -> list[Order]:
+        """The same set, at a longer horizon. See `SagaService.reconcile`."""
+        return self._unsettled_older_than(older_than_seconds)
+
+    def _unsettled_older_than(self, seconds: int) -> list[Order]:
+        placeholders = ",".join("?" for _ in self.UNSETTLED)
         with self.db.read_tx() as conn:
             rows = conn.execute(
-                """
+                f"""
                 SELECT * FROM orders
-                WHERE state IN ('QUOTED','RESERVED_STOCK','GATE_ALLOWED','PAYMENT_CAPTURED')
+                WHERE state IN ({placeholders})
                   AND updated_at < datetime('now', ?)
                 """,
-                (f"-{older_than_seconds} seconds",),
+                (*self.UNSETTLED, f"-{seconds} seconds"),
             ).fetchall()
         return [self._row_to_order(r) for r in rows]
 
@@ -475,4 +498,31 @@ class SagaRunner:
                 self._step(order, "PAYMENT_CAPTURED", "reconcile", "OK",
                            "resolved by polling, no webhook arrived", status.payment_id)
                 resolved += 1
+
+        # Anything still unsettled long after the reservation behind it expired
+        # is not going to resolve itself. This used to be the poller's blind
+        # spot: an order the process died on between capture and fulfilment
+        # reads as captured on both sides, so the branch above never fires, and
+        # it came back every thirty seconds forever while nothing anywhere said
+        # the money had moved and the goods had not.
+        #
+        # Parked, not decided. NEEDS_ATTENTION is the same answer a refund that
+        # will not go through gets, and for the same reason: the honest outcome
+        # is visible and waiting for a human, not a guess at what happened. A
+        # saga that is somehow still running writes its own next step over this.
+        for order in self.orders.stuck(STUCK_AFTER_SECONDS):
+            try:
+                reported = self.rail.status(order.rail_order_id).status if order.rail_order_id \
+                    else "no rail intent"
+            except Exception:  # noqa: BLE001
+                reported = "rail unreachable"
+            self._step(
+                order, "NEEDS_ATTENTION", "reconcile", "FAIL",
+                f"unsettled for over {STUCK_AFTER_SECONDS}s in {order.state}; "
+                f"the rail reports {reported}. The reservation behind it has "
+                f"expired, so it cannot complete on its own.",
+                order.rail_payment_id or order.rail_order_id,
+            )
+            resolved += 1
+
         return resolved
