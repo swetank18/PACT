@@ -44,6 +44,8 @@ from merchant.saga import OrderStore, SagaRunner
 from merchant.stats import StatsService
 from merchant.upsell import UpsellEngine
 from rails.mock_upi.adapter import MockUpiAdapter
+from rails.paypal.adapter import PayPalAdapter
+from rails.paypal.client import PayPalClient
 from rails.razorpay.adapter import RazorpayAdapter
 from rails.razorpay.client import RazorpayClient, credentials_from_env
 
@@ -64,6 +66,11 @@ def _build_rail(db: Database):  # noqa: ANN201
     name = os.environ.get("PACT_RAIL", "").strip().lower()
     creds = credentials_from_env()
 
+    if name == "paypal":
+        # In the catalog's own currency and no other. PayPal does not settle
+        # INR, so on the rupee catalog this refuses to boot, which is the point:
+        # the alternative is 74900 paise charged as $749.00.
+        return PayPalAdapter(PayPalClient(db, currency=CURRENCY))
     if name == "mock_upi" or (not name and not creds.configured):
         if not creds.configured:
             log.warning(

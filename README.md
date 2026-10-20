@@ -30,7 +30,7 @@ Or for development, with hot reload and the services on separate ports:
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh          # gate :8000, merchant :8100, webhooks :8110, beats :8300
-./scripts/test.sh         # 215 tests
+./scripts/test.sh         # 266 tests
 
 cd console && npm install && npm run dev    # http://localhost:5173
 ```
@@ -73,7 +73,7 @@ driven:
 
 | | |
 | --- | --- |
-| `ci` | 215 Python tests, 55 console tests, typecheck, and a contract-drift check |
+| `ci` | 266 Python tests, 55 console tests, typecheck, and a contract-drift check |
 | `container` | builds the image, waits for its healthcheck, runs the six demo beats against it over HTTP, asserts the SSE stream is live, restarts it with the volume attached and checks the orders and the gate's signing key survived, drives every console surface in Chromium, records the demo video against that image, and soaks it for three minutes |
 
 The beats are asserted on what they are meant to prove, not on a 200 — beat 3
@@ -89,7 +89,7 @@ what ships is the artefact that was tested rather than a second build.
 ```
 contracts/   frozen wire shapes, reason codes, the signing procedure
 core/        RAIL AGNOSTIC. gate, mandate, ledger, audit, rail.py, config
-rails/       one directory per settlement rail: razorpay, mock_upi
+rails/       one directory per settlement rail: razorpay, paypal, mock_upi
 merchant/    catalog, quote engine, headroom upsell, saga, MCP tools
 buyer/       the agent: one program, two flags, no forked scripts
 sim/         four-arm experiment, attacks, benign set, chaos, ablation, beats
@@ -225,8 +225,15 @@ the environment this was built in. It is instead driven through
 for: it is built from `API_NOTES.md` and it *refuses* what the real API refuses.
 Missing `currency` on capture is a 400. A second capture is the documented
 "already paid" 400, not a success. A duplicate `receipt` is rejected rather than
-replayed. 27 tests, mutation-checked — dropping `currency` from capture fails
+replayed. 28 tests, mutation-checked — dropping `currency` from capture fails
 four of them.
+
+One of the 28 exists because the other 27 could not see a bug. The saga hands one
+idempotency key to `create_intent` and to `capture`, and the table was keyed on
+that alone, so the capture was answered with the stored *order* and never sent.
+Every saga-driven purchase on this rail would have rolled back. Each test had
+invented a fresh key per call, which the saga does not; the table is now keyed
+per operation.
 
 What that cannot catch is a field the real API requires that `API_NOTES.md`
 failed to record. Only a test key closes that, and it is the largest remaining
@@ -236,6 +243,38 @@ Webhook signatures are HMAC-SHA256 over the **raw** body — re-serialising befo
 verifying is the standard way that check silently stops working, and
 `tests/test_webhook.py` asserts it. Webhooks are never the only path: a
 reconciliation poller resolves anything pending and older than 30 seconds.
+
+## PayPal
+
+`rails/paypal/` is the third rail, written 2026-10-20 from PayPal's published
+OpenAPI specs; `rails/paypal/API_NOTES.md` marks each line as read in the spec or
+unverified. The shape that makes it work for an agent: the account holder vaults
+their PayPal wallet **once**, approving at PayPal, and every purchase after that
+is an order created against the vault with `intent: AUTHORIZE` — authorised in one
+call, no approve button, captured by the saga as a separate step. The mandate
+bounds what the agent may spend; the vault is what it spends from.
+
+What the specs forced:
+
+- **Sandbox only, on the host.** A PayPal client id has no `test_` prefix, so the
+  client refuses any base URL that is not the sandbox.
+- **No INR.** PayPal does not list it. The rail refuses to start in a currency it
+  cannot settle, so `PACT_RAIL=paypal` on today's rupee catalog stops the merchant
+  at boot instead of charging 74900 paise as $749.00.
+- **A request id per call type.** PayPal requires it, and the saga's one key would
+  otherwise be the same id for an order and its capture — the Razorpay bug again.
+- **Replays return the present.** A repeated `PayPal-Request-Id` answers with the
+  resource as it is now, so a capture retried after its refund reads `REFUNDED`.
+  The local table still answers replays with what happened.
+- **`COMPLETED` is not paid.** The order's status covers authorised, captured and
+  declined alike; the client reads the authorization's.
+- **A capture that lost its answer is looked up, not rolled back**, because rolling
+  it back would release the budget while the money is gone.
+
+51 tests through `tests/fake_paypal.py`, built the same way as the Razorpay fake,
+plus the real saga run forward and through a refund on this rail. Nine mutations
+of the client, each caught. **None of it has run against the sandbox**:
+`scripts/paypal_sandbox.py` does that in one command once there are credentials.
 
 ## Invariants
 
@@ -252,6 +291,10 @@ reconciliation poller resolves anything pending and older than 30 seconds.
 
 ## Limitations
 
+- The PayPal client has never run against the sandbox, and the catalog is in
+  rupees, which PayPal cannot settle — so the PayPal rail does not boot until a
+  dollar-priced profile exists. Both are deliberate refusals, not gaps papered
+  over; see the PayPal section.
 - Test mode only. No live money has moved through this, and the Razorpay client
   has never run against the live API — see above for what stands in for it and
   what that does not cover.

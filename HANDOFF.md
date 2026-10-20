@@ -125,9 +125,9 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **215 Python tests, 55 console
+~11k lines of Python, ~10k of TypeScript. **266 Python tests, 55 console
 tests**, all green — one Python test skips unless the clone predates the key
-purge, so a run reports 214 passed and 1 skipped — plus two GitHub Actions
+purge, so a run reports 265 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every
 console surface against it on every push.
 
@@ -219,7 +219,7 @@ Added 2026-08-31, and all of it runs on every push rather than once by hand:
 - **The console has been seen.** Chromium, every surface, zero console
   errors and zero failed requests. Screenshots in `docs/screenshots/`.
 - **The Razorpay client runs**, against a fake built from `API_NOTES.md` that
-  refuses what the real API refuses. 27 tests, mutation-checked.
+  refuses what the real API refuses. 28 tests, mutation-checked.
 - **The auditor runs**, through an injected transport. 19 tests. Every failure
   path returns `unavailable` and steps up, never approval.
 - **The harness's tally agrees with the merchant's ledger to the paise.**
@@ -268,11 +268,23 @@ Added 2026-09-05:
 - **The Razorpay client has never run against the *real* API.** Still true, and
   still the largest gap. There are no test keys here. What changed is that it is
   no longer *unexercised*: `tests/fake_razorpay.py` enforces the documented rules
-  and 27 tests drive the real client through it. The boundary is now exactly the
+  and 28 tests drive the real client through it. The boundary is now exactly the
   accuracy of `API_NOTES.md` — a field the live API requires that the notes
   failed to record is still invisible.
   To close it: `export RAZORPAY_KEY_ID=rzp_test_… RAZORPAY_KEY_SECRET=… PACT_RAIL=razorpay`.
   The client refuses to start on a non-`rzp_test_` key.
+- **The PayPal client has never run against the sandbox.** Added 2026-10-20,
+  for the PayPal + AI hackathon. Written from PayPal's published OpenAPI specs,
+  driven through `tests/fake_paypal.py` by 51 tests including the real saga
+  forward and through a refund, nine mutations each caught. Same boundary as
+  Razorpay: exactly the accuracy of `rails/paypal/API_NOTES.md`.
+  To close it: `export PAYPAL_CLIENT_ID=… PAYPAL_CLIENT_SECRET=…` from a sandbox
+  app, then `python3 scripts/paypal_sandbox.py`, which vaults a sandbox buyer
+  (one approval at PayPal) and runs a purchase, capture, refund and read-back,
+  printing every disagreement with the notes.
+  **It cannot be the deployed rail yet, on purpose.** PayPal does not list INR and
+  the catalog is in paise, so `PACT_RAIL=paypal` refuses to boot rather than charge
+  74900 paise as $749.00. It needs a dollar-priced profile first — section 7.
 - **The intent auditor's model has never been called.** No `ANTHROPIC_API_KEY`.
   The gate runs deterministic mode: eight checks + quote binding + a regex
   injection scan. The auditor's *wiring* is now tested — request shape, every
@@ -465,6 +477,7 @@ checks, and a QA report on the film that passed all ten of its own rows.
 | An order the process died on mid-saga was polled forever and never raised | The reconciler resolves exactly one case — the rail captured and the merchant never recorded it — and left everything else it found where it was. An order interrupted between capture and fulfilment reads as captured on both sides, so that branch never fires: it came back on every pass, every thirty seconds, indefinitely, while nothing anywhere said the money had moved and the goods had not. A refund that will not go through is parked in `NEEDS_ATTENTION` and raised in the console; this was the same situation and it was silent. Anything unsettled past the reservation TTL — after which the budget has been swept and it cannot complete on its own — is now parked with what the rail actually reported. Parked, not decided: a guess at what happened would be worse than a human looking. |
 | The merchant never verified the envelope it was handed | "A merchant can trust a signed envelope without asking" is the claim the whole design rests on. The gate signed every envelope and published its key at `/v1/gate/pubkey` — docstring: "So the merchant can verify the headroom envelopes it is handed" — and `HttpGateClient.headroom` parsed the JSON and believed it. No money was ever at risk, because `authorize` re-derives every ceiling server side; what was at risk was the claim, which is the thing being sold. Verified now, failing closed, with one key refetch before calling a mismatch a forgery — the gate mints a new key whenever it boots without its volume, which is every restart on the plan the deployed instance is actually on. |
 | The film's crossover was an interpolation, and a flattering one | S17 said "crossover ≈ 18%", spoken and on screen, where `results.md` says 20% — the swept point at which arm D actually wins. 18% is a straight line drawn between two swept points, which the generated results deliberately decline to draw, and it has PACT winning sooner than the evidence states. `video/assets.md` promises every figure on screen traces to a file in the tree; that one did not. |
+| A Razorpay capture driven by the saga never reached Razorpay | Found 2026-10-20 while writing the PayPal client. The saga hands one idempotency key to `create_intent` and `capture`; the client's table was keyed on it alone, so the capture was served the stored order as a replay, status `created`, `ok=False`. Every saga-driven purchase on that rail would have rolled back as `RAIL_CAPTURE_FAILED`. 27 tests passed because each invented a fresh key per call; the deployed rail is mock_upi, whose `create_intent` records nothing. PayPal requires a request id per call type for the same reason, so the bug would have been copied straight into the third rail. |
 | The documented way to build the video could not run | `node ../video/record_walkthrough.mjs` — Node resolves a bare specifier from the importing file's directory, `video/` has no `node_modules` and the repository root's is empty. Two of the build scripts also had `/home/swetank` in a font path, which made "five commands on a clean checkout produce the same film" true on exactly one laptop. |
 
 ---
@@ -519,6 +532,23 @@ day they were run on.**
 ---
 
 ## 7. Open work, roughly prioritised
+
+**For the PayPal + AI hackathon** (submissions close 2026-11-12; the rules allow
+"meaningfully advance an existing project", and the one requirement is meaningful
+use of both PayPal and AI). Done on 2026-10-20: the PayPal rail, section 3. Next:
+
+- **Sandbox credentials**, then `scripts/paypal_sandbox.py`. Five minutes at
+  developer.paypal.com; enable vaulting on the sandbox app.
+- **A dollar profile.** Currency as a profile property, a USD price list and USD
+  persona ceilings, the console formatting money by currency rather than `₹`. The
+  PayPal rail will not boot without it, by design.
+- **AI that is actually AI.** Today the buyer agent is scripted and the auditor
+  has never been called. A model-driven buyer — Claude choosing what to buy
+  through tools, bounded by the gate it cannot talk its way past — is the half of
+  "PayPal and AI" that does not exist yet. The auditor with a key is item 2 below.
+- **The vault step in the grant flow**, so connecting PayPal is part of signing a
+  mandate in the console rather than a script.
+- **A pending-capture state in the saga.** `rails/paypal/API_NOTES.md`, "Open".
 
 1. **Exercise the Razorpay path with real test keys.** The largest remaining
    unverified surface — see section 3 for exactly how narrow it now is.
