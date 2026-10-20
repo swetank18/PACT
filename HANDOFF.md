@@ -125,9 +125,9 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **214 Python tests, 55 console
+~11k lines of Python, ~10k of TypeScript. **215 Python tests, 55 console
 tests**, all green — one Python test skips unless the clone predates the key
-purge, so a run reports 189 passed and 1 skipped — plus two GitHub Actions
+purge, so a run reports 214 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every
 console surface against it on every push.
 
@@ -154,7 +154,7 @@ Development, services on separate ports with hot reload:
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh                            # 8000 gate, 8100 merchant, 8110 hooks, 8300 beats
 cd console && npm install && npm run dev    # 5173
-./scripts/test.sh                           # 170 tests
+./scripts/test.sh                           # 215 tests
 ```
 
 `scripts/test.sh` exists because a ROS install on this machine puts broken pytest

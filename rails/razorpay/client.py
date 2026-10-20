@@ -124,19 +124,30 @@ class RazorpayClient:
 
     # ---------------------------------------------------------- idempotency --
 
-    def _cached(self, idem_key: str) -> dict | None:
+    #
+    # Keyed on the operation as well as the caller's key. The saga derives one
+    # key per order and passes it to both `create_intent` and `capture`, so a
+    # table keyed on the caller's key alone served the stored *order* back as
+    # the capture's result: the capture never reached Razorpay, came back
+    # `_replayed` with status `created`, and the adapter reported it failed.
+    # Every saga-driven purchase on this rail would have rolled back. The tests
+    # passed throughout because each one used a different key per call.
+
+    def _cached(self, operation: str, idem_key: str) -> dict | None:
         with self.db.read_tx() as conn:
             row = conn.execute(
-                "SELECT result_json FROM idempotency WHERE idem_key = ?", (idem_key,)
+                "SELECT result_json FROM idempotency WHERE idem_key = ?",
+                (f"{operation}:{idem_key}",),
             ).fetchone()
         return json.loads(row["result_json"]) if row else None
 
-    def _remember(self, idem_key: str, operation: str, result: dict) -> None:
+    def _remember(self, operation: str, idem_key: str, result: dict) -> None:
         with self.db.immediate_tx() as conn:
             conn.execute(
                 "INSERT OR IGNORE INTO idempotency "
                 "(idem_key, operation, result_json, created_at) VALUES (?, ?, ?, ?)",
-                (idem_key, operation, json.dumps(result, separators=(",", ":")), utcnow()),
+                (f"{operation}:{idem_key}", operation,
+                 json.dumps(result, separators=(",", ":")), utcnow()),
             )
 
     # ---------------------------------------------------------- transport ----
@@ -180,7 +191,7 @@ class RazorpayClient:
     def create_order(
         self, amount_paise: Paise, receipt: str, notes: dict, idem_key: str
     ) -> dict:
-        cached = self._cached(idem_key)
+        cached = self._cached("create_order", idem_key)
         if cached is not None:
             log.info("create_order short circuited on idempotency key")
             return {**cached, "_replayed": True}
@@ -195,7 +206,7 @@ class RazorpayClient:
                 "notes": notes,
             },
         )
-        self._remember(idem_key, "create_order", body)
+        self._remember("create_order", idem_key, body)
         return body
 
     # ------------------------------------------------------------ payments ---
@@ -215,7 +226,7 @@ class RazorpayClient:
         Capture has no server-side idempotency, so the table is the only thing
         standing between a retry and a double charge.
         """
-        cached = self._cached(idem_key)
+        cached = self._cached("capture", idem_key)
         if cached is not None:
             log.info("capture short circuited on idempotency key")
             return {**cached, "_replayed": True}
@@ -234,11 +245,11 @@ class RazorpayClient:
             if exc.status == 400:
                 current = self.fetch_payment(payment_id)
                 if current.get("status") == "captured":
-                    self._remember(idem_key, "capture", current)
+                    self._remember("capture", idem_key, current)
                     return {**current, "_replayed": True}
             raise
 
-        self._remember(idem_key, "capture", body)
+        self._remember("capture", idem_key, body)
         return body
 
     # ------------------------------------------------------------- refunds ---
@@ -246,7 +257,7 @@ class RazorpayClient:
     def refund(
         self, payment_id: str, amount_paise: Paise, idem_key: str, speed: str = "normal"
     ) -> dict:
-        cached = self._cached(idem_key)
+        cached = self._cached("refund", idem_key)
         if cached is not None:
             log.info("refund short circuited on idempotency key")
             return {**cached, "_replayed": True}
@@ -260,7 +271,7 @@ class RazorpayClient:
                 "receipt": receipt_for(idem_key),
             },
         )
-        self._remember(idem_key, "refund", body)
+        self._remember("refund", idem_key, body)
         return body
 
     def fetch_refund(self, payment_id: str, refund_id: str) -> dict:

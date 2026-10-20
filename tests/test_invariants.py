@@ -546,6 +546,18 @@ def test_the_deck_and_the_console_name_the_same_people():
     )
 
 
+#: What the Hack Summit decks say about the suite, and go on saying.
+#:
+#: Those three decks were submitted with the suite at 214 Python and 55 console
+#: tests, and they were held to the live count for as long as they were the
+#: thing a judge would open next. They are archival now. Holding them to the
+#: live count turned every new test into a hand edit of `PACT-pitch.pptx`,
+#: which has no generator, so they are pinned to what they were submitted with
+#: instead — still to each other and to their generators, which is the drift
+#: that actually happened. The README, HANDOFF and CI still track the suite.
+SUBMITTED_DECK_SUITE = (214, 55)
+
+
 def test_the_documented_test_counts_are_the_real_ones(request):
     """
     A test count written into prose, and then not updated.
@@ -568,6 +580,8 @@ def test_the_documented_test_counts_are_the_real_ones(request):
     The console count cannot be collected from Python without running vitest, so
     the three places that state it are asserted to agree with *each other* —
     which is the drift that actually happened.
+
+    The submitted decks are held to `SUBMITTED_DECK_SUITE`, not to the suite.
     """
     collected = {item.location[0].replace("\\", "/") for item in request.session.items}
     on_disk = {f"tests/{p.name}" for p in (REPO / "tests").glob("test_*.py")}
@@ -597,19 +611,6 @@ def test_the_documented_test_counts_are_the_real_ones(request):
         "README.md, what CI proves": stated("README.md", readme, both),
         "HANDOFF.md, section 1": stated("HANDOFF.md", handoff, both),
         "ci.yml, the job name": stated("ci.yml", ci, r"name:\s+python\s+\((\d+)\s+tests"),
-        # The submitted deck is generated, and the reason it is generated is so
-        # a number that moves in the repository can be carried into it without
-        # opening PowerPoint. That only holds if something notices when one
-        # does. This is the artifact a judge actually reads.
-        "gen_hacksummit_deck.py, the proof chip": stated(
-            "gen_hacksummit_deck.py", deck, r'"(\d+)\s+\+\s+\d+\s+tests'
-        ),
-        "gen_hacksummit_deck.py, the CI slide": stated(
-            "gen_hacksummit_deck.py", deck, both
-        ),
-        "gen_explainer_deck.py, the evidence slide": stated(
-            "gen_explainer_deck.py", explainer, r"tests — (\d+) pytest"
-        ),
     }
     wrong = [f"{where} says {n}" for where, n in python_claims.items() if n != total]
     assert not wrong, (
@@ -620,28 +621,50 @@ def test_the_documented_test_counts_are_the_real_ones(request):
         "README.md": int(re.search(both, readme).group(2)),  # type: ignore[union-attr]
         "HANDOFF.md": int(re.search(both, handoff).group(2)),  # type: ignore[union-attr]
         "ci.yml": stated("ci.yml", ci, r"name:\s+console\s+\((\d+)\s+tests"),
-        "gen_hacksummit_deck.py": int(re.search(both, deck).group(2)),  # type: ignore[union-attr]
-        "gen_hacksummit_deck.py, the proof chip": int(
-            re.search(r'"\d+\s+\+\s+(\d+)\s+tests', deck).group(1)  # type: ignore[union-attr]
-        ),
-        "gen_explainer_deck.py": int(
-            re.search(r"tests — \d+ pytest, (\d+) vitest", explainer).group(1)  # type: ignore[union-attr]
-        ),
     }
     assert len(set(console_claims.values())) == 1, (
         "the console test count disagrees with itself: "
         + ", ".join(f"{where} says {n}" for where, n in console_claims.items())
     )
 
+    # ---------------------------------------- the submitted decks' generators ---
+    #
+    # The submitted deck is generated so that a number can be carried into it
+    # without opening PowerPoint. They now carry the count they were submitted
+    # with, and must still agree with the decks they build.
+    deck_python, deck_console = SUBMITTED_DECK_SUITE
+    generator_claims = {
+        "gen_hacksummit_deck.py, the proof chip": (
+            stated("gen_hacksummit_deck.py", deck, r'"(\d+)\s+\+\s+\d+\s+tests'),
+            int(re.search(r'"\d+\s+\+\s+(\d+)\s+tests', deck).group(1)),  # type: ignore[union-attr]
+        ),
+        "gen_hacksummit_deck.py, the CI slide": (
+            stated("gen_hacksummit_deck.py", deck, both),
+            int(re.search(both, deck).group(2)),  # type: ignore[union-attr]
+        ),
+        "gen_explainer_deck.py, the evidence slide": (
+            stated("gen_explainer_deck.py", explainer, r"tests — (\d+) pytest"),
+            int(re.search(r"tests — \d+ pytest, (\d+) vitest", explainer).group(1)),  # type: ignore[union-attr]
+        ),
+    }
+    wrong = [
+        f"{where} says {p} + {c}"
+        for where, (p, c) in generator_claims.items()
+        if (p, c) != SUBMITTED_DECK_SUITE
+    ]
+    assert not wrong, (
+        f"the decks were submitted at {deck_python} + {deck_console} but "
+        + ", ".join(wrong)
+    )
+
     # gen_explainer_deck.py prints a combined figure on two slides. It is the
     # sum, so it drifts twice as easily and reads as the most confident number
     # on the page.
-    console = next(iter(console_claims.values()))
-    combined = total + console
+    combined = deck_python + deck_console
     for found in re.finditer(r'\("(\d+)", "tests', explainer):
         assert int(found.group(1)) == combined, (
-            f"gen_explainer_deck.py says {found.group(1)} tests but the suites "
-            f"collect {total} + {console} = {combined}"
+            f"gen_explainer_deck.py says {found.group(1)} tests but the decks were "
+            f"submitted at {deck_python} + {deck_console} = {combined}"
         )
 
     # ------------------------------------------------- and the decks as built ---
@@ -658,15 +681,15 @@ def test_the_documented_test_counts_are_the_real_ones(request):
     # script; the deck has to actually say it.
     decks = {
         "HackSummit-PACT.pptx": [
-            (r"(\d+)\s*\+\s*(\d+)\s+tests", (total, console)),
-            (r"(\d+) Python tests, (\d+) console tests", (total, console)),
+            (r"(\d+)\s*\+\s*(\d+)\s+tests", SUBMITTED_DECK_SUITE),
+            (r"(\d+) Python tests, (\d+) console tests", SUBMITTED_DECK_SUITE),
         ],
         "PACT-explainer.pptx": [
-            (r"tests — (\d+) pytest, (\d+) vitest", (total, console)),
+            (r"tests — (\d+) pytest, (\d+) vitest", SUBMITTED_DECK_SUITE),
             (r"(\d+)\s+tests, green on every push", (combined,)),
         ],
         "PACT-pitch.pptx": [
-            (r"tests — (\d+) Python, (\d+) console", (total, console)),
+            (r"tests — (\d+) Python, (\d+) console", SUBMITTED_DECK_SUITE),
             (r"(\d+)\s+tests, green on every push", (combined,)),
         ],
     }
@@ -682,9 +705,9 @@ def test_the_documented_test_counts_are_the_real_ones(request):
             for match in found:
                 got = tuple(int(g) for g in (match if isinstance(match, tuple) else (match,)))
                 assert got == expected, (
-                    f"docs/{name} says {got} where the suites give {expected}. "
-                    f"Regenerate it — or, for PACT-pitch.pptx, edit it, because "
-                    f"that one has no generator."
+                    f"docs/{name} says {got}, but it was submitted saying {expected}. "
+                    f"A submitted deck is archival; if it has to change, change "
+                    f"SUBMITTED_DECK_SUITE with it and say why."
                 )
 
 

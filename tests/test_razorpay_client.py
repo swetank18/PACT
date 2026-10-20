@@ -228,6 +228,27 @@ def test_the_same_key_never_reaches_the_api_twice(api, client):
     assert first.get("_replayed") is not True
 
 
+def test_one_key_for_the_order_and_its_capture_does_not_collide(api, adapter):
+    """
+    The key the saga actually passes. It derives one per order and hands it to
+    both `create_intent` and `capture`, and a table keyed on that alone served
+    the stored order back as the capture: no request reached the API, the
+    result came back replayed with status `created`, and every purchase on
+    this rail would have rolled back. The other tests here never saw it
+    because each one invents a fresh key per call, which the saga does not.
+    """
+    idem = idempotency_key("ord_saga", AMOUNT, 1)
+    intent = adapter.create_intent(AMOUNT, ref="ord_saga", idem_key=idem)
+    pid = api.authorized_payment(intent.intent_id, AMOUNT)
+
+    result = adapter.capture(pid, AMOUNT, idem)
+
+    assert [path for _, path, _, _ in api.seen][-1] == f"/payments/{pid}/capture"
+    assert result.ok and result.status == "captured"
+    assert result.replayed is False
+    assert result.ref == pid
+
+
 def test_a_duplicate_receipt_is_an_error_not_a_replay(api, client):
     """
     Documents *why* the local table exists rather than leaning on `receipt`.
@@ -365,10 +386,11 @@ def test_a_failed_call_is_not_remembered_as_a_success(api, client, db: Database)
     with pytest.raises(RazorpayError):
         client.create_order(AMOUNT, "r", {}, "k_failed")
 
+    # Any row at all, not a row under the caller's key: the table namespaces
+    # its keys by operation, so a lookup on the bare key would find nothing
+    # whether or not the failure had been stored.
     with db.read_tx() as conn:
-        rows = conn.execute(
-            "SELECT 1 FROM idempotency WHERE idem_key = ?", ("k_failed",)
-        ).fetchall()
+        rows = conn.execute("SELECT 1 FROM idempotency").fetchall()
     assert not rows
 
     api.fail_with = []
