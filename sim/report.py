@@ -16,7 +16,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from contracts.money import rupees
+import httpx
+
+from contracts.money import format_money
 from sim.metrics import ArmMetrics, cross_check, mean_and_range
 
 
@@ -32,6 +34,7 @@ def write_results(
     out: Path,
     save_sessions: bool = True,
     hostile_rate: float = 0.08,
+    currency: str | None = None,
 ) -> int:
     from sim.run import (
         ABLATIONS,
@@ -47,6 +50,15 @@ def write_results(
         run_benign,
         run_chaos,
     )
+
+    # The currency the merchant under test sells in, from its own manifest, so
+    # a dollar run is never printed with a rupee sign.
+    if currency is None:
+        manifest = httpx.get(f"{MERCHANT}/.well-known/agent-commerce.json", timeout=10).json()
+        currency = str(manifest.get("currency", "INR"))
+
+    def money(minor: int) -> str:
+        return format_money(minor, currency)
     from sim import benign as benign_mod
 
     #: Rates for the sensitivity sweep. Deliberately spans "almost no fraud" to
@@ -136,11 +148,11 @@ def write_results(
         if ARMS[arm].get("human_only"):
             label += " *(modelled, not simulated)*"
         a(
-            f"| **{arm}** | {label} | {rupees(round(gmv_mean))} | "
-            f"{_pct(total.completion_rate)} | {rupees(total.avg_order_value_minor)} | "
+            f"| **{arm}** | {label} | {money(round(gmv_mean))} | "
+            f"{_pct(total.completion_rate)} | {money(total.avg_order_value_minor)} | "
             f"{_pct(total.attach_rate)} | {_pct(total.upsell_rejection_rate)} | "
             f"{_pct(total.false_block_rate)} | {_pct(total.step_up_recovery_rate)} | "
-            f"{rupees(round(loss_mean))} | {rupees(round(net_mean))} |"
+            f"{money(round(loss_mean))} | {money(round(net_mean))} |"
         )
     a("")
 
@@ -150,7 +162,7 @@ def write_results(
     a("|---|---:|---:|---:|")
     for arm, runs in by_arm.items():
         mean, lo, hi = mean_and_range([m.gmv_per_100 for m in runs])
-        a(f"| {arm} | {rupees(round(mean))} | {rupees(round(lo))} | {rupees(round(hi))} |")
+        a(f"| {arm} | {money(round(mean))} | {money(round(lo))} | {money(round(hi))} |")
     a("")
 
     a("### How arm A is produced\n")
@@ -183,7 +195,7 @@ def write_results(
     }
     for arm, runs in by_arm.items():
         loss_mean, _, _ = mean_and_range([m.loss_per_100 for m in runs])
-        a(f"| {arm} | {hostile_counts.get(arm, 0)} | {rupees(round(loss_mean))} | "
+        a(f"| {arm} | {hostile_counts.get(arm, 0)} | {money(round(loss_mean))} | "
           f"{defence.get(arm, '')} |")
     a("")
     a("> Arm C is the row worth pausing on. Its cap is real and it works against the "
@@ -207,8 +219,8 @@ def write_results(
         winner = "D" if d.net_per_100 > b.net_per_100 else "B"
         if winner == "D" and crossover is None:
             crossover = rate
-        a(f"| {rate:.0%} | {rupees(round(b.net_per_100))} | "
-          f"{rupees(round(d.net_per_100))} | **{winner}** |")
+        a(f"| {rate:.0%} | {money(round(b.net_per_100))} | "
+          f"{money(round(d.net_per_100))} | **{winner}** |")
     a("")
     if crossover is not None:
         a(f"> **Above roughly {crossover:.0%} adversarial traffic, PACT nets more than "
@@ -289,7 +301,7 @@ def write_results(
 
     a("## Cross-check against the services\n")
     if check.agrees:
-        a(f"The harness and the merchant agree: GMV {rupees(check.engine_gmv_minor)}.\n")
+        a(f"The harness and the merchant agree: GMV {money(check.engine_gmv_minor)}.\n")
     else:
         a("**The harness and the services disagree. The services are right.**\n")
         for d in check.discrepancies:

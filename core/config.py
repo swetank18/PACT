@@ -42,6 +42,14 @@ class Profile:
     rail: str
     merchant_payee: str
     merchant_name: str
+    #: ISO 4217. Every amount in the system is integer minor units of this.
+    #: Rupees unless a profile says otherwise, because every profile before the
+    #: PayPal one priced in rupees.
+    currency: str = "INR"
+    #: Tax, shipping and the price list for this currency. Read by the merchant,
+    #: never by the gate: what something costs is the merchant's business, and
+    #: the gate only ever sees the total it is asked to approve.
+    pricing: dict[str, Any] = field(default_factory=dict)
     surfaces: tuple[str, ...] = ()
     #: Which demo beats are bound to which keys, for the console.
     beats: dict[str, str] = field(default_factory=dict)
@@ -75,6 +83,8 @@ def load(name: str | None = None) -> Profile:
         rail=os.environ.get("PACT_RAIL") or data.get("rail", FALLBACK_RAIL),
         merchant_payee=os.environ.get("PACT_MERCHANT_PAYEE") or data.get("merchant_payee", ""),
         merchant_name=data.get("merchant_name", "DeskKit"),
+        currency=str(data.get("currency", "INR")).upper(),
+        pricing=data.get("pricing", {}) or {},
         surfaces=tuple(data.get("surfaces", ())),
         beats=data.get("beats", {}) or {},
         framing=data.get("framing", {}) or {},

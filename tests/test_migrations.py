@@ -161,7 +161,8 @@ def test_a_database_written_before_the_rename_still_reads(tmp_path, keys):
     quote = QuoteEngine(db).build([QuoteItemRequest(sku="STA-NB-A5")], mandate_id=mandate.mandate_id)
     order = Order(
         order_id=new_id("ord"), quote_id=quote.quote_id, mandate_id=mandate.mandate_id,
-        state="FULFILLED", amount_minor=quote.total_minor, items_summary="1x notebooks",
+        state="FULFILLED", amount_minor=quote.total_minor, currency=quote.currency,
+        items_summary="1x notebooks",
         rail="mock_upi", at=quote.expires_at,
     )
     OrderStore(db).put(order)

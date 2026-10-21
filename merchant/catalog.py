@@ -10,13 +10,27 @@ collaborative filtering would not move the claim a millimetre.
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from typing import Any
 
-from contracts.money import MinorUnits
+from contracts.money import DECIMALS, MinorUnits
+from core.config import Profile
+from core.config import load as load_profile
 
 MERCHANT_NAME = "DeskKit"
-MERCHANT_PAYEE = "deskkit@razorpay"
-CURRENCY = "INR"
+#: The payee every test and every profile-less run uses. A profile overrides
+#: it, and the merchant's manifest advertises whichever one is in force, so a
+#: mandate's allowlist always names the payee the gate will check against.
+DEFAULT_PAYEE = "deskkit@razorpay"
+
+#: GST, and the rupee shipping rule, for the base price list below.
+BASE_CURRENCY = "INR"
+BASE_PRICING: dict[str, Any] = {
+    "tax_bps": 1800,
+    "tax_label": "GST 18%",
+    "shipping_minor": 9_900,
+    "free_shipping_over_minor": 100_000,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,7 +44,9 @@ class Product:
     initial_stock: int
 
 
-CATALOG: tuple[Product, ...] = (
+#: The catalog as first priced, in paise. A profile in another currency
+#: replaces every price; see `build`.
+BASE_CATALOG: tuple[Product, ...] = (
     Product("STA-NB-A5", "A5 ruled notebook, 5 pack", "stationery", 74900,
             "Soft-cover A5 notebooks, 96 pages, 5 per pack.",
             ("notebook", "notebooks", "paper", "supplies", "stationery", "restock", "office"), 40),
@@ -62,6 +78,79 @@ CATALOG: tuple[Product, ...] = (
             "900x400mm recycled felt desk mat.",
             ("mat", "desk", "furniture", "setup"), 35),
 )
+
+
+
+@dataclass(frozen=True, slots=True)
+class Pricing:
+    currency: str
+    #: Basis points, so tax stays integer. 1800 is 18%.
+    tax_bps: int
+    #: What the quote calls the tax line. A dollar profile's rate is
+    #: illustrative — one flat rate, no per-state rules — and says so here.
+    tax_label: str
+    shipping_minor: MinorUnits
+    free_shipping_over_minor: MinorUnits
+
+
+class CatalogError(RuntimeError):
+    """A profile's prices that cannot be sold from."""
+
+
+def build(profile: Profile) -> tuple[tuple[Product, ...], Pricing]:
+    """
+    The catalog and pricing a profile sells at.
+
+    In the base currency the base list applies and the profile may adjust tax
+    and shipping. In any other currency the profile must price **every** SKU:
+    a catalog half in rupees and half in dollars would quote a total that is
+    confidently wrong, so a gap refuses to build rather than fall back.
+    """
+    currency = profile.currency
+    if currency not in DECIMALS:
+        raise CatalogError(f"no money rules for currency {currency!r}")
+    cfg = {**(BASE_PRICING if currency == BASE_CURRENCY else {}), **profile.pricing}
+
+    catalog = BASE_CATALOG
+    prices: dict[str, Any] = cfg.get("prices", {}) or {}
+    if currency != BASE_CURRENCY or prices:
+        unknown = sorted(set(prices) - {p.sku for p in BASE_CATALOG})
+        missing = sorted({p.sku for p in BASE_CATALOG} - set(prices))
+        if unknown:
+            raise CatalogError(f"profile {profile.name} prices SKUs that do not exist: {unknown}")
+        if missing and currency != BASE_CURRENCY:
+            raise CatalogError(
+                f"profile {profile.name} sells in {currency} but leaves {missing} unpriced"
+            )
+        catalog = tuple(
+            replace(p, price_minor=_whole(prices[p.sku], f"prices.{p.sku}")) if p.sku in prices else p
+            for p in BASE_CATALOG
+        )
+
+    try:
+        pricing = Pricing(
+            currency=currency,
+            tax_bps=_whole(cfg["tax_bps"], "tax_bps"),
+            tax_label=str(cfg.get("tax_label", "Tax")),
+            shipping_minor=_whole(cfg["shipping_minor"], "shipping_minor"),
+            free_shipping_over_minor=_whole(cfg["free_shipping_over_minor"], "free_shipping_over_minor"),
+        )
+    except KeyError as exc:
+        raise CatalogError(f"profile {profile.name} has no pricing.{exc.args[0]}") from None
+    return catalog, pricing
+
+
+def _whole(value: Any, name: str) -> int:
+    """Minor units in a YAML file are integers. 12.99 is a typo for 1299."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise CatalogError(f"pricing {name} must be a non-negative integer in minor units, got {value!r}")
+    return value
+
+
+PROFILE = load_profile()
+CATALOG, PRICING = build(PROFILE)
+CURRENCY = PRICING.currency
+MERCHANT_PAYEE = PROFILE.merchant_payee or DEFAULT_PAYEE
 
 BY_SKU: dict[str, Product] = {p.sku: p for p in CATALOG}
 CATEGORIES: tuple[str, ...] = tuple(dict.fromkeys(p.category for p in CATALOG))

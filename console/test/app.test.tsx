@@ -62,6 +62,7 @@ class FakeEventSource {
 }
 
 const STATS: MerchantStats = {
+  currency: "INR",
   gmv_minor: 12450000,
   orders: 15,
   avg_order_value_minor: 830000,
@@ -80,6 +81,7 @@ const ORDER: Order = {
   mandate_id: "mnd_1",
   state: "PAYMENT_CAPTURED",
   amount_minor: 249900,
+  currency: "INR",
   items_summary: "1x Adjustable desk lamp",
   rail: "mock_upi",
   at: "2026-08-30T14:22:05Z",

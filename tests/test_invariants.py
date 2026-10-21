@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from contracts.money import MoneyError, gst, parse_minor, rupees
+from contracts.money import MoneyError, format_money, parse_minor, tax_at
 from contracts.reason_codes import CHECK_ORDER, REASON_TEXT, ReasonCode, Verdict, verdict_for
 from contracts.schemas import QuoteItemRequest
 
@@ -204,14 +204,26 @@ def test_money_accepts_ints_and_integral_strings():
 
 def test_tax_is_integer_arithmetic_with_no_float_anywhere():
     # 18% of 74900 paise is 13482.0 exactly; the point is the type, not the value.
-    assert gst(74900, 1800) == 13482
-    assert isinstance(gst(74901, 1800), int)
+    assert tax_at(74900, 1800) == 13482
+    assert isinstance(tax_at(74901, 1800), int)
 
 
 def test_indian_grouping():
-    assert rupees(12_45_000_00) == "₹12,45,000"
-    assert rupees(98282) == "₹982.82"
-    assert rupees(0) == "₹0"
+    assert format_money(12_45_000_00, "INR") == "₹12,45,000"
+    assert format_money(98282, "INR") == "₹982.82"
+    assert format_money(0, "INR") == "₹0"
+
+
+def test_dollars_group_in_thousands_and_yen_have_no_fraction():
+    assert format_money(1_245_000_00, "USD") == "$1,245,000"
+    assert format_money(24999, "USD") == "$249.99"
+    assert format_money(-1250, "USD") == "-$12.50"
+    assert format_money(1200, "JPY") == "¥1,200"
+
+
+def test_a_currency_with_no_display_rule_is_refused_not_guessed():
+    with pytest.raises(MoneyError):
+        format_money(100, "XYZ")
 
 
 # ------------------------------------------------------------ reason codes ---

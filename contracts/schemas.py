@@ -140,6 +140,8 @@ class Quote(Strict):
     tax_minor: MinorUnits
     shipping_minor: MinorUnits
     total_minor: MinorUnits
+    #: ISO 4217. Every amount above is integer minor units of this.
+    currency: str
     expires_at: str
     headroom_fit: HeadroomFit | None = None
 
@@ -288,6 +290,7 @@ class Order(Strict):
     mandate_id: str
     state: SagaState
     amount_minor: MinorUnits
+    currency: str
     items_summary: str
     rail: str
     rail_order_id: str | None = None
@@ -312,6 +315,7 @@ class CreateOrderRequest(Strict):
 
 
 class MerchantStats(Strict):
+    currency: str
     gmv_minor: MinorUnits = 0
     orders: int = 0
     avg_order_value_minor: MinorUnits = 0
@@ -336,6 +340,9 @@ class AgentCommerceManifest(Strict):
     mcp_endpoint: str
     categories: list[str]
     currency: str
+    #: What the quote's tax line is, in words — "GST 18%", or a dollar
+    #: profile's flat rate marked as illustrative.
+    tax_label: str
     accepts_mandates: list[str]
     headroom_endpoint: str
     quote_ttl_seconds: int

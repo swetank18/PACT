@@ -147,6 +147,8 @@ export type Quote = {
   tax_minor: MinorUnits;
   shipping_minor: MinorUnits;
   total_minor: MinorUnits;
+  /** ISO 4217. Every amount here is integer minor units of it. */
+  currency: string;
   expires_at: string;
   headroom_fit?: {
     fits: boolean;
@@ -192,6 +194,7 @@ export type Order = {
   /** Which settlement rail moved the money. The console only displays it. */
   rail: string;
   amount_minor: MinorUnits;
+  currency: string;
   items_summary: string;
   rail_order_id?: string | null;
   rail_payment_id?: string | null;
@@ -209,6 +212,7 @@ export type Order = {
 /* ------------------------------------------------------------- stats ------ */
 
 export type MerchantStats = {
+  currency: string;
   gmv_minor: MinorUnits;
   orders: number;
   avg_order_value_minor: MinorUnits;
@@ -252,6 +256,8 @@ export type AgentCommerceManifest = {
   mcp_endpoint: string;
   categories: string[];
   currency: string;
+  /** "GST 18%", or a dollar profile's flat rate marked illustrative. */
+  tax_label: string;
   accepts_mandates: string[];
   headroom_endpoint: string;
   quote_ttl_seconds: number;

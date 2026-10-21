@@ -70,6 +70,7 @@ const quote: Quote = {
   tax_minor: 26964,
   shipping_minor: 0,
   total_minor: 176764,
+  currency: "INR",
   expires_at: "2099-01-01T00:00:00Z",
   headroom_fit: null,
 };
@@ -80,6 +81,7 @@ const order: Order = {
   mandate_id: "mnd_TEST",
   state: "NEEDS_ATTENTION",
   amount_minor: 176764,
+  currency: "INR",
   items_summary: "2x A5 ruled notebook",
   rail: "mock_upi",
   at: "2026-08-30T14:22:05Z",

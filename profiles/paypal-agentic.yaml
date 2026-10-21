@@ -1,0 +1,44 @@
+# Event three: the PayPal AI Hackathon. PayPal rail, dollars.
+#
+# PayPal does not settle INR, so this profile prices every SKU in US cents. The
+# list is a real US price list, not the rupee one divided by an exchange rate,
+# so the four-arm results in dollars are their own run and not a rescaling of
+# the rupee one.
+rail: paypal
+merchant_name: DeskKit
+currency: USD
+# The sandbox business account the PayPal app belongs to. PACT checks every
+# mandate's allowlist and every payment against this string; PayPal pays the
+# account the API credentials belong to. Override with PACT_MERCHANT_PAYEE.
+merchant_payee: deskkit@business.example.com
+surfaces: [grant, agent, console, firewall]
+
+pricing:
+  # One flat rate, for illustration. US sales tax varies by state and city and
+  # this does not pretend to model it; the quote line says so.
+  tax_bps: 800
+  tax_label: "Sales tax (illustrative 8%)"
+  shipping_minor: 599
+  free_shipping_over_minor: 5000
+  prices:
+    STA-NB-A5: 1299     # A5 ruled notebook, 5 pack
+    STA-PEN-12: 949     # gel pens, 12 pack
+    STA-STK-01: 599     # sticky notes, assorted
+    CBL-USBC-2M: 1499   # USB-C to USB-C cable, 2m
+    CBL-HDMI-2M: 1799   # HDMI 2.1 cable, 2m
+    CBL-HUB-7P: 4999    # 7 port USB-C hub
+    FUR-LMP-01: 3999    # adjustable desk lamp
+    FUR-MON-ARM: 6999   # single monitor arm
+    FUR-CHR-ERG: 24900  # ergonomic task chair
+    FUR-MAT-DSK: 2499   # felt desk mat
+
+beats:
+  "1": happy path, agent buys end to end
+  "2": headroom upsell, offer made and accepted
+  "3": naive upsell for contrast, offer rejected by the gate
+  "4": attacks, rapid fire
+  "5": forced stockout, refund, budget released, alternative accepted
+  "6": duplicate webhook arrives, nothing happens
+
+framing:
+  opening: PayPal gave agents the power to pay. PACT lets the person whose money it is bound it, and lets the merchant read that bound before it sells.

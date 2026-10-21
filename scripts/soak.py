@@ -62,7 +62,7 @@ sys.path.insert(0, str(REPO))
 import httpx  # noqa: E402
 
 from buyer.agent import BuyerAgent  # noqa: E402
-from contracts.money import rupees  # noqa: E402
+from contracts.money import format_money  # noqa: E402
 
 PER_TXN_MINOR = 500_000
 SKU = "STA-NB-A5"
@@ -754,17 +754,21 @@ def report(
     # server side, from its own tables. If those two disagree the soak found
     # something far more interesting than a memory graph.
     gmv_delta = after["gmv_minor"] - before["gmv_minor"]
+
+    def money(minor: int) -> str:
+        return format_money(minor, after["currency"])
+
     order_delta = after["orders"] - before["orders"]
     print()
     print(f"     the saga drained the in-flight orders in {drained_in:.1f}s after the "
           "load stopped")
     if gmv_delta == tally.settled_minor and order_delta == tally.settled:
-        print(f"OK   the merchant's ledger agrees to the paise: {order_delta} orders, "
-              f"{rupees(gmv_delta)}")
+        print(f"OK   the merchant's ledger agrees to the unit: {order_delta} orders, "
+              f"{money(gmv_delta)}")
     else:
         print(f"FAIL harness settled {tally.settled} orders / "
-              f"{rupees(tally.settled_minor)}; the merchant recorded "
-              f"{order_delta} / {rupees(gmv_delta)}")
+              f"{money(tally.settled_minor)}; the merchant recorded "
+              f"{order_delta} / {money(gmv_delta)}")
         # The difference is almost always states, not money: an order the
         # harness placed and the merchant then rolled back is settled to one
         # and not GMV to the other, and both are right. Print the distribution

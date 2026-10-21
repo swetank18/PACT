@@ -4,6 +4,7 @@
 # events. Every rerun makes them more solid.
 rail: mock_upi
 merchant_name: DeskKit
+currency: INR   # the base price list, GST 18%; see merchant/catalog.py
 merchant_payee: deskkit@okaxis
 surfaces: [grant, gate_console]
 

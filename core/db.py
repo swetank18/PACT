@@ -109,6 +109,9 @@ CREATE TABLE IF NOT EXISTS orders (
   decision_id    TEXT,
   state          TEXT NOT NULL,
   amount_minor   INTEGER NOT NULL,
+  -- Nullable, and added by ADD_COLUMNS for databases that predate it. Null
+  -- means rupees: every order written before this column existed was.
+  currency       TEXT,
   items_summary  TEXT NOT NULL,
   rail           TEXT NOT NULL,
   rail_order_id  TEXT,
@@ -170,6 +173,7 @@ CREATE TABLE IF NOT EXISTS counters (
 #: every boot, guarded by PRAGMA table_info. Additive and nullable only.
 ADD_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("saga_steps", "reason_code", "TEXT"),
+    ("orders", "currency", "TEXT"),
 )
 
 #: Columns renamed after a table shipped, as (table, old, new).

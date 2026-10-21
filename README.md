@@ -30,7 +30,7 @@ Or for development, with hot reload and the services on separate ports:
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh          # gate :8000, merchant :8100, webhooks :8110, beats :8300
-./scripts/test.sh         # 267 tests
+./scripts/test.sh         # 282 tests
 
 cd console && npm install && npm run dev    # http://localhost:5173
 ```
@@ -73,7 +73,7 @@ driven:
 
 | | |
 | --- | --- |
-| `ci` | 267 Python tests, 55 console tests, typecheck, and a contract-drift check |
+| `ci` | 282 Python tests, 55 console tests, typecheck, and a contract-drift check |
 | `container` | builds the image, waits for its healthcheck, runs the six demo beats against it over HTTP, asserts the SSE stream is live, restarts it with the volume attached and checks the orders and the gate's signing key survived, drives every console surface in Chromium, records the demo video against that image, and soaks it for three minutes |
 
 The beats are asserted on what they are meant to prove, not on a 200 — beat 3
@@ -259,8 +259,12 @@ What the specs forced:
 - **Sandbox only, on the host.** A PayPal client id has no `test_` prefix, so the
   client refuses any base URL that is not the sandbox.
 - **No INR.** PayPal does not list it. The rail refuses to start in a currency it
-  cannot settle, so `PACT_RAIL=paypal` on today's rupee catalog stops the merchant
-  at boot instead of charging 74900 paise as $749.00.
+  cannot settle, so `PACT_RAIL=paypal` on the rupee catalog stops the merchant at
+  boot instead of charging 74900 paise as $749.00. `PACT_PROFILE=paypal-agentic`
+  sells in dollars from a real US price list, with an 8% sales tax that the quote
+  labels as illustrative; every quote, order and stats response carries its
+  `currency`. With no PayPal keys that profile runs on the simulated rail, still in
+  dollars.
 - **A request id per call type.** PayPal requires it, and the saga's one key would
   otherwise be the same id for an order and its capture — the Razorpay bug again.
 - **Replays return the present.** A repeated `PayPal-Request-Id` answers with the
@@ -291,10 +295,9 @@ of the client, each caught. **None of it has run against the sandbox**:
 
 ## Limitations
 
-- The PayPal client has never run against the sandbox, and the catalog is in
-  rupees, which PayPal cannot settle — so the PayPal rail does not boot until a
-  dollar-priced profile exists. Both are deliberate refusals, not gaps papered
-  over; see the PayPal section.
+- The PayPal client has never run against the sandbox; see the PayPal section
+  for what stands in for it. The console still formats every amount in rupees,
+  so on the dollar profile its numbers are right and its symbols are not yet.
 - Test mode only. No live money has moved through this, and the Razorpay client
   has never run against the live API — see above for what stands in for it and
   what that does not cover.

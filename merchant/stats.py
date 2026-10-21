@@ -17,6 +17,7 @@ from __future__ import annotations
 from contracts.money import MinorUnits
 from contracts.schemas import MerchantStats
 from core.db import Database
+from merchant.catalog import CURRENCY
 from merchant.upsell import UpsellEngine
 
 #: States where the merchant actually keeps the money.
@@ -57,6 +58,7 @@ class StatsService:
         counters = self.upsell.counters
 
         return MerchantStats(
+            currency=CURRENCY,
             gmv_minor=gmv,
             orders=orders,
             avg_order_value_minor=round(gmv / orders) if orders else 0,

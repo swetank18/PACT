@@ -52,7 +52,7 @@ sys.path.insert(0, str(REPO))
 import httpx  # noqa: E402
 
 from buyer.agent import BuyerAgent, iso  # noqa: E402
-from contracts.money import rupees  # noqa: E402
+from contracts.money import format_money  # noqa: E402
 
 PER_TXN_MINOR = 500_000
 
@@ -116,7 +116,8 @@ def ceiling_mode(base: str, allowed: int, racers_each: int) -> int:
         payee = setup.discover()["merchant_payee"]
         # Priced first, with no mandate, so the budget can be set to exactly
         # `allowed` purchases and nothing else can be the binding constraint.
-        unit = setup.quote([{"sku": "FUR-LMP-01", "qty": 1}], None)["total_minor"]
+        priced = setup.quote([{"sku": "FUR-LMP-01", "qty": 1}], None)
+        unit, currency = priced["total_minor"], priced["currency"]
         # max_count deliberately generous. Otherwise the count ceiling binds
         # first and this measures a comparison against an integer instead of the
         # SUM over reservations computed inside BEGIN IMMEDIATE — which is the
@@ -126,7 +127,10 @@ def ceiling_mode(base: str, allowed: int, racers_each: int) -> int:
     finally:
         setup.close()
 
-    print(f"one mandate: {rupees(unit * allowed)}, exactly {allowed} x {rupees(unit)}")
+    def money(minor: int) -> str:
+        return format_money(minor, currency)
+
+    print(f"one mandate: {money(unit * allowed)}, exactly {allowed} x {money(unit)}")
     print(f"max_count set to {racers + 10} so the budget is what binds")
     print(f"{racers} buyers racing\n")
 
@@ -189,14 +193,14 @@ def ceiling_mode(base: str, allowed: int, racers_each: int) -> int:
         print(f"  {n:>4}  {reason}")
 
     print(f"\nauthorize latency: {percentiles([o[2] for o in outcomes if o[2]])}")
-    print(f"settled {len(settled)}, {rupees(spent)} against a ceiling of {rupees(cap)}")
+    print(f"settled {len(settled)}, {money(spent)} against a ceiling of {money(cap)}")
 
     failures = 0
     if spent > cap:
-        print(f"\nFAIL overspent by {rupees(spent - cap)}")
+        print(f"\nFAIL overspent by {money(spent - cap)}")
         failures += 1
     else:
-        print(f"OK   overspend {rupees(0)} with {racers} buyers racing")
+        print(f"OK   overspend {money(0)} with {racers} buyers racing")
     if errors:
         print(f"FAIL {len(errors)} request(s) errored: {sorted({e[0] for e in errors})}")
         failures += 1

@@ -21,7 +21,7 @@ from datetime import timedelta
 
 from contracts.ids import new_id
 from contracts.legacy import upgrade_keys
-from contracts.money import MinorUnits, gst
+from contracts.money import MinorUnits, tax_at
 from contracts.schemas import (
     Headroom,
     HeadroomFit,
@@ -32,13 +32,9 @@ from contracts.schemas import (
     utcnow,
 )
 from core.db import Database
-from merchant.catalog import BY_SKU
+from merchant.catalog import BY_SKU, PRICING
 
-#: 18% GST, in basis points so the whole calculation stays integer.
-GST_BPS = 1800
 QUOTE_TTL_SECONDS = 300
-FREE_SHIPPING_OVER_MINOR = 100_000
-SHIPPING_MINOR = 9_900
 
 
 class QuoteEngine:
@@ -73,8 +69,10 @@ class QuoteEngine:
                 )
             )
         subtotal: MinorUnits = sum(line.line_total_minor for line in lines)
-        tax: MinorUnits = gst(subtotal, GST_BPS)
-        shipping: MinorUnits = 0 if subtotal >= FREE_SHIPPING_OVER_MINOR else SHIPPING_MINOR
+        tax: MinorUnits = tax_at(subtotal, PRICING.tax_bps)
+        shipping: MinorUnits = (
+            0 if subtotal >= PRICING.free_shipping_over_minor else PRICING.shipping_minor
+        )
         return lines, subtotal, tax, shipping, subtotal + tax + shipping
 
     def total_with_addon(self, quote: Quote, addon_sku: str) -> MinorUnits:
@@ -122,6 +120,7 @@ class QuoteEngine:
             tax_minor=tax,
             shipping_minor=shipping,
             total_minor=total,
+            currency=PRICING.currency,
             expires_at=expires,
             headroom_fit=fit,
         )
@@ -157,7 +156,12 @@ class QuoteEngine:
             row = conn.execute(
                 "SELECT body_json FROM quotes WHERE quote_id = ?", (quote_id,)
             ).fetchone()
-        return Quote.model_validate(upgrade_keys(json.loads(row["body_json"]))) if row else None
+        if row is None:
+            return None
+        body = upgrade_keys(json.loads(row["body_json"]))
+        # Every quote stored before quotes carried a currency was in rupees.
+        body.setdefault("currency", "INR")
+        return Quote.model_validate(body)
 
     def is_live(self, quote: Quote) -> bool:
         return parse_rfc3339(utcnow()) <= parse_rfc3339(quote.expires_at)

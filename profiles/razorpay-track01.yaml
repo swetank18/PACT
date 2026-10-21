@@ -4,6 +4,7 @@
 # Nothing event-specific belongs in core/.
 rail: razorpay
 merchant_name: DeskKit
+currency: INR   # the base price list, GST 18%; see merchant/catalog.py
 merchant_payee: deskkit@razorpay
 surfaces: [checkout, merchant_console]
 

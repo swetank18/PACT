@@ -37,7 +37,7 @@ from dataclasses import dataclass
 from contracts.ids import new_id
 from contracts.legacy import upgrade_keys
 from contracts.reason_codes import ReasonCode
-from contracts.money import MinorUnits, rupees
+from contracts.money import MinorUnits, format_money
 from contracts.schemas import Addon, Order, Quote, QuoteItemRequest, utcnow
 from core.audit.store import AuditStore
 from core.db import Database
@@ -80,9 +80,9 @@ class OrderStore:
                 """
                 INSERT INTO orders
                     (order_id, quote_id, mandate_id, decision_id, state, amount_minor,
-                     items_summary, rail, rail_order_id, rail_payment_id,
+                     currency, items_summary, rail, rail_order_id, rail_payment_id,
                      recovered_from, alternative_json, at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(order_id) DO UPDATE SET
                     state            = excluded.state,
                     rail_order_id    = excluded.rail_order_id,
@@ -98,6 +98,7 @@ class OrderStore:
                     None,
                     order.state,
                     order.amount_minor,
+                    order.currency,
                     order.items_summary,
                     order.rail,
                     order.rail_order_id,
@@ -169,6 +170,9 @@ class OrderStore:
             mandate_id=row["mandate_id"],
             state=row["state"],
             amount_minor=row["amount_minor"],
+            # Null on every order written before orders carried a currency,
+            # and every one of those was in rupees.
+            currency=row["currency"] or "INR",
             items_summary=row["items_summary"],
             rail=row["rail"],
             rail_order_id=row["rail_order_id"],
@@ -236,6 +240,7 @@ class SagaRunner:
             mandate_id=mandate_id,
             state="QUOTED",
             amount_minor=quote.total_minor,
+            currency=quote.currency,
             items_summary=", ".join(f"{l.qty}x {l.name}" for l in quote.items),
             rail=self.rail.name,
             at=utcnow(),
@@ -243,7 +248,7 @@ class SagaRunner:
         self.orders.put(order)
         self.orders.set_decision(order.order_id, decision_id)
 
-        self._step(order, "QUOTED", "quote", "OK", rupees(quote.total_minor), quote.quote_id)
+        self._step(order, "QUOTED", "quote", "OK", format_money(quote.total_minor, quote.currency), quote.quote_id)
         self._pause()
 
         # 1. Soft hold on stock.
@@ -331,7 +336,7 @@ class SagaRunner:
         # Compensation 2: give the budget back.
         released = self.gate.release(decision_id)
         self._step(order, "BUDGET_RELEASED", "release_reservation", "OK",
-                   f"{rupees(released or order.amount_minor)} back to headroom")
+                   f"{format_money(released or order.amount_minor, order.currency)} back to headroom")
         self._pause()
 
         # 4. The growth move: offer the nearest compliant alternative.

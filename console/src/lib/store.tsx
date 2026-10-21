@@ -24,6 +24,8 @@ const MAX_ORDERS = 200;
 const STATS_POLL_MS = 2000;
 
 export const EMPTY_STATS: MerchantStats = {
+  // Unknown until the merchant answers; never guessed.
+  currency: "",
   gmv_minor: 0,
   orders: 0,
   avg_order_value_minor: 0,

@@ -36,6 +36,8 @@ from merchant.catalog import (
     Inventory,
     MERCHANT_NAME,
     MERCHANT_PAYEE,
+    PRICING,
+    PROFILE,
     search,
 )
 from merchant.gate_client import GATE_URL, HttpGateClient
@@ -46,6 +48,7 @@ from merchant.upsell import UpsellEngine
 from rails.mock_upi.adapter import MockUpiAdapter
 from rails.paypal.adapter import PayPalAdapter
 from rails.paypal.client import PayPalClient
+from rails.paypal.client import credentials_from_env as paypal_credentials_from_env
 from rails.razorpay.adapter import RazorpayAdapter
 from rails.razorpay.client import RazorpayClient, credentials_from_env
 
@@ -60,25 +63,38 @@ STEP_DELAY_S = float(os.environ.get("PACT_SAGA_STEP_DELAY_S", "0.35"))
 
 def _build_rail(db: Database):  # noqa: ANN201
     """
-    Pick the rail from the profile. `rails/` depends on `core`, never the
-    reverse, so this is the only place that names a concrete rail.
-    """
-    name = os.environ.get("PACT_RAIL", "").strip().lower()
-    creds = credentials_from_env()
+    Pick the rail. `rails/` depends on `core`, never the reverse, so this is
+    the only place that names a concrete rail.
 
-    if name == "paypal":
+    `PACT_RAIL` is an instruction and is followed as given, credentials or not:
+    a real rail with no credentials refuses its calls rather than pretending to
+    settle. The profile's rail is a default: it is used when that rail's
+    credentials are present, and otherwise the merchant runs on the simulated
+    rail and says so. That is what lets the repository run with no keys at all,
+    in whatever currency the profile sells in.
+    """
+    explicit = os.environ.get("PACT_RAIL", "").strip().lower()
+    name = explicit or PROFILE.rail.strip().lower()
+    razorpay = credentials_from_env()
+    paypal = paypal_credentials_from_env()
+
+    if name == "paypal" and (explicit or paypal.configured):
         # In the catalog's own currency and no other. PayPal does not settle
         # INR, so on the rupee catalog this refuses to boot, which is the point:
         # the alternative is 74900 paise charged as $749.00.
-        return PayPalAdapter(PayPalClient(db, currency=CURRENCY))
-    if name == "mock_upi" or (not name and not creds.configured):
-        if not creds.configured:
-            log.warning(
-                "No Razorpay credentials, using the mock_upi rail. Everything "
-                "above the adapter is identical; only settlement is simulated."
-            )
-        return MockUpiAdapter()
-    return RazorpayAdapter(RazorpayClient(db))
+        return PayPalAdapter(PayPalClient(db, paypal, currency=CURRENCY))
+    if name == "razorpay" and (explicit or razorpay.configured):
+        return RazorpayAdapter(RazorpayClient(db))
+    if not explicit and name in ("", "razorpay") and razorpay.configured:
+        return RazorpayAdapter(RazorpayClient(db))
+
+    if name != "mock_upi":
+        log.warning(
+            "The %s rail has no credentials here, so the merchant is using the "
+            "mock_upi rail. Everything above the adapter is identical; only "
+            "settlement is simulated.", name or "configured",
+        )
+    return MockUpiAdapter()
 
 
 class MerchantService:
@@ -157,6 +173,7 @@ async def manifest() -> dict:
         mcp_endpoint=f"http://localhost:8100/mcp",
         categories=list(CATEGORIES),
         currency=CURRENCY,
+        tax_label=PRICING.tax_label,
         accepts_mandates=["pact/v1"],
         headroom_endpoint=f"{GATE_URL}/v1/mandates/{{id}}/headroom",
         quote_ttl_seconds=QUOTE_TTL_SECONDS,
