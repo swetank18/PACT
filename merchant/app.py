@@ -9,6 +9,7 @@ and a human cannot be quoted different prices.
 from __future__ import annotations
 
 import asyncio
+import html
 import json
 import logging
 import os
@@ -16,6 +17,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from contracts.schemas import (
@@ -45,9 +47,10 @@ from merchant.quote import QUOTE_TTL_SECONDS, QuoteEngine
 from merchant.saga import OrderStore, SagaRunner
 from merchant.stats import StatsService
 from merchant.upsell import UpsellEngine
+from merchant.wallets import VaultService, WalletError, WalletStore, vault_id_resolver
 from rails.mock_upi.adapter import MockUpiAdapter
 from rails.paypal.adapter import PayPalAdapter
-from rails.paypal.client import PayPalClient
+from rails.paypal.client import PayPalClient, PayPalError
 from rails.paypal.client import credentials_from_env as paypal_credentials_from_env
 from rails.razorpay.adapter import RazorpayAdapter
 from rails.razorpay.client import RazorpayClient, credentials_from_env
@@ -61,7 +64,7 @@ RECONCILE_INTERVAL_SECONDS = 15
 STEP_DELAY_S = float(os.environ.get("PACT_SAGA_STEP_DELAY_S", "0.35"))
 
 
-def _build_rail(db: Database):  # noqa: ANN201
+def _build_rail(db: Database, wallets: WalletStore):  # noqa: ANN201
     """
     Pick the rail. `rails/` depends on `core`, never the reverse, so this is
     the only place that names a concrete rail.
@@ -82,7 +85,12 @@ def _build_rail(db: Database):  # noqa: ANN201
         # In the catalog's own currency and no other. PayPal does not settle
         # INR, so on the rupee catalog this refuses to boot, which is the point:
         # the alternative is 74900 paise charged as $749.00.
-        return PayPalAdapter(PayPalClient(db, paypal, currency=CURRENCY))
+        # Each order pays from the wallet its own mandate connected; see
+        # merchant/wallets.py for why a disconnected one never falls back.
+        return PayPalAdapter(
+            PayPalClient(db, paypal, currency=CURRENCY),
+            vault_id_for=vault_id_resolver(wallets, paypal.vault_id),
+        )
     if name == "razorpay" and (explicit or razorpay.configured):
         return RazorpayAdapter(RazorpayClient(db))
     if not explicit and name in ("", "razorpay") and razorpay.configured:
@@ -107,7 +115,13 @@ class MerchantService:
         self.upsell = UpsellEngine(self.inventory, self.quotes)
         self.orders = OrderStore(self.db)
         self.gate = HttpGateClient()
-        self.rail = _build_rail(self.db)
+        self.wallets = WalletStore(self.db)
+        self.rail = _build_rail(self.db, self.wallets)
+        #: Only a rail that vaults a wallet has one to connect.
+        self.vault = (
+            VaultService(self.rail.client, self.wallets, self.gate)
+            if self.rail.name == "paypal" else None
+        )
         self.saga = SagaRunner(
             self.db,
             audit=self.audit,
@@ -548,6 +562,70 @@ async def reset() -> dict:
         service.rail.reset()
     service.bus.publish("reset", {"at": utcnow()})
     return {"ok": True}
+
+
+# ------------------------------------------------------------- wallets ---
+#
+# Connecting the PayPal wallet a mandate pays from. Every change is signed by
+# the principal and checked by the gate; no response carries the vault id.
+# See merchant/wallets.py.
+
+
+def _vault() -> VaultService:
+    if service.vault is None:
+        raise HTTPException(409, f"this merchant settles on {service.rail.name}, "
+                                 "which has no wallet to connect")
+    return service.vault
+
+
+async def _wallet_call(fn, *args, **kwargs) -> dict:  # noqa: ANN001
+    try:
+        return await asyncio.to_thread(fn, *args, **kwargs)
+    except WalletError as exc:
+        raise HTTPException(exc.status, exc.detail) from exc
+    except PayPalError as exc:
+        raise HTTPException(502, f"PayPal: {exc.code} {exc.description} "
+                                 f"(debug_id {exc.debug_id})") from exc
+
+
+@app.post("/v1/paypal/vault")
+async def connect_wallet(body: dict, request: Request) -> dict:
+    """Start connecting a wallet. Returns PayPal's page for the principal."""
+    base = os.environ.get("PACT_PUBLIC_MERCHANT_URL") or str(request.base_url)
+    return await _wallet_call(_vault().connect, str(body.get("mandate_id", "")),
+                              body.get("payload"), body.get("signature"), base_url=base)
+
+
+@app.get("/v1/paypal/vault/return", response_class=HTMLResponse)
+async def wallet_returned(ref: str, cancelled: int = 0) -> HTMLResponse:
+    """
+    Where PayPal sends the browser back. A page, not a redirect: redirecting
+    to a URL the request named would be an open redirect, and the console
+    polls the status anyway.
+    """
+    result = await _wallet_call(_vault().returned, ref, cancelled=bool(cancelled))
+    console = os.environ.get("PACT_CONSOLE_URL", "/")
+    words = {"VAULTED": "Your PayPal wallet is connected.",
+             "FAILED": "Connecting was cancelled at PayPal. Nothing was connected.",
+             "PENDING": "PayPal has not confirmed the approval yet."}.get(
+                 result["status"], f"Status: {result['status']}.")
+    return HTMLResponse(
+        "<!doctype html><meta charset=utf-8><title>PACT · PayPal</title>"
+        f"<body style='font-family:system-ui;padding:2rem'><p>{html.escape(words)}</p>"
+        f"<p><a href='{html.escape(console)}#/grant'>Back to PACT</a></p></body>"
+    )
+
+
+@app.get("/v1/paypal/vault/{mandate_id}")
+async def wallet_status(mandate_id: str) -> dict:
+    return await _wallet_call(_vault().refresh, mandate_id)
+
+
+@app.post("/v1/paypal/vault/{mandate_id}/disconnect")
+async def disconnect_wallet(mandate_id: str, body: dict) -> dict:
+    """Delete the wallet at PayPal. The mandate pays from nothing after this."""
+    return await _wallet_call(_vault().disconnect, mandate_id, body.get("payload"),
+                              body.get("signature"))
 
 
 @app.get("/v1/health")

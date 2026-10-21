@@ -33,6 +33,9 @@ class GateClient(Protocol):
     def redeem(self, token: str, amount_minor: MinorUnits) -> tuple[bool, str, str | None]: ...
     def commit(self, decision_id: str) -> bool: ...
     def release(self, decision_id: str) -> MinorUnits: ...
+    def verify_principal(
+        self, mandate_id: str, *, action: str, payload: dict, signature: str
+    ) -> tuple[bool, str]: ...
 
 
 class HttpGateClient(GateClient):
@@ -157,6 +160,22 @@ class HttpGateClient(GateClient):
             log.error("release failed for %s: %s", decision_id, exc)
             raise
 
+    def verify_principal(
+        self, mandate_id: str, *, action: str, payload: dict, signature: str
+    ) -> tuple[bool, str]:
+        """No answer is a no. Anything that cannot be confirmed is refused."""
+        try:
+            r = self._client.post(
+                f"/v1/mandates/{mandate_id}/verify_principal",
+                json={"action": action, "payload": payload, "signature": signature},
+            )
+            r.raise_for_status()
+            body = r.json()
+            return bool(body.get("ok")), str(body.get("reason_code", ""))
+        except httpx.HTTPError as exc:
+            log.error("verify_principal failed for %s: %s", mandate_id, exc)
+            return False, "GATE_UNAVAILABLE"
+
 
 class InProcessGateClient(GateClient):
     """Used by the tests, and by the single-process dev runner."""
@@ -177,3 +196,11 @@ class InProcessGateClient(GateClient):
 
     def release(self, decision_id: str) -> MinorUnits:
         return self.gate.ledger.release(decision_id)
+
+    def verify_principal(
+        self, mandate_id: str, *, action: str, payload: dict, signature: str
+    ) -> tuple[bool, str]:
+        ok, code = self.gate.mandates.verify_principal(
+            mandate_id, action=action, payload=payload, signature=signature
+        )
+        return ok, str(code)

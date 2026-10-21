@@ -125,9 +125,9 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **309 Python tests, 57 console
+~11k lines of Python, ~10k of TypeScript. **328 Python tests, 57 console
 tests**, all green — one Python test skips unless the clone predates the key
-purge, so a run reports 308 passed and 1 skipped — plus two GitHub Actions
+purge, so a run reports 327 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every
 console surface against it on every push.
 
@@ -154,7 +154,7 @@ Development, services on separate ports with hot reload:
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh                            # 8000 gate, 8100 merchant, 8110 hooks, 8300 beats
 cd console && npm install && npm run dev    # 5173
-./scripts/test.sh                           # 309 tests
+./scripts/test.sh                           # 328 tests
 ```
 
 `scripts/test.sh` exists because a ROS install on this machine puts broken pytest
@@ -567,8 +567,14 @@ use of both PayPal and AI). Done on 2026-10-20: the PayPal rail, section 3. Next
   has never been called. A model-driven buyer — Claude choosing what to buy
   through tools, bounded by the gate it cannot talk its way past — is the half of
   "PayPal and AI" that does not exist yet. The auditor with a key is item 2 below.
-- **The vault step in the grant flow**, so connecting PayPal is part of signing a
-  mandate in the console rather than a script.
+- **The vault step in the grant flow.** The merchant side is done (2026-10-21):
+  `POST /v1/paypal/vault` starts it, PayPal's page approves it, the status poll
+  or the return page finishes it, and `POST /v1/paypal/vault/{id}/disconnect`
+  deletes the wallet at PayPal. Every change is signed by the principal and
+  checked by the gate (`/v1/mandates/{id}/verify_principal`), which never hands
+  the merchant the key. Each order pays from its own mandate's wallet; a
+  disconnected one cannot fall back to the demo wallet. Left: the console's
+  Connect PayPal step — doc 1's C2.
 - **A pending-capture state in the saga.** Done 2026-10-21: `PAYMENT_PENDING`
   and `PAYMENT_AUTHORIZED`, and a declined wallet rolls back cleanly instead of
   escaping the saga. `rails/paypal/API_NOTES.md` has the detail.

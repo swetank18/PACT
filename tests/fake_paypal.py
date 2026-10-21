@@ -186,6 +186,11 @@ class FakePayPal:
             return self._show(self.setup_tokens, m.group(1))
         if method == "POST" and path == "/v3/vault/payment-tokens":
             return self._payment_token(body)
+        if method == "DELETE" and (m := re.fullmatch(r"/v3/vault/payment-tokens/([^/]+)", path)):
+            if self.vaulted.pop(m.group(1), None) is None:
+                return _error(404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID",
+                              "Specified resource ID does not exist.")
+            return httpx.Response(204)
         return _error(404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID", f"no route {method} {path}")
 
     # --------------------------------------------------------------- auth ---
@@ -433,7 +438,10 @@ class FakePayPal:
                           "The payer has not approved the setup token.")
         vault_id = self._id("vt")
         self.vaulted[vault_id] = True
-        return httpx.Response(201, json={"id": vault_id, "payment_source": {"paypal": {}}})
+        return httpx.Response(201, json={
+            "id": vault_id,
+            "payment_source": {"paypal": {"email_address": "judge-buyer@personal.example.com"}},
+        })
 
     # ----------------------------------------------------------- webhooks ---
 

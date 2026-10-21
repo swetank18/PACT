@@ -346,6 +346,17 @@ class PayPalClient:
             request_id=request_id("payment_token", idem_key),
         )
 
+    def delete_payment_token(self, vault_id: str) -> None:
+        """
+        Forget the wallet at PayPal, so nothing — not even a bug on our side —
+        can charge it again. A 404 is success: the token is already gone.
+        """
+        try:
+            self._request("DELETE", f"/v3/vault/payment-tokens/{vault_id}")
+        except PayPalError as exc:
+            if exc.status != 404:
+                raise
+
     # ------------------------------------------------------------- orders ----
 
     def create_authorized_order(

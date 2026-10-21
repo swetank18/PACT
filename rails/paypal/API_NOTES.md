@@ -55,7 +55,14 @@ PayPal returns a payment token, and later orders name it.
   approves at the returned link, then `POST /v3/vault/payment-tokens` turns the
   setup token into a payment token. Its `id` is the `vault_id`. SPEC (paths and
   request shapes). **UNVERIFIED** that a sandbox app has vaulting enabled by
-  default — the app's settings page has a checkbox for it.
+  default — the app's settings page has a checkbox for it. **UNVERIFIED** that
+  the payment token response carries `payment_source.paypal.email_address`;
+  the merchant shows it masked when it does and nothing when it does not.
+- Undo: `DELETE /v3/vault/payment-tokens/{id}`. SPEC (path). The client treats
+  a 404 as already gone.
+- PACT's side of it is `merchant/wallets.py`: the principal signs the request
+  to connect or disconnect, the gate confirms the signature, and the vault id
+  never leaves the merchant's database.
 - Every purchase after that: `POST /v2/checkout/orders` with
   `intent: AUTHORIZE` and `payment_source.paypal.vault_id`, plus
   `stored_credential: {payment_initiator: MERCHANT, usage: SUBSEQUENT,

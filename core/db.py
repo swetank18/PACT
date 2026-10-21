@@ -154,6 +154,22 @@ CREATE TABLE IF NOT EXISTS idempotency (
 
 -- Every rail callback we have already applied, keyed so a duplicate or
 -- out of order delivery is a no op.
+-- The wallet each mandate pays from, on a rail that vaults one. The rail's
+-- token for the wallet lives here and nowhere else: never in a response, never
+-- in a log line, never in front of the agent.
+CREATE TABLE IF NOT EXISTS wallets (
+  mandate_id     TEXT PRIMARY KEY,
+  rail           TEXT NOT NULL,
+  ref            TEXT NOT NULL UNIQUE,
+  setup_token_id TEXT,
+  vault_id       TEXT,
+  status         TEXT NOT NULL CHECK (status IN ('PENDING','VAULTED','FAILED','DISCONNECTED')),
+  payer_masked   TEXT,
+  detail         TEXT,
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS rail_events (
   event_key  TEXT PRIMARY KEY,
   event_type TEXT NOT NULL,
@@ -204,6 +220,7 @@ RESETTABLE_TABLES = (
     "nonces",
     "reservations",
     "quotes",
+    "wallets",
     "mandates",
     "counters",
 )

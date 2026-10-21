@@ -15,12 +15,19 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any
 
 from contracts.crypto import verify
 from contracts.legacy import upgrade_keys
 from contracts.reason_codes import ReasonCode
-from contracts.schemas import Mandate, utcnow
+from contracts.schemas import Mandate, parse_rfc3339, utcnow
 from core.db import Database
+
+
+#: How old a principal's signed request may be. Long enough for a slow round
+#: trip through a phone; short enough that a captured one is soon useless.
+PRINCIPAL_MAX_AGE_SECONDS = 120
 
 
 def _with_currency(body: dict) -> dict:
@@ -107,6 +114,47 @@ class MandateStore:
             signature_ok=bool(row["signature_ok"]),
             revoked=bool(row["revoked"]),
         )
+
+    def verify_principal(
+        self,
+        mandate_id: str,
+        *,
+        action: str,
+        payload: dict[str, Any],
+        signature: str,
+        max_age_seconds: int = PRINCIPAL_MAX_AGE_SECONDS,
+    ) -> tuple[bool, ReasonCode]:
+        """
+        Whether a request really comes from the person who signed this mandate.
+
+        For the things only the principal may do outside a payment — connect a
+        wallet to the mandate, disconnect it — the merchant forwards the signed
+        request here and gets a yes or no. It never learns the delegator's key:
+        the headroom envelope is built so the merchant cannot see who the buyer
+        is, and handing out the key would undo that.
+
+        The payload names the action and the mandate, so a signature for one
+        cannot be replayed as the other, and carries `issued_at`, so an old one
+        cannot be replayed at all past a short window. Inside the window a replay
+        repeats an idempotent act, which is why there is no nonce.
+        """
+        stored = self.get(mandate_id)
+        if stored is None:
+            return False, ReasonCode.MANDATE_NOT_FOUND
+        if not stored.signature_ok:
+            return False, ReasonCode.MANDATE_SIG_INVALID
+        if payload.get("mandate_id") != mandate_id or payload.get("action") != action:
+            return False, ReasonCode.REQUEST_SIG_INVALID
+        try:
+            issued = parse_rfc3339(str(payload.get("issued_at", "")))
+        except ValueError:
+            return False, ReasonCode.REQUEST_STALE
+        age = (datetime.now(timezone.utc) - issued).total_seconds()
+        if age > max_age_seconds or age < -max_age_seconds:
+            return False, ReasonCode.REQUEST_STALE
+        if not verify(payload, signature, stored.mandate.delegator.pubkey):
+            return False, ReasonCode.REQUEST_SIG_INVALID
+        return True, ReasonCode.OK
 
     def revoke(self, mandate_id: str) -> bool:
         with self.db.immediate_tx() as conn:

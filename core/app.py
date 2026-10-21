@@ -186,6 +186,24 @@ async def revoke_mandate(mandate_id: str) -> dict:
     return {"ok": True}
 
 
+@app.post("/v1/mandates/{mandate_id}/verify_principal")
+async def verify_principal(mandate_id: str, body: dict) -> dict:
+    """
+    Is this signed request from the person who signed the mandate? Yes or no,
+    and why not. The merchant asks this before it lets anyone connect or
+    disconnect the wallet a mandate pays from; it never sees the key.
+    """
+    payload = body.get("payload")
+    if not isinstance(payload, dict):
+        raise HTTPException(422, "payload must be an object")
+    ok, code = await asyncio.to_thread(
+        service.mandates.verify_principal, mandate_id,
+        action=str(body.get("action", "")), payload=payload,
+        signature=str(body.get("signature", "")),
+    )
+    return {"ok": ok, "reason_code": str(code)}
+
+
 @app.get("/v1/mandates/{mandate_id}/headroom")
 async def get_headroom(mandate_id: str) -> dict:
     envelope = await asyncio.to_thread(service.headroom.for_mandate, mandate_id)
