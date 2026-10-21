@@ -112,7 +112,7 @@ def check_health(base: str, timeout: float) -> str:
     health = wait_for_health(base, timeout)
     if not health.get("ok"):
         raise Failure(f"healthz not ok: {health}")
-    missing = {"/api/gate", "/api/merchant", "/api/sim", "/api/webhooks"} - set(
+    missing = {"/api/gate", "/api/merchant", "/api/sim", "/api/webhooks", "/api/agent"} - set(
         health.get("mounted", [])
     )
     if missing:

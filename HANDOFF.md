@@ -125,9 +125,9 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **328 Python tests, 57 console
+~11k lines of Python, ~10k of TypeScript. **350 Python tests, 57 console
 tests**, all green — one Python test skips unless the clone predates the key
-purge, so a run reports 327 passed and 1 skipped — plus two GitHub Actions
+purge, so a run reports 349 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every
 console surface against it on every push.
 
@@ -154,7 +154,7 @@ Development, services on separate ports with hot reload:
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh                            # 8000 gate, 8100 merchant, 8110 hooks, 8300 beats
 cd console && npm install && npm run dev    # 5173
-./scripts/test.sh                           # 328 tests
+./scripts/test.sh                           # 350 tests
 ```
 
 `scripts/test.sh` exists because a ROS install on this machine puts broken pytest
@@ -563,10 +563,15 @@ use of both PayPal and AI). Done on 2026-10-20: the PayPal rail, section 3. Next
   Done the same day: currency signed into the mandate, checked by `scope`,
   carried on the headroom envelope. Left: USD persona ceilings for the
   simulation, and the console formatting by currency.
-- **AI that is actually AI.** Today the buyer agent is scripted and the auditor
-  has never been called. A model-driven buyer — Claude choosing what to buy
-  through tools, bounded by the gate it cannot talk its way past — is the half of
-  "PayPal and AI" that does not exist yet. The auditor with a key is item 2 below.
+- **AI that is actually AI.** The Claude buyer exists as of 2026-10-21:
+  `buyer/llm_agent.py` (the loop and seven tools), `buyer/runs.py` (runs,
+  limits, the step-up relay), `buyer/app.py` mounted at `/api/agent`. 22 tests
+  drive it with a scripted model against the real gate and saga; **it has never
+  called the real model** — no key here. One finding from writing them: the
+  payee-redirect injection in `INJECTIONS[2]` is not one the pattern scan
+  recognises, so only the payee check stops it, and only when the model obeys
+  it. That is the auditor's job, and doc 2's E1 measures it. Still to do: the
+  auditor on the SDK with a key, and the console's run viewer (doc 1, C3).
 - **The vault step in the grant flow.** The merchant side is done (2026-10-21):
   `POST /v1/paypal/vault` starts it, PayPal's page approves it, the status poll
   or the return page finishes it, and `POST /v1/paypal/vault/{id}/disconnect`

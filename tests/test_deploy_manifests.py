@@ -115,6 +115,9 @@ def test_the_database_and_the_signing_key_live_on_the_mounted_volume():
     ):
         assert env["PACT_DB_URL"] == f"sqlite:///{VOLUME}/pact.db", source
         assert env["PACT_GATE_KEY_PATH"].startswith(f"{VOLUME}/"), source
+        # The Claude agent's delegate key. Lost on restart, every mandate
+        # signed for the agent names a key it no longer holds.
+        assert env["PACT_AGENT_KEY_PATH"].startswith(f"{VOLUME}/"), source
 
     assert fly()["mounts"]["destination"] == VOLUME
     assert render()["disk"]["mountPath"] == VOLUME
@@ -129,7 +132,7 @@ def test_compose_inherits_the_paths_rather_than_restating_them():
     must still agree — that is what this asserts, rather than forbidding it.
     """
     environment = compose().get("environment") or {}
-    for key in ("PACT_DB_URL", "PACT_GATE_KEY_PATH"):
+    for key in ("PACT_DB_URL", "PACT_GATE_KEY_PATH", "PACT_AGENT_KEY_PATH"):
         if key in environment:
             assert str(environment[key]) == dockerfile_env()[key], key
 

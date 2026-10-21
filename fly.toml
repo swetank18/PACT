@@ -25,6 +25,7 @@ primary_region = "bom"
   PACT_PROFILE = "razorpay-track01"
   PACT_DB_URL = "sqlite:////data/pact.db"
   PACT_GATE_KEY_PATH = "/data/gate_signing_key.hex"
+  PACT_AGENT_KEY_PATH = "/data/agent_signing_key.hex"
   PORT = "8080"
   # Paces the rollback so the console can draw it one row at a time. Set to 0
   # before running the simulation against a deployed instance.

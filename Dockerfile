@@ -67,6 +67,7 @@ COPY --from=console /build/console/dist ./console/dist
 RUN mkdir -p /data && chmod 700 /data
 ENV PACT_DB_URL=sqlite:////data/pact.db \
     PACT_GATE_KEY_PATH=/data/gate_signing_key.hex \
+    PACT_AGENT_KEY_PATH=/data/agent_signing_key.hex \
     PACT_PROFILE=razorpay-track01 \
     PORT=8080
 

@@ -30,7 +30,7 @@ Or for development, with hot reload and the services on separate ports:
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh          # gate :8000, merchant :8100, webhooks :8110, beats :8300
-./scripts/test.sh         # 328 tests
+./scripts/test.sh         # 350 tests
 
 cd console && npm install && npm run dev    # http://localhost:5173
 ```
@@ -73,7 +73,7 @@ driven:
 
 | | |
 | --- | --- |
-| `ci` | 328 Python tests, 57 console tests, typecheck, and a contract-drift check |
+| `ci` | 350 Python tests, 57 console tests, typecheck, and a contract-drift check |
 | `container` | builds the image, waits for its healthcheck, runs the six demo beats against it over HTTP, asserts the SSE stream is live, restarts it with the volume attached and checks the orders and the gate's signing key survived, drives every console surface in Chromium, records the demo video against that image, and soaks it for three minutes |
 
 The beats are asserted on what they are meant to prove, not on a 200 — beat 3
@@ -243,6 +243,30 @@ Webhook signatures are HMAC-SHA256 over the **raw** body — re-serialising befo
 verifying is the standard way that check silently stops working, and
 `tests/test_webhook.py` asserts it. Webhooks are never the only path: a
 reconciliation poller resolves anything pending and older than 30 seconds.
+
+## The Claude buyer
+
+`buyer/llm_agent.py` is the agent the PayPal build is about: Claude, given a goal
+and a mandate, shopping through seven tools — search, read a product page, read
+its headroom, quote, ask for addons, pay, take an alternative — and paying through
+the gate like any other agent. It cannot do arithmetic that reaches a payload
+(`pay` takes a quote id, and the amount sent is the quote's), it never holds the
+principal's key, and no tool returns a wallet. Everything it read travels with the
+payment, so the gate judges it in the context it was made in.
+
+`buyer/app.py` serves it at `/api/agent`: start a run, watch every step over SSE
+with the token usage each model turn cost, and answer its step-ups. The
+principal's signed approval goes through the run to the gate, so the agent gets
+its settlement token and the console never handles one. Runs are capped per hour
+and at once, because a hosted demo is open to anyone.
+
+**Attack mode** hides instructions in the first product page it reads. The point
+is not that the model is never fooled. It is that the gate is not: a payment to
+the injected payee is refused on scope, and a page the pattern scan recognises
+refuses any payment made from it. 22 tests drive the agent with a scripted model
+against the real gate and saga. **None has called the real model**; with no
+`ANTHROPIC_API_KEY` the agent refuses runs with a 503 and everything else runs
+unchanged.
 
 ## PayPal
 

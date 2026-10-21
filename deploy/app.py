@@ -70,6 +70,7 @@ os.environ.setdefault("PACT_MERCHANT_URL", f"{SELF}/api/merchant")
 from core.app import app as gate_app, service as gate_service  # noqa: E402
 from merchant.app import app as merchant_app, service as merchant_service  # noqa: E402
 from rails.razorpay.webhooks import WebhookProcessor, build_app  # noqa: E402
+from buyer.app import app as agent_app  # noqa: E402
 from sim.demo import app as demo_app  # noqa: E402
 
 
@@ -112,6 +113,7 @@ MOUNTED = (
     ("/api/merchant", merchant_app),
     ("/api/sim", demo_app),
     ("/api/webhooks", webhook_app),
+    ("/api/agent", agent_app),
 )
 
 
