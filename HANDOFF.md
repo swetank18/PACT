@@ -125,9 +125,9 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **288 Python tests, 57 console
+~11k lines of Python, ~10k of TypeScript. **291 Python tests, 57 console
 tests**, all green — one Python test skips unless the clone predates the key
-purge, so a run reports 287 passed and 1 skipped — plus two GitHub Actions
+purge, so a run reports 290 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every
 console surface against it on every push.
 
@@ -154,7 +154,7 @@ Development, services on separate ports with hot reload:
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh                            # 8000 gate, 8100 merchant, 8110 hooks, 8300 beats
 cd console && npm install && npm run dev    # 5173
-./scripts/test.sh                           # 288 tests
+./scripts/test.sh                           # 291 tests
 ```
 
 `scripts/test.sh` exists because a ROS install on this machine puts broken pytest
@@ -496,6 +496,7 @@ checks, and a QA report on the film that passed all ten of its own rows.
 | The merchant never verified the envelope it was handed | "A merchant can trust a signed envelope without asking" is the claim the whole design rests on. The gate signed every envelope and published its key at `/v1/gate/pubkey` — docstring: "So the merchant can verify the headroom envelopes it is handed" — and `HttpGateClient.headroom` parsed the JSON and believed it. No money was ever at risk, because `authorize` re-derives every ceiling server side; what was at risk was the claim, which is the thing being sold. Verified now, failing closed, with one key refetch before calling a mismatch a forgery — the gate mints a new key whenever it boots without its volume, which is every restart on the plan the deployed instance is actually on. |
 | The film's crossover was an interpolation, and a flattering one | S17 said "crossover ≈ 18%", spoken and on screen, where `results.md` says 20% — the swept point at which arm D actually wins. 18% is a straight line drawn between two swept points, which the generated results deliberately decline to draw, and it has PACT winning sooner than the evidence states. `video/assets.md` promises every figure on screen traces to a file in the tree; that one did not. |
 | A Razorpay capture driven by the saga never reached Razorpay | Found 2026-10-20 while writing the PayPal client. The saga hands one idempotency key to `create_intent` and `capture`; the client's table was keyed on it alone, so the capture was served the stored order as a replay, status `created`, `ok=False`. Every saga-driven purchase on that rail would have rolled back as `RAIL_CAPTURE_FAILED`. 27 tests passed because each invented a fresh key per call; the deployed rail is mock_upi, whose `create_intent` records nothing. PayPal requires a request id per call type for the same reason, so the bug would have been copied straight into the third rail. |
+| The reconciler only ever saw orders from a previous day | Found 2026-10-21 while testing a pending PayPal capture with a realistic age. `_unsettled_older_than` compared stored `2026-10-21T06:00:00Z` against SQLite's `datetime('now', '-30 seconds')`, which writes `2026-10-21 06:04:36`. As text the two agree up to the date, then `T` sorts after the space, so every order updated today was "newer" than any cutoff. The 30-second poll that resolves an order whose webhook never came, and the five-minute check that parks a stuck one, both waited for UTC midnight. Every test, and the chaos suite's dropped-webhook case, backdated the order to 2000-01-01 — a different day — and passed. The cutoff is now computed in the stored format; three tests use ages a real order has. |
 | The documented way to build the video could not run | `node ../video/record_walkthrough.mjs` — Node resolves a bare specifier from the importing file's directory, `video/` has no `node_modules` and the repository root's is empty. Two of the build scripts also had `/home/swetank` in a font path, which made "five commands on a clean checkout produce the same film" true on exactly one laptop. |
 
 ---

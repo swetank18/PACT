@@ -33,6 +33,7 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 from contracts.ids import new_id
 from contracts.legacy import upgrade_keys
@@ -136,15 +137,28 @@ class OrderStore:
         return self._unsettled_older_than(older_than_seconds)
 
     def _unsettled_older_than(self, seconds: int) -> list[Order]:
+        """
+        The cutoff is computed here, in the format `updated_at` is stored in,
+        and compared as text. It used to be SQLite's `datetime('now', ...)`,
+        which writes `2026-10-21 06:04:36` against stored `2026-10-21T06:00:00Z`:
+        the strings agree up to the date, then `T` sorts after the space, so
+        every order updated *today* compared as newer than the cutoff, however
+        old it was. The reconciler saw nothing until the UTC date changed, and
+        the five-minute stuck check waited for midnight. Every test passed,
+        because every test backdated its order to the year 2000.
+        """
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(seconds=seconds)
+        ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         placeholders = ",".join("?" for _ in self.UNSETTLED)
         with self.db.read_tx() as conn:
             rows = conn.execute(
                 f"""
                 SELECT * FROM orders
                 WHERE state IN ({placeholders})
-                  AND updated_at < datetime('now', ?)
+                  AND updated_at < ?
                 """,
-                (*self.UNSETTLED, f"-{seconds} seconds"),
+                (*self.UNSETTLED, cutoff),
             ).fetchall()
         return [self._row_to_order(r) for r in rows]
 
