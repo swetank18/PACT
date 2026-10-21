@@ -33,6 +33,7 @@
         },
         "intent": "restock office supplies for the month",
         "constraints": {
+          "currency": "INR",
           "max_per_txn_minor": 500000,
           "max_total_minor": 1500000,
           "max_count": 5,
@@ -49,8 +50,8 @@
         },
         "issued_at": "2026-08-30T09:58:12Z"
       },
-      "canonical": "{\"constraints\":{\"category_allowlist\":[\"stationery\",\"office_furniture\",\"cables\"],\"max_count\":5,\"max_per_txn_minor\":500000,\"max_total_minor\":1500000,\"merchant_allowlist\":[\"deskkit@razorpay\"],\"valid_from\":\"2026-08-30T10:00:00Z\",\"valid_until\":\"2026-08-31T10:00:00Z\"},\"delegate\":{\"agent_id\":\"buyer_agent_v1\",\"pubkey\":\"PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw\"},\"delegator\":{\"account\":\"swetank@okaxis\",\"pubkey\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"},\"intent\":\"restock office supplies for the month\",\"issued_at\":\"2026-08-30T09:58:12Z\",\"mandate_id\":\"mnd_01J8XQ4K7T\",\"v\":1}",
-      "signature": "tHQjqT-bvYhV3iPKxE3bfB465akNDc9PMoIZBQP3d-5brsFRL_o9KTd7eNQ4iJNw9EC_EfqvOJJ6FrQx2LlTBQ"
+      "canonical": "{\"constraints\":{\"category_allowlist\":[\"stationery\",\"office_furniture\",\"cables\"],\"currency\":\"INR\",\"max_count\":5,\"max_per_txn_minor\":500000,\"max_total_minor\":1500000,\"merchant_allowlist\":[\"deskkit@razorpay\"],\"valid_from\":\"2026-08-30T10:00:00Z\",\"valid_until\":\"2026-08-31T10:00:00Z\"},\"delegate\":{\"agent_id\":\"buyer_agent_v1\",\"pubkey\":\"PUAXw-hDiVqStwqnTRt-vJyYLM8uxJaMwM1V8Sr0Zgw\"},\"delegator\":{\"account\":\"swetank@okaxis\",\"pubkey\":\"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo\"},\"intent\":\"restock office supplies for the month\",\"issued_at\":\"2026-08-30T09:58:12Z\",\"mandate_id\":\"mnd_01J8XQ4K7T\",\"v\":1}",
+      "signature": "jbMtYXNUMYltwmo6BSwupyoZBPJqS1dXHGCatkCvZ8z8OUW11doJGYEiXiNjdAS6IlMoKPX7cMskiWjV0k1HCA"
     },
     {
       "name": "unicode_and_ordering",

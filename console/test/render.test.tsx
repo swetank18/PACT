@@ -26,6 +26,7 @@ import { Slides } from "../src/surfaces/slides/Slides";
 
 const headroom: Headroom = {
   mandate_id: "mnd_TEST",
+  currency: "INR",
   headroom_minor: 890000,
   max_per_txn_minor: 500000,
   payments_remaining: 3,

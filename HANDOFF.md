@@ -125,9 +125,9 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **282 Python tests, 55 console
+~11k lines of Python, ~10k of TypeScript. **288 Python tests, 57 console
 tests**, all green — one Python test skips unless the clone predates the key
-purge, so a run reports 281 passed and 1 skipped — plus two GitHub Actions
+purge, so a run reports 287 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every
 console surface against it on every push.
 
@@ -154,7 +154,7 @@ Development, services on separate ports with hot reload:
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh                            # 8000 gate, 8100 merchant, 8110 hooks, 8300 beats
 cd console && npm install && npm run dev    # 5173
-./scripts/test.sh                           # 282 tests
+./scripts/test.sh                           # 288 tests
 ```
 
 `scripts/test.sh` exists because a ROS install on this machine puts broken pytest
@@ -286,7 +286,9 @@ Added 2026-09-05:
   boot rather than charge 74900 paise as $749.00. Since 2026-10-21 there is a
   dollar profile, `paypal-agentic`: a US price list, an 8% sales tax labelled
   illustrative, and `currency` on every quote, order and stats response. The
-  console does not format by currency yet — doc 1's C1.
+  mandate signs its currency too, and the gate's scope check refuses one that is
+  not the merchant's (`SCOPE_CURRENCY_MISMATCH`). The console does not format by
+  currency yet — doc 1's C1.
 - **The intent auditor's model has never been called.** No `ANTHROPIC_API_KEY`.
   The gate runs deterministic mode: eight checks + quote binding + a regex
   injection scan. The auditor's *wiring* is now tested — request shape, every
@@ -557,8 +559,9 @@ use of both PayPal and AI). Done on 2026-10-20: the PayPal rail, section 3. Next
   developer.paypal.com; enable vaulting on the sandbox app.
 - **The rest of the dollar work.** Done 2026-10-21: currency as a profile
   property, the USD price list, `currency` on quote, order, stats and manifest.
-  Left: currency inside the signed mandate with a gate check, USD persona
-  ceilings for the simulation, and the console formatting by currency.
+  Done the same day: currency signed into the mandate, checked by `scope`,
+  carried on the headroom envelope. Left: USD persona ceilings for the
+  simulation, and the console formatting by currency.
 - **AI that is actually AI.** Today the buyer agent is scripted and the auditor
   has never been called. A model-driven buyer — Claude choosing what to buy
   through tools, bounded by the gate it cannot talk its way past — is the half of

@@ -64,6 +64,7 @@ def pending(client):
         "intent": "restock office supplies",
         "issued_at": iso(now),
         "constraints": {
+            "currency": "INR",
             "max_per_txn_minor": 500_000,
             "max_total_minor": 1_500_000,
             "max_count": 5,

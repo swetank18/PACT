@@ -18,7 +18,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { gate } from "../../lib/api";
+import { gate, merchantCurrency } from "../../lib/api";
 import type { Headroom, Mandate, MinorUnits } from "../../lib/contracts";
 import { signPayload } from "../../lib/crypto";
 import { getDeviceKey, newId, type DeviceKey } from "../../lib/device";
@@ -53,6 +53,8 @@ export type MandateDraft = {
   valid_from: string;
   valid_until: string;
   template_id?: string | null;
+  /** Carried over when re-signing an existing mandate; otherwise the merchant's. */
+  currency?: string;
 };
 
 type Ctx = {
@@ -253,6 +255,7 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
 
   const buildAndSign = useCallback(
     async (draft: MandateDraft, key: DeviceKey, replaces?: string): Promise<StoredMandate> => {
+      const currency = draft.currency ?? (await merchantCurrency());
       const unsigned: Mandate = {
         v: 1,
         mandate_id: newId("mnd"),
@@ -260,6 +263,7 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
         delegate: { agent_id: draft.agent_id || DEFAULT_AGENT_ID, pubkey: key.publicKeyB64u },
         intent: draft.intent.trim(),
         constraints: {
+          currency,
           max_per_txn_minor: draft.per_txn_minor,
           max_total_minor: draft.total_minor,
           max_count: draft.count,
@@ -422,6 +426,8 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
               valid_from: nowRfc3339(),
               valid_until: c.valid_until,
               template_id: m.template_id ?? null,
+              // Resuming re-signs what was left, in what it was left in.
+              currency: c.currency,
             },
             key,
             m.mandate.mandate_id,

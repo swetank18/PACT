@@ -146,6 +146,22 @@ export const gate = {
 
 /* ----------------------------------------------------------- merchant ----- */
 
+/**
+ * What the merchant sells in, from its own manifest, asked at the moment of
+ * signing.
+ *
+ * Every mandate is signed in it: 50000 is $500 to a dollar merchant and ₹500
+ * to a rupee one, and the gate refuses a mandate in the wrong one. Not cached:
+ * signing is a rare human act, and an answer cached for the life of the page
+ * would outlive a merchant restarted on another profile. Nothing signs without
+ * an answer — a guessed currency would be signed in and could not be taken back.
+ */
+export async function merchantCurrency(): Promise<string> {
+  const m = await merchant.manifest();
+  if (!m.currency) throw new Error("The merchant's manifest names no currency.");
+  return m.currency;
+}
+
 export const merchant = {
   manifest: () => get<AgentCommerceManifest>(`${MERCHANT}/.well-known/agent-commerce.json`),
 

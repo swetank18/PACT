@@ -30,7 +30,7 @@ Or for development, with hot reload and the services on separate ports:
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh          # gate :8000, merchant :8100, webhooks :8110, beats :8300
-./scripts/test.sh         # 282 tests
+./scripts/test.sh         # 288 tests
 
 cd console && npm install && npm run dev    # http://localhost:5173
 ```
@@ -73,7 +73,7 @@ driven:
 
 | | |
 | --- | --- |
-| `ci` | 282 Python tests, 55 console tests, typecheck, and a contract-drift check |
+| `ci` | 288 Python tests, 57 console tests, typecheck, and a contract-drift check |
 | `container` | builds the image, waits for its healthcheck, runs the six demo beats against it over HTTP, asserts the SSE stream is live, restarts it with the volume attached and checks the orders and the gate's signing key survived, drives every console surface in Chromium, records the demo video against that image, and soaks it for three minutes |
 
 The beats are asserted on what they are meant to prove, not on a 200 — beat 3
@@ -282,8 +282,11 @@ of the client, each caught. **None of it has run against the sandbox**:
 
 ## Invariants
 
-- **Money is integer minor units.** `contracts/money.py` refuses floats outright
-  rather than rounding one, because a float here is always a bug.
+- **Money is integer minor units, in a named currency.** `contracts/money.py`
+  refuses floats outright rather than rounding one, because a float here is
+  always a bug. The mandate signs its currency, and the gate refuses a mandate in
+  any currency other than the merchant's: 50000 is $500 to one and ₹500 to the
+  other, and `SCOPE_CURRENCY_MISMATCH` is the code that says which.
 - **Prices are computed server side.** The model never does arithmetic that
   reaches a payload, which makes a hallucinated price a structural impossibility
   rather than a hope. `QUOTE_AMOUNT_MISMATCH` is the reason code that proves it.

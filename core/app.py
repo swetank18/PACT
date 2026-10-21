@@ -39,6 +39,8 @@ log = logging.getLogger("pact.gate.app")
 #: test greps for.
 PROFILE = config.load()
 MERCHANT_PAYEE = PROFILE.merchant_payee
+#: What the merchant this gate guards sells in. Every mandate must match it.
+CURRENCY = PROFILE.currency
 SWEEP_INTERVAL_SECONDS = 10
 
 if not MERCHANT_PAYEE:
@@ -67,7 +69,7 @@ class GateService:
         self.mandates = MandateStore(self.db)
         self.ledger = Ledger(self.db)
         self.auditor = Auditor()
-        self.config = GateConfig(merchant_payee=MERCHANT_PAYEE)
+        self.config = GateConfig(merchant_payee=MERCHANT_PAYEE, currency=CURRENCY)
         self.gate = Gate(
             self.db,
             config=self.config,
@@ -77,13 +79,13 @@ class GateService:
             audit=self.audit,
         )
         self.headroom = HeadroomService(
-            self.mandates, self.ledger, merchant_payee=MERCHANT_PAYEE
+            self.mandates, self.ledger, merchant_payee=MERCHANT_PAYEE, currency=CURRENCY
         )
 
     def set_disabled_checks(self, names: set[str]) -> None:
         """Ablation. Rebuilds the gate with a new config; cheap and explicit."""
         self.config = GateConfig(
-            merchant_payee=MERCHANT_PAYEE, disabled_checks=frozenset(names)
+            merchant_payee=MERCHANT_PAYEE, currency=CURRENCY, disabled_checks=frozenset(names)
         )
         self.gate.config = self.config
 

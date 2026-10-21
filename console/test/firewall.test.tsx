@@ -33,6 +33,7 @@ const MANDATE: Mandate = {
   delegate: { agent_id: "buyer_agent_v1", pubkey: "pk" },
   intent: "restock office supplies",
   constraints: {
+    currency: "INR",
     max_per_txn_minor: 300000,
     max_total_minor: 300000,
     max_count: 1,
@@ -52,6 +53,7 @@ const STORED: StoredMandate = {
 
 const HEADROOM: Headroom = {
   mandate_id: "mnd_TEST",
+  currency: "INR",
   headroom_minor: 60000,
   max_per_txn_minor: 300000,
   payments_remaining: 1,
@@ -115,6 +117,8 @@ const posted: Array<{ url: string; init?: RequestInit }> = [];
 
 /** Flipped by the test that checks what happens when the gate refuses one. */
 let acceptMandates = true;
+/** What the mocked merchant manifest says it sells in. */
+let manifestCurrency: string | undefined = "INR";
 
 function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const url = String(input);
@@ -131,7 +135,7 @@ function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Respon
         : url.includes("/v1/orders")
           ? { orders: [] }
           : url.includes("agent-commerce.json")
-            ? { categories: ["stationery"], merchant_payee: "deskkit@razorpay" }
+            ? { categories: ["stationery"], merchant_payee: "deskkit@razorpay", currency: manifestCurrency }
             : { ok: true };
 
   return Promise.resolve(
@@ -140,6 +144,19 @@ function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Respon
       headers: { "content-type": "application/json" },
     }),
   );
+}
+
+async function createMandateThroughTheWizard(): Promise<void> {
+  await click("+ Create mandate");
+  await type("#fw-intent", "restock office supplies");
+  await click("Next →"); // scope
+  await type("#fw-merchant", "deskkit@razorpay");
+  await click("Add");
+  await click("Next →"); // caps
+  await click("Next →"); // window
+  await click("Next →"); // review
+  await click("Sign & activate");
+  await flush();
 }
 
 /* ------------------------------------------------------------------ setup - */
@@ -155,6 +172,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(fakeFetch));
   localStorage.clear();
   acceptMandates = true;
+  manifestCurrency = "INR";
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -510,6 +528,31 @@ describe("the firewall surface", () => {
     // And it stays visible afterwards, rather than only at the moment of signing.
     const stored = JSON.parse(localStorage.getItem("pact.firewall.mandates.v1")!);
     expect(stored[0].registered).toBe("rejected");
+  });
+
+  it("signs the mandate in the currency the merchant sells in", async () => {
+    // 50000 is $500 or ₹500 depending on this field, and it is inside the
+    // signature, so it has to come from the merchant rather than a default.
+    manifestCurrency = "USD";
+    window.location.hash = "#/firewall/mandates";
+    await mount();
+    await flush();
+    await createMandateThroughTheWizard();
+
+    const sent = posted.find((p) => p.url.endsWith("/v1/mandates"));
+    expect(sent).toBeDefined();
+    expect(JSON.parse(String(sent!.init!.body)).constraints.currency).toBe("USD");
+  });
+
+  it("signs nothing when the merchant's manifest names no currency", async () => {
+    manifestCurrency = undefined;
+    window.location.hash = "#/firewall/mandates";
+    await mount();
+    await flush();
+    await createMandateThroughTheWizard();
+
+    expect(posted.some((p) => p.url.endsWith("/v1/mandates"))).toBe(false);
+    expect(container.textContent).toContain("names no currency");
   });
 
   it("says so on the mandate itself when the gate never received it", async () => {

@@ -31,6 +31,7 @@ from merchant.gate_client import HttpGateClient
 def _envelope(key, *, headroom_minor: int = 500_000) -> Headroom:
     envelope = Headroom(
         mandate_id="mnd_TEST",
+        currency="INR",
         headroom_minor=headroom_minor,
         max_per_txn_minor=500_000,
         payments_remaining=3,

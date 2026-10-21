@@ -16,7 +16,7 @@ from core.gate.engine import Gate, GateConfig
 from core.ledger.headroom import HeadroomService
 from core.ledger.reservations import Ledger
 from core.mandate.store import MandateStore
-from merchant.catalog import MERCHANT_PAYEE, Inventory
+from merchant.catalog import CURRENCY, MERCHANT_PAYEE, Inventory
 from merchant.gate_client import InProcessGateClient
 from merchant.quote import QuoteEngine
 from merchant.saga import OrderStore, SagaRunner
@@ -51,14 +51,15 @@ def gate(db, tmp_path):
     ledger = Ledger(db)
     g = Gate(
         db,
-        config=GateConfig(merchant_payee=MERCHANT_PAYEE),
+        config=GateConfig(merchant_payee=MERCHANT_PAYEE, currency=CURRENCY),
         auditor=Auditor(api_key=None),  # deterministic mode; no network in tests
         mandates=mandates,
         ledger=ledger,
         audit=audit,
     )
     g.headroom_service = HeadroomService(
-        mandates, ledger, merchant_payee=MERCHANT_PAYEE, signing_key=Ed25519PrivateKey.generate()
+        mandates, ledger, merchant_payee=MERCHANT_PAYEE, currency=CURRENCY,
+        signing_key=Ed25519PrivateKey.generate(),
     )
     return g
 
@@ -70,6 +71,7 @@ def make_mandate(gate, keys):
     def _make(**overrides):
         now = datetime.now(timezone.utc)
         constraints = {
+            "currency": CURRENCY,
             "max_per_txn_minor": 500_000,
             "max_total_minor": 1_500_000,
             "max_count": 5,

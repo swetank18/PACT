@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 
-import { gate } from "../../lib/api";
+import { gate, merchantCurrency } from "../../lib/api";
 import type { Mandate } from "../../lib/contracts";
 import { signPayload } from "../../lib/crypto";
 import { getDeviceKey, newId, type DeviceKey } from "../../lib/device";
@@ -84,6 +84,7 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
     try {
       // Built exactly in the shape contracts section 6 froze. Field order does
       // not matter — JCS sorts before signing — but the shape does.
+      const currency = await merchantCurrency();
       const unsigned: Mandate = {
         v: 1,
         mandate_id: newId("mnd"),
@@ -91,6 +92,7 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
         delegate: { agent_id: "buyer_agent_v1", pubkey: device.publicKeyB64u },
         intent: goal.trim(),
         constraints: {
+          currency,
           max_per_txn_minor: perTxnMinor,
           max_total_minor: totalMinor,
           max_count: Number(maxCount),

@@ -32,7 +32,7 @@ from contracts.schemas import Mandate, QuoteItemRequest
 from core.db import Database
 from core.ledger.reservations import Ledger
 from core.mandate.store import MandateStore
-from merchant.catalog import MERCHANT_PAYEE
+from merchant.catalog import CURRENCY, MERCHANT_PAYEE
 from tests.conftest import iso
 
 CONCURRENCY = 20
@@ -49,6 +49,7 @@ def _mandate_on(db: Database, **constraint_overrides) -> Mandate:
     priv, pub = generate_keypair()
     now = datetime.now(timezone.utc)
     constraints = {
+        "currency": CURRENCY,
         "max_per_txn_minor": PER_PAYMENT_MINOR,
         "max_total_minor": 5 * PER_PAYMENT_MINOR,
         "max_count": 50,  # not the binding constraint unless a test says so

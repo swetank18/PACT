@@ -19,6 +19,10 @@ from contracts.schemas import Headroom, QuoteItemRequest
 #: change and should require deleting a line from this test, deliberately.
 ALLOWED_FIELDS = {
     "mandate_id",
+    # Added 2026-10-21. The mandate's currency tells the merchant nothing about
+    # the buyer beyond whether it can sell to them at all, which is what
+    # merchant_in_scope already answers; this says why when the answer is no.
+    "currency",
     "headroom_minor",
     "max_per_txn_minor",
     "payments_remaining",

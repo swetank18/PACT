@@ -158,3 +158,52 @@ for k in ("PAYPAL_CLIENT_ID", "PAYPAL_CLIENT_SECRET"):
     out = _merchant("paypal-agentic", env_without_keys)
     assert out["rail"] == "mock_upi"
     assert out["quote"]["currency"] == "USD"
+
+
+# --------------------------------------------- the mandate's own currency ---
+
+
+def test_a_mandate_in_another_currency_is_out_of_scope(make_mandate, quotes, authorize, gate):
+    """
+    50000 is $500 to a dollar mandate and ₹500 to a rupee merchant. The gate
+    refuses to read one as the other, and refuses before the ceiling check, so
+    no budget is reserved for a payment it is about to turn down.
+    """
+    from contracts.reason_codes import ReasonCode
+    from contracts.schemas import QuoteItemRequest
+
+    mandate = make_mandate(constraints={"currency": "USD"})
+    q = quotes.build([QuoteItemRequest(sku="STA-NB-A5")], mandate_id=mandate.mandate_id)
+
+    decision = authorize(mandate, q)
+
+    assert decision.verdict == "BLOCK"
+    assert decision.reason_code == ReasonCode.SCOPE_CURRENCY_MISMATCH
+    assert gate.ledger.spent_and_count(mandate.mandate_id) == (0, 0)
+
+
+def test_the_envelope_says_why_and_the_merchant_offers_nothing(make_mandate, quotes, gate, merchant):
+    from contracts.schemas import QuoteItemRequest
+
+    mandate = make_mandate(constraints={"currency": "USD"})
+    envelope = gate.headroom_service.for_mandate(mandate.mandate_id)
+    assert envelope.currency == "USD"
+    assert envelope.merchant_in_scope is False
+
+    q = quotes.build([QuoteItemRequest(sku="STA-NB-A5")], mandate_id=mandate.mandate_id,
+                     headroom=envelope)
+    assert q.headroom_fit is not None and q.headroom_fit.fits is False
+    offered, _ = merchant.upsell.suggest(q, envelope)
+    assert offered == []
+
+
+@pytest.mark.parametrize("bad", ["usd", "US", "DOLLARS", ""])
+def test_a_currency_that_is_not_an_iso_code_is_refused(bad):
+    from pydantic import ValidationError
+
+    from contracts.schemas import Constraints
+
+    with pytest.raises(ValidationError):
+        Constraints(currency=bad, max_per_txn_minor=1, max_total_minor=1, max_count=1,
+                    merchant_allowlist=["m"], category_allowlist=["c"],
+                    valid_from="2026-01-01T00:00:00Z", valid_until="2027-01-01T00:00:00Z")

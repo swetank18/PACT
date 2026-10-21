@@ -69,6 +69,8 @@ BUDGET_TAKING = frozenset({"ceiling"})
 @dataclass(frozen=True, slots=True)
 class GateConfig:
     merchant_payee: str
+    #: ISO 4217, from the profile. Checked against every mandate by `scope`.
+    currency: str
     #: Ablation. Names in here are reported as SKIPPED and never run, so Lane B
     #: can rerun the attack set with one layer removed and record what leaks.
     disabled_checks: frozenset[str] = frozenset()
@@ -132,6 +134,7 @@ class Gate:
             conn_factory=lambda: self.db.conn,
             db=self.db,
             merchant_payee=self.config.merchant_payee,
+            currency=self.config.currency,
             quote=quote,
         )
 

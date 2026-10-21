@@ -20,11 +20,13 @@ import pytest
 from contracts.reason_codes import CHECK_ORDER, ReasonCode, Verdict
 from contracts.schemas import QuoteItemRequest
 from core.gate.engine import GateConfig
-from merchant.catalog import MERCHANT_PAYEE
+from merchant.catalog import CURRENCY, MERCHANT_PAYEE
 
 
 def _ablate(gate, *names: str) -> None:
-    gate.config = GateConfig(merchant_payee=MERCHANT_PAYEE, disabled_checks=frozenset(names))
+    gate.config = GateConfig(
+        merchant_payee=MERCHANT_PAYEE, currency=CURRENCY, disabled_checks=frozenset(names)
+    )
 
 
 @pytest.fixture

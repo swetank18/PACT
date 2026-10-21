@@ -57,6 +57,7 @@ def main() -> int:
         "delegate": {"agent_id": "buyer_agent_v1", "pubkey": delegate_pub},
         "intent": "restock office supplies for the month",
         "constraints": {
+            "currency": "INR",
             "max_per_txn_minor": 500000,
             "max_total_minor": 1500000,
             "max_count": 5,

@@ -89,11 +89,13 @@ class HeadroomService:
         ledger: Ledger,
         *,
         merchant_payee: str,
+        currency: str,
         signing_key: Ed25519PrivateKey | None = None,
     ) -> None:
         self.mandates = mandates
         self.ledger = ledger
         self.merchant_payee = merchant_payee
+        self.currency = currency
         self.signing_key = signing_key or load_or_create_gate_key()
 
     @property
@@ -116,12 +118,19 @@ class HeadroomService:
 
         envelope = Headroom(
             mandate_id=mandate_id,
+            currency=c.currency,
             headroom_minor=0 if dead else max(0, c.max_total_minor - spent),
             max_per_txn_minor=0 if dead else c.max_per_txn_minor,
             payments_remaining=0 if dead else max(0, c.max_count - used),
             categories_allowed=[] if dead else list(c.category_allowlist),
             valid_until=c.valid_until,
-            merchant_in_scope=(not dead) and self.merchant_payee in c.merchant_allowlist,
+            # In scope means this merchant may sell against it at all: named on
+            # the allowlist, and in the currency it prices in. The upsell filter
+            # and the quote's fit both key off this, so a mandate in the wrong
+            # currency is offered nothing rather than offered nonsense.
+            merchant_in_scope=(not dead)
+            and self.merchant_payee in c.merchant_allowlist
+            and c.currency == self.currency,
             as_of=utcnow(),
         )
         envelope.signature = sign(envelope.model_dump(), self.signing_key)

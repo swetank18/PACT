@@ -112,6 +112,8 @@ def _to_pre_rename(value, parent=None):
                 old = key[: -len("_minor")] + "_paise"
             if key == "account" and parent == "delegator":
                 old = "vpa"
+            if key == "currency" and parent == "constraints":
+                continue  # the old image signed no currency into a mandate
             out[old] = _to_pre_rename(inner, key)
         return out
     if isinstance(value, list):
@@ -149,6 +151,7 @@ def test_a_database_written_before_the_rename_still_reads(tmp_path, keys):
         delegate={"agent_id": "buyer_agent_v1", "pubkey": pub},
         intent="restock office supplies",
         constraints={
+            "currency": "INR",
             "max_per_txn_minor": 500_000, "max_total_minor": 1_500_000, "max_count": 5,
             "merchant_allowlist": ["deskkit@razorpay"], "category_allowlist": ["stationery"],
             "valid_from": (now - timedelta(minutes=1)).isoformat().replace("+00:00", "Z"),
@@ -188,5 +191,6 @@ def test_a_database_written_before_the_rename_still_reads(tmp_path, keys):
     assert stored is not None and stored.signature_ok
     assert stored.mandate.constraints.max_total_minor == 1_500_000
     assert stored.mandate.delegator.account == "swetank@okaxis"
+    assert stored.mandate.constraints.currency == "INR", "every mandate before today was rupees"
     assert QuoteEngine(upgraded).get(quote.quote_id).total_minor == quote.total_minor
     assert OrderStore(upgraded).get(order.order_id).amount_minor == quote.total_minor

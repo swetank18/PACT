@@ -169,6 +169,7 @@ class BuyerAgent:
             "intent": persona["goal"],
             "issued_at": iso(now),
             "constraints": {
+                "currency": m.get("currency") or self.merchant_currency(),
                 "max_per_txn_minor": m["max_per_txn_minor"],
                 "max_total_minor": m["max_total_minor"],
                 "max_count": m["max_count"],
@@ -188,7 +189,23 @@ class BuyerAgent:
         """Cold, from the manifest. No partnership, no hardcoded endpoints."""
         r = self.http.get(f"{self.merchant_url}/.well-known/agent-commerce.json")
         r.raise_for_status()
-        return r.json()
+        manifest = r.json()
+        self._currency = manifest.get("currency")
+        return manifest
+
+    def merchant_currency(self) -> str:
+        """
+        What the merchant sells in, from its own manifest, asked once.
+
+        A mandate's amounts mean nothing without it, and the human signs in the
+        currency the merchant prices in — so the agent learns it the same way
+        it learns the payee, by discovery, rather than assuming rupees.
+        """
+        if getattr(self, "_currency", None) is None:
+            self.discover()
+        if not self._currency:
+            raise RuntimeError("the merchant's manifest names no currency")
+        return self._currency
 
     def search(self, query: str, category: str | None = None) -> list[dict[str, Any]]:
         params = {"q": query}

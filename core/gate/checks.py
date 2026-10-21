@@ -62,6 +62,9 @@ class CheckContext:
     conn_factory: Callable[[], sqlite3.Connection]
     db: object  # core.db.Database; typed loosely to keep this module rail free
     merchant_payee: str
+    #: What this merchant sells in. A mandate in any other currency is out of
+    #: scope, whatever its numbers say.
+    currency: str
     quote: dict | None = None
     #: Set by the ceiling check so the engine can hand it to the token issuer.
     reservation_id: str | None = None
@@ -215,6 +218,12 @@ def check_scope(ctx: CheckContext) -> CheckOutcome:
             ReasonCode.SCOPE_MERCHANT_NOT_ALLOWED,
             f"{ctx.request.payee} is not on the allowlist "
             f"({', '.join(c.merchant_allowlist)})",
+        )
+
+    if c.currency != ctx.currency:
+        return _fail(
+            ReasonCode.SCOPE_CURRENCY_MISMATCH,
+            f"the mandate is in {c.currency} and this merchant sells in {ctx.currency}",
         )
 
     if ctx.quote is not None:

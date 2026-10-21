@@ -119,6 +119,8 @@ export type Decision = {
  */
 export type Headroom = {
   mandate_id: string;
+  /** The mandate's currency; merchant_in_scope is false when it is not the merchant's. */
+  currency: string;
   headroom_minor: MinorUnits;
   max_per_txn_minor: MinorUnits;
   payments_remaining: number;
@@ -228,6 +230,8 @@ export type MerchantStats = {
 /* ------------------------------------------------------------ mandate ----- */
 
 export type MandateConstraints = {
+  /** ISO 4217, signed with the rest. The amounts mean nothing without it. */
+  currency: string;
   max_per_txn_minor: MinorUnits;
   max_total_minor: MinorUnits;
   max_count: number;

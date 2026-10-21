@@ -162,6 +162,7 @@ def run_all(agent: BuyerAgent, payee: str, *, count: int = 60) -> list[BenignRes
         "intent": "restock before the window closes",
         "issued_at": iso(now),
         "constraints": {
+            "currency": agent.merchant_currency(),
             "max_per_txn_minor": 500_000,
             "max_total_minor": 1_500_000,
             "max_count": 5,

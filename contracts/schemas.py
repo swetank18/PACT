@@ -63,6 +63,10 @@ class Delegate(Party):
 
 
 class Constraints(Strict):
+    #: ISO 4217, signed with everything else. A mandate bounds an amount *in a
+    #: currency*: 50000 means $500 to a dollar merchant and ₹500 to a rupee
+    #: one, and the gate refuses to read it as the other.
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
     max_per_txn_minor: MinorUnits
     max_total_minor: MinorUnits
     max_count: int = Field(ge=1)
@@ -104,6 +108,9 @@ class Headroom(Strict):
     """
 
     mandate_id: str
+    #: The mandate's currency. `merchant_in_scope` is false when it is not the
+    #: currency this merchant sells in, and this says why.
+    currency: str
     headroom_minor: MinorUnits
     max_per_txn_minor: MinorUnits
     payments_remaining: int

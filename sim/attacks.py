@@ -292,6 +292,7 @@ def atk_08_expired_mandate(agent: BuyerAgent, persona: dict, payee: str) -> list
         "intent": persona["goal"],
         "issued_at": iso(past),
         "constraints": {
+            "currency": agent.merchant_currency(),
             "max_per_txn_minor": 500_000,
             "max_total_minor": 1_500_000,
             "max_count": 5,

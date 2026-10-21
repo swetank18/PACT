@@ -23,6 +23,17 @@ from contracts.schemas import Mandate, utcnow
 from core.db import Database
 
 
+def _with_currency(body: dict) -> dict:
+    """
+    Every mandate stored before mandates carried a currency was signed in
+    rupees: no profile priced in anything else until 2026-10-21. Its signature
+    was verified at registration over the body as it was, so this adds what was
+    true of it rather than changing what was signed.
+    """
+    body.get("constraints", {}).setdefault("currency", "INR")
+    return body
+
+
 @dataclass(frozen=True, slots=True)
 class StoredMandate:
     mandate: Mandate
@@ -92,7 +103,7 @@ class MandateStore:
         if row is None:
             return None
         return StoredMandate(
-            mandate=Mandate.model_validate(upgrade_keys(json.loads(row["body_json"]))),
+            mandate=Mandate.model_validate(_with_currency(upgrade_keys(json.loads(row["body_json"])))),
             signature_ok=bool(row["signature_ok"]),
             revoked=bool(row["revoked"]),
         )

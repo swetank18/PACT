@@ -45,6 +45,9 @@ class ReasonCode(StrEnum):
     # scope
     SCOPE_MERCHANT_NOT_ALLOWED = "SCOPE_MERCHANT_NOT_ALLOWED"
     SCOPE_CATEGORY_MISMATCH = "SCOPE_CATEGORY_MISMATCH"
+    #: The mandate is in a currency this merchant does not sell in. Without it,
+    #: a rupee mandate's 50000 would be read as $500 by a dollar merchant.
+    SCOPE_CURRENCY_MISMATCH = "SCOPE_CURRENCY_MISMATCH"
 
     # intent
     INTENT_MISMATCH = "INTENT_MISMATCH"
@@ -128,6 +131,7 @@ REASON_TEXT: dict[ReasonCode, str] = {
     ReasonCode.CEILING_COUNT: "No purchases left on this mandate",
     ReasonCode.SCOPE_MERCHANT_NOT_ALLOWED: "This merchant is not on the allowlist",
     ReasonCode.SCOPE_CATEGORY_MISMATCH: "This category is not on the allowlist",
+    ReasonCode.SCOPE_CURRENCY_MISMATCH: "This mandate is in a different currency from the merchant",
     ReasonCode.INTENT_MISMATCH: "The purchase does not match the stated goal",
     ReasonCode.INTENT_INJECTION_SUSPECTED: "The page text tried to instruct the agent",
     ReasonCode.AUDITOR_UNAVAILABLE: "The intent auditor did not answer, so this needs you",
