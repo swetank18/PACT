@@ -58,8 +58,8 @@ export function StepUpModal({
         approval = {
           decision_id: decision.decision_id,
           mandate_id: decision.mandate_id,
-          amount_paise: decision.amount_paise,
-          payee_vpa: decision.payee_vpa,
+          amount_minor: decision.amount_minor,
+          payee: decision.payee,
           approved_at: nowRfc3339(),
         };
         signature = await signPayload(approval, key.privateKey);
@@ -89,10 +89,10 @@ export function StepUpModal({
 
           <div className={s.facts}>
             <span className={s.factLabel}>Amount</span>
-            <span className={`${s.amount}`}>{inr(decision.amount_paise)}</span>
+            <span className={`${s.amount}`}>{inr(decision.amount_minor)}</span>
 
             <span className={s.factLabel}>Paying</span>
-            <span className={s.factValue}>{decision.payee_vpa}</span>
+            <span className={s.factValue}>{decision.payee}</span>
 
             <span className={s.factLabel}>Reason code</span>
             <span className={s.factValue}>{decision.reason_code}</span>
@@ -119,7 +119,7 @@ export function StepUpModal({
             disabled={busy !== null}
             autoFocus
           >
-            {busy === "approve" ? "Signing…" : `Approve ${inr(decision.amount_paise)}`}
+            {busy === "approve" ? "Signing…" : `Approve ${inr(decision.amount_minor)}`}
           </Button>
         </div>
       </div>

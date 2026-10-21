@@ -34,7 +34,7 @@ import httpx
 
 from contracts.crypto import generate_keypair, sign
 from contracts.ids import new_id
-from contracts.money import Paise
+from contracts.money import MinorUnits
 
 log = logging.getLogger("pact.buyer")
 
@@ -82,11 +82,11 @@ class SessionResult:
     arm: str
     seed: int
     completed: bool = False
-    gmv_paise: Paise = 0
+    gmv_minor: MinorUnits = 0
     #: Money the merchant took and then lost: fraud, hallucinated prices, or a
     #: purchase outside what the human actually authorised. Arm B's number.
-    loss_paise: Paise = 0
-    refunded_paise: Paise = 0
+    loss_minor: MinorUnits = 0
+    refunded_minor: MinorUnits = 0
     order_ids: list[str] = field(default_factory=list)
     decisions: list[dict[str, Any]] = field(default_factory=list)
     upsell_offered: int = 0
@@ -151,7 +151,7 @@ class BuyerAgent:
 
     # ------------------------------------------------------------ mandate ---
 
-    def issue_mandate(self, persona: dict[str, Any], merchant_vpa: str) -> Mandate:
+    def issue_mandate(self, persona: dict[str, Any], merchant_payee: str) -> Mandate:
         """
         The human signs on device. The agent gets the mandate, never the key.
 
@@ -164,15 +164,15 @@ class BuyerAgent:
         body = {
             "v": 1,
             "mandate_id": new_id("mnd"),
-            "delegator": {"vpa": persona.get("vpa", "buyer@okaxis"), "pubkey": pub},
+            "delegator": {"account": persona.get("account", "buyer@okaxis"), "pubkey": pub},
             "delegate": {"agent_id": "buyer_agent_v1", "pubkey": pub},
             "intent": persona["goal"],
             "issued_at": iso(now),
             "constraints": {
-                "max_per_txn_paise": m["max_per_txn_paise"],
-                "max_total_paise": m["max_total_paise"],
+                "max_per_txn_minor": m["max_per_txn_minor"],
+                "max_total_minor": m["max_total_minor"],
                 "max_count": m["max_count"],
-                "merchant_allowlist": [merchant_vpa],
+                "merchant_allowlist": [merchant_payee],
                 "category_allowlist": list(m["categories"]),
                 "valid_from": iso(now - timedelta(minutes=1)),
                 "valid_until": iso(now + timedelta(hours=m.get("valid_hours", 24))),
@@ -242,9 +242,9 @@ class BuyerAgent:
         self,
         mandate: Mandate,
         quote: dict[str, Any],
-        merchant_vpa: str,
+        merchant_payee: str,
         *,
-        amount_override: Paise | None = None,
+        amount_override: MinorUnits | None = None,
         payee_override: str | None = None,
         nonce_override: str | None = None,
         excerpt: str | None = None,
@@ -260,8 +260,8 @@ class BuyerAgent:
         req = {
             "mandate_id": mandate.id,
             "quote_id": quote["quote_id"],
-            "amount_paise": amount_override if amount_override is not None else quote["total_paise"],
-            "payee_vpa": payee_override or merchant_vpa,
+            "amount_minor": amount_override if amount_override is not None else quote["total_minor"],
+            "payee": payee_override or merchant_payee,
             "nonce": nonce_override or new_id("dec"),
             "issued_at": iso(datetime.now(timezone.utc)),
             # Populated honestly. Stub these and the intent auditor has nothing
@@ -315,8 +315,8 @@ class BuyerAgent:
             approval = {
                 "decision_id": decision["decision_id"],
                 "mandate_id": decision["mandate_id"],
-                "amount_paise": decision["amount_paise"],
-                "payee_vpa": decision["payee_vpa"],
+                "amount_minor": decision["amount_minor"],
+                "payee": decision["payee"],
                 "approved_at": iso(datetime.now(timezone.utc)),
             }
             payload["approval"] = approval

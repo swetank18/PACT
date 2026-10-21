@@ -116,7 +116,7 @@ def test_create_order_sends_paise_and_a_currency(api, client):
     method, path, sent, _ = api.seen[-1]
 
     assert (method, path) == ("POST", "/orders")
-    # Paise, not rupees. Sending 2499 here charges a hundredth of the order.
+    # MinorUnits, not rupees. Sending 2499 here charges a hundredth of the order.
     assert sent["amount"] == AMOUNT
     assert sent["currency"] == "INR"
     assert body["status"] == "created"

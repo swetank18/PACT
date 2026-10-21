@@ -56,7 +56,7 @@ export function Mandates({
       // describe it are the ones captured before it was revoked.
       const hr = effectiveHeadroom(m, raw);
       const health = healthFor(m, hr, blocksPer.get(m.mandate.mandate_id) ?? 0);
-      const spent = hr ? Math.max(0, m.mandate.constraints.max_total_paise - hr.headroom_paise) : 0;
+      const spent = hr ? Math.max(0, m.mandate.constraints.max_total_minor - hr.headroom_minor) : 0;
       return { m, hr, status, health, spent };
     });
 
@@ -146,7 +146,7 @@ export function Mandates({
               <dl className={f.agentFacts}>
                 <dt>Budget</dt>
                 <dd>
-                  {inr(t.total_paise)} · {inr(t.per_txn_paise)} each
+                  {inr(t.total_minor)} · {inr(t.per_txn_minor)} each
                 </dd>
                 <dt>Payments</dt>
                 <dd>{t.count}</dd>
@@ -261,11 +261,11 @@ export function Mandates({
                           {hr ? (
                             <Bar
                               used={spent}
-                              total={m.mandate.constraints.max_total_paise}
+                              total={m.mandate.constraints.max_total_minor}
                               label={
                                 m.revoked_at
-                                  ? `${inr(hr.headroom_paise)} was left when it was paused`
-                                  : `${inr(spent)} of ${inr(m.mandate.constraints.max_total_paise)}`
+                                  ? `${inr(hr.headroom_minor)} was left when it was paused`
+                                  : `${inr(spent)} of ${inr(m.mandate.constraints.max_total_minor)}`
                               }
                             />
                           ) : (
@@ -321,7 +321,7 @@ function MandateDetail({
   const blocks = mine.filter((d) => d.verdict === "BLOCK").length;
   const health = healthFor(sm, hr, blocks);
   const status = statusOf(sm, raw);
-  const spent = hr ? Math.max(0, c.max_total_paise - hr.headroom_paise) : 0;
+  const spent = hr ? Math.max(0, c.max_total_minor - hr.headroom_minor) : 0;
   const used = hr ? Math.max(0, c.max_count - hr.payments_remaining) : 0;
 
   return (
@@ -396,9 +396,9 @@ function MandateDetail({
             <dt>Categories</dt>
             <dd>{c.category_allowlist.join(", ") || "— none"}</dd>
             <dt>Per payment</dt>
-            <dd>{inr(c.max_per_txn_paise)}</dd>
+            <dd>{inr(c.max_per_txn_minor)}</dd>
             <dt>Total</dt>
-            <dd>{inr(c.max_total_paise)}</dd>
+            <dd>{inr(c.max_total_minor)}</dd>
             <dt>Payments</dt>
             <dd>at most {c.max_count}</dd>
             <dt>Valid from</dt>
@@ -423,8 +423,8 @@ function MandateDetail({
               <div style={{ marginTop: 18 }}>
                 <Bar
                   used={spent}
-                  total={c.max_total_paise}
-                  label={`${inr(spent)} of ${inr(c.max_total_paise)}`}
+                  total={c.max_total_minor}
+                  label={`${inr(spent)} of ${inr(c.max_total_minor)}`}
                 />
               </div>
               {sm.revoked_at && (
@@ -442,7 +442,7 @@ function MandateDetail({
                   {used} of {c.max_count}
                 </dd>
                 <dt>Left to spend</dt>
-                <dd>{inr(hr.headroom_paise)}</dd>
+                <dd>{inr(hr.headroom_minor)}</dd>
                 <dt>Time left</dt>
                 <dd>{until(c.valid_until)}</dd>
                 <dt>Blocked attempts</dt>
@@ -496,8 +496,8 @@ function MandateDetail({
                     <td>
                       <VerdictBadge verdict={d.verdict} />
                     </td>
-                    <td className={f.mono}>{d.payee_vpa}</td>
-                    <td className={f.numCell}>{inr(d.amount_paise)}</td>
+                    <td className={f.mono}>{d.payee}</td>
+                    <td className={f.numCell}>{inr(d.amount_minor)}</td>
                     <td>
                       <Ago at={d.at} />
                     </td>
@@ -517,7 +517,7 @@ function MandateDetail({
           body={
             <>
               The agent will no longer be able to use this mandate, and any payment already in
-              flight against it is blocked. {inr(hr?.headroom_paise ?? 0)} of unspent authority is
+              flight against it is blocked. {inr(hr?.headroom_minor ?? 0)} of unspent authority is
               withdrawn. Revoking cannot be undone — you would sign a new mandate instead.
             </>
           }

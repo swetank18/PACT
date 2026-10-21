@@ -10,25 +10,25 @@
  * never computes a price; it divides paise by a hundred to draw a rectangle.
  */
 import { inr } from "../lib/money";
-import type { Headroom, Paise } from "../lib/contracts";
+import type { Headroom, MinorUnits } from "../lib/contracts";
 import s from "./HeadroomBar.module.css";
 
 type Props = {
   headroom: Headroom | null;
   /** Total budget, only known when the human granted it on this device. */
-  totalBudgetPaise?: Paise | null;
+  totalBudgetMinor?: MinorUnits | null;
   /** The quote currently on the table. */
-  purchasePaise?: Paise;
+  purchaseMinor?: MinorUnits;
   /** The addon being offered, drawn as its own segment on top of the purchase. */
-  addonPaise?: Paise;
+  addonMinor?: MinorUnits;
   compact?: boolean;
 };
 
 export function HeadroomBar({
   headroom,
-  totalBudgetPaise,
-  purchasePaise = 0,
-  addonPaise = 0,
+  totalBudgetMinor,
+  purchaseMinor = 0,
+  addonMinor = 0,
   compact = false,
 }: Props) {
   if (!headroom) {
@@ -43,25 +43,25 @@ export function HeadroomBar({
     );
   }
 
-  const remaining = headroom.headroom_paise;
+  const remaining = headroom.headroom_minor;
   // The merchant only ever sees remaining headroom — the total budget is
   // deliberately absent from the envelope. When the human granted the mandate
   // on this device we know the total and can draw the spent portion; when we
   // are rendering the merchant's view we cannot, and the bar is scaled to
   // remaining authority instead. Both are honest, and the difference is the
   // privacy argument made visible.
-  const total = totalBudgetPaise ?? remaining;
+  const total = totalBudgetMinor ?? remaining;
   const used = Math.max(0, total - remaining);
 
-  const committed = Math.min(purchasePaise, remaining);
-  const addon = Math.max(0, Math.min(addonPaise, remaining - committed));
+  const committed = Math.min(purchaseMinor, remaining);
+  const addon = Math.max(0, Math.min(addonMinor, remaining - committed));
   const free = Math.max(0, remaining - committed - addon);
-  const overflow = purchasePaise + addonPaise - remaining;
+  const overflow = purchaseMinor + addonMinor - remaining;
 
   const w = (paise: number) => `${total > 0 ? (paise / total) * 100 : 0}%`;
   const capPct =
-    total > 0 && headroom.max_per_txn_paise < total
-      ? Math.min(100, ((used + headroom.max_per_txn_paise) / total) * 100)
+    total > 0 && headroom.max_per_txn_minor < total
+      ? Math.min(100, ((used + headroom.max_per_txn_minor) / total) * 100)
       : null;
 
   const afterThis = remaining - committed - addon;
@@ -90,7 +90,7 @@ export function HeadroomBar({
         {capPct !== null && (
           <div className={s.capLabelRow}>
             <div className={s.capLabel} style={{ left: `${capPct}%` }}>
-              per transaction cap {inr(headroom.max_per_txn_paise)}
+              per transaction cap {inr(headroom.max_per_txn_minor)}
             </div>
           </div>
         )}
@@ -99,7 +99,7 @@ export function HeadroomBar({
       {!compact && (
         <>
           <div className={s.legend}>
-            {totalBudgetPaise != null && (
+            {totalBudgetMinor != null && (
               <span className={s.legendItem}>
                 <span className={`${s.swatch} ${s.used}`} />
                 spent <span className={`${s.value} num`}>{inr(used)}</span>

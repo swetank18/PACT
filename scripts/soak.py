@@ -64,7 +64,7 @@ import httpx  # noqa: E402
 from buyer.agent import BuyerAgent  # noqa: E402
 from contracts.money import rupees  # noqa: E402
 
-PER_TXN_PAISE = 500_000
+PER_TXN_MINOR = 500_000
 SKU = "STA-NB-A5"
 
 
@@ -208,8 +208,8 @@ def persona() -> dict[str, Any]:
         "addon_receptivity": 0.0,
         "step_up_approval": 0.0,
         "mandate": {
-            "max_total_paise": PER_TXN_PAISE * 2,
-            "max_per_txn_paise": PER_TXN_PAISE,
+            "max_total_minor": PER_TXN_MINOR * 2,
+            "max_per_txn_minor": PER_TXN_MINOR,
             "max_count": 2,
             "categories": ["stationery", "cables", "office_furniture"],
             "valid_hours": 24,
@@ -224,7 +224,7 @@ class Tally:
 
     lock: threading.Lock = field(default_factory=threading.Lock)
     settled: int = 0
-    settled_paise: int = 0
+    settled_minor: int = 0
     latencies: list[float] = field(default_factory=list)
     reasons: dict[str, int] = field(default_factory=dict)
     sse_frames: int = 0
@@ -237,7 +237,7 @@ class Tally:
             self.latencies.append(elapsed)
             if reason == "SETTLED":
                 self.settled += 1
-                self.settled_paise += paise
+                self.settled_minor += paise
 
     def window(self) -> tuple[int, list[float]]:
         """Drain what has happened since the last call. The sampler owns this;
@@ -257,7 +257,7 @@ def buyer(base: str) -> BuyerAgent:
     )
 
 
-def purchase_loop(base: str, vpa: str, tally: Tally, deadline: float, think: float) -> None:
+def purchase_loop(base: str, payee: str, tally: Tally, deadline: float, think: float) -> None:
     """A buyer, over and over, with a pause between purchases.
 
     A fresh agent per purchase on purpose: it is a fresh HTTP connection, which
@@ -269,14 +269,14 @@ def purchase_loop(base: str, vpa: str, tally: Tally, deadline: float, think: flo
         agent = buyer(base)
         started = time.perf_counter()
         try:
-            mandate = agent.issue_mandate(persona(), vpa)
+            mandate = agent.issue_mandate(persona(), payee)
             quote = agent.quote([{"sku": SKU, "qty": 1}], mandate.id)
-            decision = agent.authorize(mandate, quote, vpa)
+            decision = agent.authorize(mandate, quote, payee)
             if decision["verdict"] != "ALLOW":
                 tally.record(decision["reason_code"], 0, time.perf_counter() - started)
             else:
                 agent.create_order(quote["quote_id"], decision)
-                tally.record("SETTLED", quote["total_paise"], time.perf_counter() - started)
+                tally.record("SETTLED", quote["total_minor"], time.perf_counter() - started)
         except httpx.HTTPStatusError as exc:
             code = ""
             try:
@@ -463,7 +463,7 @@ def soak(args: argparse.Namespace) -> int:
 
     setup = buyer(base)
     try:
-        vpa = setup.discover()["merchant_vpa"]
+        payee = setup.discover()["merchant_payee"]
     finally:
         setup.close()
 
@@ -515,7 +515,7 @@ def soak(args: argparse.Namespace) -> int:
 
     pool = ThreadPoolExecutor(max_workers=args.concurrency + 3)
     for _ in range(args.concurrency):
-        pool.submit(purchase_loop, base, vpa, tally, deadline, args.think)
+        pool.submit(purchase_loop, base, payee, tally, deadline, args.think)
     pool.submit(sse_loop, base, tally, deadline)
     pool.submit(console_loop, base, tally, deadline)
     pool.submit(restock_loop, base, deadline, args.restock)
@@ -568,7 +568,7 @@ def soak(args: argparse.Namespace) -> int:
             "concurrency": args.concurrency,
             "wall_seconds": round(wall, 1),
             "settled": tally.settled,
-            "settled_paise": tally.settled_paise,
+            "settled_minor": tally.settled_minor,
             "reasons": tally.reasons,
             "sse_frames": tally.sse_frames,
             "sse_reconnects": tally.sse_reconnects,
@@ -753,17 +753,17 @@ def report(
     # The harness counted what it settled. The merchant counted independently,
     # server side, from its own tables. If those two disagree the soak found
     # something far more interesting than a memory graph.
-    gmv_delta = after["gmv_paise"] - before["gmv_paise"]
+    gmv_delta = after["gmv_minor"] - before["gmv_minor"]
     order_delta = after["orders"] - before["orders"]
     print()
     print(f"     the saga drained the in-flight orders in {drained_in:.1f}s after the "
           "load stopped")
-    if gmv_delta == tally.settled_paise and order_delta == tally.settled:
+    if gmv_delta == tally.settled_minor and order_delta == tally.settled:
         print(f"OK   the merchant's ledger agrees to the paise: {order_delta} orders, "
               f"{rupees(gmv_delta)}")
     else:
         print(f"FAIL harness settled {tally.settled} orders / "
-              f"{rupees(tally.settled_paise)}; the merchant recorded "
+              f"{rupees(tally.settled_minor)}; the merchant recorded "
               f"{order_delta} / {rupees(gmv_delta)}")
         # The difference is almost always states, not money: an order the
         # harness placed and the merchant then rolled back is settled to one
@@ -796,7 +796,7 @@ def replay(args: argparse.Namespace) -> int:
 
     tally = Tally()
     tally.settled = saved["settled"]
-    tally.settled_paise = saved["settled_paise"]
+    tally.settled_minor = saved["settled_minor"]
     tally.reasons = saved["reasons"]
     tally.sse_frames = saved["sse_frames"]
     tally.sse_reconnects = saved["sse_reconnects"]

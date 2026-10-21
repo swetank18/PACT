@@ -256,10 +256,10 @@ export function TransactionDrawer({
         <div className={f.drawerBody}>
           <div className={`${f.verdictBanner} ${banner.cls}`}>
             <span className={f.verdictWord}>{banner.word}</span>
-            <span className={f.verdictAmount}>{inr(decision.amount_paise)}</span>
+            <span className={f.verdictAmount}>{inr(decision.amount_minor)}</span>
           </div>
           <div className={f.drawerSub}>
-            {agentLabel} → <span className={f.mono}>{decision.payee_vpa}</span> ·{" "}
+            {agentLabel} → <span className={f.mono}>{decision.payee}</span> ·{" "}
             {stamp(decision.at)}
           </div>
 

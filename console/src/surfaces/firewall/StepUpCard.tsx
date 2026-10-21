@@ -37,8 +37,8 @@ export async function answerStepUp(decision: Decision, approve: boolean): Promis
     approval = {
       decision_id: decision.decision_id,
       mandate_id: decision.mandate_id,
-      amount_paise: decision.amount_paise,
-      payee_vpa: decision.payee_vpa,
+      amount_minor: decision.amount_minor,
+      payee: decision.payee,
       approved_at: nowRfc3339(),
     };
     signature = await signPayload(approval, key.privateKey);
@@ -51,7 +51,7 @@ export function StepUpCard({
   agentLabel,
   intent,
   wide,
-  autoApprovePaise,
+  autoApproveMinor,
   onResolved,
   onOpenDetail,
 }: {
@@ -60,7 +60,7 @@ export function StepUpCard({
   intent?: string;
   wide?: boolean;
   /** This screen's own threshold. The gate does not know about it. */
-  autoApprovePaise: number;
+  autoApproveMinor: number;
   onResolved: (id: string, approved: boolean) => void;
   onOpenDetail?: () => void;
 }) {
@@ -93,7 +93,7 @@ export function StepUpCard({
   // Below the threshold the human set, this screen answers on their behalf —
   // still with their device signature, and still labelled as automatic.
   useEffect(() => {
-    if (autoApprovePaise > 0 && decision.amount_paise <= autoApprovePaise && !busy && !gone) {
+    if (autoApproveMinor > 0 && decision.amount_minor <= autoApproveMinor && !busy && !gone) {
       void resolve(true, "threshold");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -111,7 +111,7 @@ export function StepUpCard({
       <div className={`${f.stepUp} ${wide ? f.stepUpWide : ""} ${f.stepUpExpired}`}>
         <div className={f.stepUpHead}>
           {auto === "threshold"
-            ? `Auto-approved · under your ${inr(autoApprovePaise)} threshold`
+            ? `Auto-approved · under your ${inr(autoApproveMinor)} threshold`
             : auto === "timeout"
               ? "Refused · no answer in time"
               : busy === "approve"
@@ -133,9 +133,9 @@ export function StepUpCard({
         <div>
           <strong>{agentLabel}</strong> wants to pay
         </div>
-        <div className={f.stepUpAmount}>{inr(decision.amount_paise)}</div>
+        <div className={f.stepUpAmount}>{inr(decision.amount_minor)}</div>
         <div className={f.stepUpMeta}>
-          to <span className={f.mono}>{decision.payee_vpa}</span>
+          to <span className={f.mono}>{decision.payee}</span>
         </div>
         {intent && <div className={f.stepUpMeta}>Intent: “{intent}”</div>}
         <div className={f.stepUpMeta}>

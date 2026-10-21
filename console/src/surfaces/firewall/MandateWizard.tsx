@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { merchant as merchantApi } from "../../lib/api";
 import type { Decision } from "../../lib/contracts";
-import { inr, nowRfc3339, rupeesToPaise, stamp } from "../../lib/money";
+import { inr, nowRfc3339, majorToMinor, stamp } from "../../lib/money";
 import { useFirewall, type MandateDraft } from "./provider";
 import { DEFAULT_AGENT_ID, TEMPLATES, type StoredMandate, type Template } from "./state";
 import f from "./firewall.module.css";
@@ -79,18 +79,18 @@ export function MandateWizard({
   const t = seed.template;
   const blocked = seed.fromBlock;
 
-  const [intent, setIntent] = useState(t?.intent ?? (blocked ? `pay ${blocked.payee_vpa}` : ""));
+  const [intent, setIntent] = useState(t?.intent ?? (blocked ? `pay ${blocked.payee}` : ""));
   const [agentId, setAgentId] = useState(agents[0]?.agent_id ?? DEFAULT_AGENT_ID);
   const [categories, setCategories] = useState<string[]>(t?.categories ?? []);
   const [merchants, setMerchants] = useState<string[]>(
-    t?.merchants ?? (blocked ? [blocked.payee_vpa] : []),
+    t?.merchants ?? (blocked ? [blocked.payee] : []),
   );
   const [merchantEntry, setMerchantEntry] = useState("");
   const [perTxn, setPerTxn] = useState(
-    String((t?.per_txn_paise ?? blocked?.amount_paise ?? 300000) / 100),
+    String((t?.per_txn_minor ?? blocked?.amount_minor ?? 300000) / 100),
   );
   const [total, setTotal] = useState(
-    String((t?.total_paise ?? blocked?.amount_paise ?? 300000) / 100),
+    String((t?.total_minor ?? blocked?.amount_minor ?? 300000) / 100),
   );
   const [count, setCount] = useState(String(t?.count ?? 1));
   const [from, setFrom] = useState(nowRfc3339());
@@ -108,13 +108,13 @@ export function MandateWizard({
       .manifest()
       .then((m) => {
         if (m.categories?.length) setCatalogCats(m.categories);
-        if (m.merchant_vpa) setKnownMerchants((prev) => [...new Set([m.merchant_vpa, ...prev])]);
+        if (m.merchant_payee) setKnownMerchants((prev) => [...new Set([m.merchant_payee, ...prev])]);
       })
       .catch(() => undefined);
   }, []);
 
-  const perTxnPaise = rupeesToPaise(perTxn);
-  const totalPaise = rupeesToPaise(total);
+  const perTxnMinor = majorToMinor(perTxn);
+  const totalMinor = majorToMinor(total);
   const countN = Number(count) || 0;
 
   const suggestion = useMemo(
@@ -128,24 +128,24 @@ export function MandateWizard({
     if (step >= 1 && merchants.length === 0 && categories.length === 0)
       out.push("Pick a category or name a merchant.");
     if (step >= 2) {
-      if (perTxnPaise <= 0) out.push("Set a per-payment limit.");
-      if (totalPaise <= 0) out.push("Set a total budget.");
-      if (perTxnPaise > totalPaise) out.push("The per-payment limit is above the whole budget.");
+      if (perTxnMinor <= 0) out.push("Set a per-payment limit.");
+      if (totalMinor <= 0) out.push("Set a total budget.");
+      if (perTxnMinor > totalMinor) out.push("The per-payment limit is above the whole budget.");
       if (countN < 1) out.push("Allow at least one payment.");
     }
     if (step >= 3 && Date.parse(until) <= Date.parse(from))
       out.push("The window ends before it starts.");
     return out;
-  }, [step, intent, merchants, categories, perTxnPaise, totalPaise, countN, from, until]);
+  }, [step, intent, merchants, categories, perTxnMinor, totalMinor, countN, from, until]);
 
   const blockingNow = useMemo(() => {
     if (step === 0) return !intent.trim();
     if (step === 1) return merchants.length === 0 && categories.length === 0;
     if (step === 2)
-      return perTxnPaise <= 0 || totalPaise <= 0 || perTxnPaise > totalPaise || countN < 1;
+      return perTxnMinor <= 0 || totalMinor <= 0 || perTxnMinor > totalMinor || countN < 1;
     if (step === 3) return Date.parse(until) <= Date.parse(from);
     return problems.length > 0;
-  }, [step, intent, merchants, categories, perTxnPaise, totalPaise, countN, from, until, problems]);
+  }, [step, intent, merchants, categories, perTxnMinor, totalMinor, countN, from, until, problems]);
 
   const toggle = (list: string[], set: (v: string[]) => void, v: string) =>
     set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -166,8 +166,8 @@ export function MandateWizard({
         agent_id: agentId,
         merchants,
         categories,
-        per_txn_paise: perTxnPaise,
-        total_paise: totalPaise,
+        per_txn_minor: perTxnMinor,
+        total_minor: totalMinor,
         count: countN,
         valid_from: from,
         valid_until: until,
@@ -300,12 +300,12 @@ export function MandateWizard({
               </div>
 
               <div className={f.field}>
-                <label className={f.label} htmlFor="fw-vpa">
+                <label className={f.label} htmlFor="fw-merchant">
                   Specific merchants
                 </label>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
-                    id="fw-vpa"
+                    id="fw-merchant"
                     className={`${f.input} ${f.mono}`}
                     value={merchantEntry}
                     list="fw-known-merchants"
@@ -423,7 +423,7 @@ export function MandateWizard({
                 </div>
               </div>
 
-              {perTxnPaise > totalPaise && (
+              {perTxnMinor > totalMinor && (
                 <div className={f.warn}>
                   ⚠️ The per-payment limit is above the whole budget, so it can never bind.
                 </div>
@@ -432,7 +432,7 @@ export function MandateWizard({
               <div className={f.note}>
                 <span>🧾</span>
                 <span>
-                  {inr(totalPaise)} total · at most {inr(perTxnPaise)} each · at most {countN}{" "}
+                  {inr(totalMinor)} total · at most {inr(perTxnMinor)} each · at most {countN}{" "}
                   payment{countN === 1 ? "" : "s"}
                 </span>
               </div>
@@ -529,7 +529,7 @@ export function MandateWizard({
                 </dd>
                 <dt>Budget</dt>
                 <dd style={{ textAlign: "left" }}>
-                  {inr(totalPaise)} total, {inr(perTxnPaise)} per payment
+                  {inr(totalMinor)} total, {inr(perTxnMinor)} per payment
                 </dd>
                 <dt>Payments</dt>
                 <dd style={{ textAlign: "left" }}>at most {countN}</dd>

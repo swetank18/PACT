@@ -6,7 +6,7 @@ surfaces the console renders, which framing copy loads. Never fork the repo per
 hackathon, and never carry event-specific logic into `core/`.
 
 This module also exists so that `core/` holds no vendor literal. The merchant's
-VPA happens to have `@razorpay` as its handle, and a default like that sitting
+payee happens to have `@razorpay` as its handle, and a default like that sitting
 in `core/app.py` is exactly the kind of quiet coupling `test_invariants.py`
 greps for.
 """
@@ -40,7 +40,7 @@ SIMULATED_RAILS = frozenset({"mock_upi"})
 class Profile:
     name: str
     rail: str
-    merchant_vpa: str
+    merchant_payee: str
     merchant_name: str
     surfaces: tuple[str, ...] = ()
     #: Which demo beats are bound to which keys, for the console.
@@ -73,7 +73,7 @@ def load(name: str | None = None) -> Profile:
     return Profile(
         name=profile_name or "(none)",
         rail=os.environ.get("PACT_RAIL") or data.get("rail", FALLBACK_RAIL),
-        merchant_vpa=os.environ.get("PACT_MERCHANT_VPA") or data.get("merchant_vpa", ""),
+        merchant_payee=os.environ.get("PACT_MERCHANT_PAYEE") or data.get("merchant_payee", ""),
         merchant_name=data.get("merchant_name", "DeskKit"),
         surfaces=tuple(data.get("surfaces", ())),
         beats=data.get("beats", {}) or {},

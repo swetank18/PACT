@@ -1,5 +1,5 @@
 """
-The quote engine. Deterministic, integer paise, server side.
+The quote engine. Deterministic, integer minor units, server side.
 
 The single most defensible thing in the merchant plane. Every price, tax and
 shipping figure is computed here. The model never does arithmetic that reaches a
@@ -20,7 +20,8 @@ import json
 from datetime import timedelta
 
 from contracts.ids import new_id
-from contracts.money import Paise, gst
+from contracts.legacy import upgrade_keys
+from contracts.money import MinorUnits, gst
 from contracts.schemas import (
     Headroom,
     HeadroomFit,
@@ -36,8 +37,8 @@ from merchant.catalog import BY_SKU
 #: 18% GST, in basis points so the whole calculation stays integer.
 GST_BPS = 1800
 QUOTE_TTL_SECONDS = 300
-FREE_SHIPPING_OVER_PAISE = 100_000
-SHIPPING_PAISE = 9_900
+FREE_SHIPPING_OVER_MINOR = 100_000
+SHIPPING_MINOR = 9_900
 
 
 class QuoteEngine:
@@ -45,7 +46,7 @@ class QuoteEngine:
         self.db = db
 
     @staticmethod
-    def price(items: list[QuoteItemRequest]) -> tuple[list[LineItem], Paise, Paise, Paise, Paise]:
+    def price(items: list[QuoteItemRequest]) -> tuple[list[LineItem], MinorUnits, MinorUnits, MinorUnits, MinorUnits]:
         """
         Pure pricing. Returns (lines, subtotal, tax, shipping, total).
 
@@ -66,17 +67,17 @@ class QuoteEngine:
                     sku=product.sku,
                     name=product.name,
                     qty=req.qty,
-                    unit_paise=product.price_paise,
-                    line_total_paise=product.price_paise * req.qty,
+                    unit_minor=product.price_minor,
+                    line_total_minor=product.price_minor * req.qty,
                     category=product.category,
                 )
             )
-        subtotal: Paise = sum(line.line_total_paise for line in lines)
-        tax: Paise = gst(subtotal, GST_BPS)
-        shipping: Paise = 0 if subtotal >= FREE_SHIPPING_OVER_PAISE else SHIPPING_PAISE
+        subtotal: MinorUnits = sum(line.line_total_minor for line in lines)
+        tax: MinorUnits = gst(subtotal, GST_BPS)
+        shipping: MinorUnits = 0 if subtotal >= FREE_SHIPPING_OVER_MINOR else SHIPPING_MINOR
         return lines, subtotal, tax, shipping, subtotal + tax + shipping
 
-    def total_with_addon(self, quote: Quote, addon_sku: str) -> Paise:
+    def total_with_addon(self, quote: Quote, addon_sku: str) -> MinorUnits:
         """The true total if this addon joins the quote. Never quote.total + price."""
         items = [QuoteItemRequest(sku=l.sku, qty=l.qty) for l in quote.items]
         items.append(QuoteItemRequest(sku=addon_sku, qty=1))
@@ -102,13 +103,13 @@ class QuoteEngine:
         if headroom is not None:
             fit = HeadroomFit(
                 fits=(
-                    total <= headroom.headroom_paise
-                    and total <= headroom.max_per_txn_paise
+                    total <= headroom.headroom_minor
+                    and total <= headroom.max_per_txn_minor
                     and headroom.payments_remaining > 0
                     and headroom.merchant_in_scope
                 ),
-                headroom_paise=headroom.headroom_paise,
-                headroom_after_paise=max(0, headroom.headroom_paise - total),
+                headroom_minor=headroom.headroom_minor,
+                headroom_after_minor=max(0, headroom.headroom_minor - total),
                 categories_ok=all(
                     line.category in headroom.categories_allowed for line in lines
                 ),
@@ -117,10 +118,10 @@ class QuoteEngine:
         quote = Quote(
             quote_id=new_id("qte"),
             items=lines,
-            subtotal_paise=subtotal,
-            tax_paise=tax,
-            shipping_paise=shipping,
-            total_paise=total,
+            subtotal_minor=subtotal,
+            tax_minor=tax,
+            shipping_minor=shipping,
+            total_minor=total,
             expires_at=expires,
             headroom_fit=fit,
         )
@@ -138,13 +139,13 @@ class QuoteEngine:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO quotes
-                    (quote_id, mandate_id, total_paise, body_json, expires_at, created_at)
+                    (quote_id, mandate_id, total_minor, body_json, expires_at, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     quote.quote_id,
                     mandate_id,
-                    quote.total_paise,
+                    quote.total_minor,
                     json.dumps(quote.model_dump(), separators=(",", ":")),
                     quote.expires_at,
                     now,
@@ -156,7 +157,7 @@ class QuoteEngine:
             row = conn.execute(
                 "SELECT body_json FROM quotes WHERE quote_id = ?", (quote_id,)
             ).fetchone()
-        return Quote.model_validate(json.loads(row["body_json"])) if row else None
+        return Quote.model_validate(upgrade_keys(json.loads(row["body_json"]))) if row else None
 
     def is_live(self, quote: Quote) -> bool:
         return parse_rfc3339(utcnow()) <= parse_rfc3339(quote.expires_at)

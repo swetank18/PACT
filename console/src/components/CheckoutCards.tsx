@@ -50,7 +50,7 @@ export function QuoteCard({ quote }: { quote: Quote }) {
                   {it.sku} · {it.category}
                 </span>
               </td>
-              <td className={s.lineAmt}>{inr(it.line_total_paise)}</td>
+              <td className={s.lineAmt}>{inr(it.line_total_minor)}</td>
             </tr>
           ))}
         </tbody>
@@ -59,19 +59,19 @@ export function QuoteCard({ quote }: { quote: Quote }) {
       <div className={s.totals}>
         <div className={s.totalRow}>
           <span>Subtotal</span>
-          <span className="num">{inr(quote.subtotal_paise)}</span>
+          <span className="num">{inr(quote.subtotal_minor)}</span>
         </div>
         <div className={s.totalRow}>
           <span>Tax</span>
-          <span className="num">{inr(quote.tax_paise)}</span>
+          <span className="num">{inr(quote.tax_minor)}</span>
         </div>
         <div className={s.totalRow}>
           <span>Shipping</span>
-          <span className="num">{inr(quote.shipping_paise)}</span>
+          <span className="num">{inr(quote.shipping_minor)}</span>
         </div>
         <div className={s.grand}>
           <span className={s.grandLabel}>Total</span>
-          <span className={s.grandValue}>{inr(quote.total_paise)}</span>
+          <span className={s.grandValue}>{inr(quote.total_minor)}</span>
         </div>
       </div>
 
@@ -120,7 +120,7 @@ export function UpsellCard({
             </div>
           </div>
           <div className={s.addonActions}>
-            <span className={s.addonPrice}>{inr(a.price_paise)}</span>
+            <span className={s.addonPrice}>{inr(a.price_minor)}</span>
             {accepted === a.sku ? (
               <Pill tone="allow">added</Pill>
             ) : (

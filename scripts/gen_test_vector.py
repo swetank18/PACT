@@ -53,12 +53,12 @@ def main() -> int:
     mandate = {
         "v": 1,
         "mandate_id": "mnd_01J8XQ4K7T",
-        "delegator": {"vpa": "swetank@okaxis", "pubkey": delegator_pub},
+        "delegator": {"account": "swetank@okaxis", "pubkey": delegator_pub},
         "delegate": {"agent_id": "buyer_agent_v1", "pubkey": delegate_pub},
         "intent": "restock office supplies for the month",
         "constraints": {
-            "max_per_txn_paise": 500000,
-            "max_total_paise": 1500000,
+            "max_per_txn_minor": 500000,
+            "max_total_minor": 1500000,
             "max_count": 5,
             "merchant_allowlist": ["deskkit@razorpay"],
             "category_allowlist": ["stationery", "office_furniture", "cables"],

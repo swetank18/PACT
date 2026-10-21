@@ -14,8 +14,8 @@
 
 /* ------------------------------------------------------------- money ------ */
 
-/** Money is integer paise. Never floats, never rupees in a payload. */
-export type Paise = number;
+/** Money is integer minor units. Never floats, never major units in a payload. */
+export type MinorUnits = number;
 
 /* -------------------------------------------------------- reason codes ---- */
 
@@ -91,8 +91,8 @@ export type Decision = {
   verdict: Verdict;
   reason_code: ReasonCode | string;
   reason_detail?: string;
-  payee_vpa: string;
-  amount_paise: Paise;
+  payee: string;
+  amount_minor: MinorUnits;
   quote_id?: string | null;
   order_id?: string | null;
   elapsed_ms: number;
@@ -119,8 +119,8 @@ export type Decision = {
  */
 export type Headroom = {
   mandate_id: string;
-  headroom_paise: Paise;
-  max_per_txn_paise: Paise;
+  headroom_minor: MinorUnits;
+  max_per_txn_minor: MinorUnits;
   payments_remaining: number;
   categories_allowed: string[];
   valid_until: string;
@@ -135,23 +135,23 @@ export type LineItem = {
   sku: string;
   name: string;
   qty: number;
-  unit_paise: Paise;
-  line_total_paise: Paise;
+  unit_minor: MinorUnits;
+  line_total_minor: MinorUnits;
   category: string;
 };
 
 export type Quote = {
   quote_id: string;
   items: LineItem[];
-  subtotal_paise: Paise;
-  tax_paise: Paise;
-  shipping_paise: Paise;
-  total_paise: Paise;
+  subtotal_minor: MinorUnits;
+  tax_minor: MinorUnits;
+  shipping_minor: MinorUnits;
+  total_minor: MinorUnits;
   expires_at: string;
   headroom_fit?: {
     fits: boolean;
-    headroom_paise: Paise;
-    headroom_after_paise: Paise;
+    headroom_minor: MinorUnits;
+    headroom_after_minor: MinorUnits;
     categories_ok: boolean;
   } | null;
 };
@@ -160,7 +160,7 @@ export type Addon = {
   sku: string;
   name: string;
   category: string;
-  price_paise: Paise;
+  price_minor: MinorUnits;
   reason?: string;
 };
 
@@ -191,7 +191,7 @@ export type Order = {
   state: string;
   /** Which settlement rail moved the money. The console only displays it. */
   rail: string;
-  amount_paise: Paise;
+  amount_minor: MinorUnits;
   items_summary: string;
   rail_order_id?: string | null;
   rail_payment_id?: string | null;
@@ -209,14 +209,14 @@ export type Order = {
 /* ------------------------------------------------------------- stats ------ */
 
 export type MerchantStats = {
-  gmv_paise: Paise;
+  gmv_minor: MinorUnits;
   orders: number;
-  avg_order_value_paise: Paise;
+  avg_order_value_minor: MinorUnits;
   upsell_offers_made: number;
   upsell_offers_accepted: number;
   upsell_offers_filtered_by_headroom: number;
   upsell_attach_rate: number;
-  recovered_paise: Paise;
+  recovered_minor: MinorUnits;
   recovered_orders: number;
   needs_attention: number;
 };
@@ -224,8 +224,8 @@ export type MerchantStats = {
 /* ------------------------------------------------------------ mandate ----- */
 
 export type MandateConstraints = {
-  max_per_txn_paise: Paise;
-  max_total_paise: Paise;
+  max_per_txn_minor: MinorUnits;
+  max_total_minor: MinorUnits;
   max_count: number;
   merchant_allowlist: string[];
   category_allowlist: string[];
@@ -236,7 +236,7 @@ export type MandateConstraints = {
 export type Mandate = {
   v: 1;
   mandate_id: string;
-  delegator: { vpa: string; pubkey: string };
+  delegator: { account: string; pubkey: string };
   delegate: { agent_id: string; pubkey: string };
   intent: string;
   constraints: MandateConstraints;
@@ -248,7 +248,7 @@ export type Mandate = {
 
 export type AgentCommerceManifest = {
   merchant: string;
-  merchant_vpa: string;
+  merchant_payee: string;
   mcp_endpoint: string;
   categories: string[];
   currency: string;

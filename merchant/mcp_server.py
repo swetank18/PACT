@@ -31,7 +31,7 @@ mcp = MCPServer(name="deskkit-agent-commerce")
 
 @mcp.tool()
 def search_catalog(
-    query: str, category: str | None = None, max_price_paise: int | None = None
+    query: str, category: str | None = None, max_price_minor: int | None = None
 ) -> dict[str, Any]:
     """Find products. Returns a structured list, never prose."""
     from merchant.catalog import search
@@ -42,11 +42,11 @@ def search_catalog(
                 "sku": p.sku,
                 "name": p.name,
                 "category": p.category,
-                "price_paise": p.price_paise,
+                "price_minor": p.price_minor,
                 "in_stock": service.inventory.level(p.sku),
                 "description": p.description,
             }
-            for p in search(query, category, max_price_paise)
+            for p in search(query, category, max_price_minor)
         ]
     }
 
@@ -63,7 +63,7 @@ def get_product(sku: str) -> dict[str, Any]:
         "sku": p.sku,
         "name": p.name,
         "category": p.category,
-        "price_paise": p.price_paise,
+        "price_minor": p.price_minor,
         "in_stock": service.inventory.level(p.sku),
         "description": p.description,
         "tags": list(p.tags),
@@ -74,7 +74,7 @@ def get_product(sku: str) -> dict[str, Any]:
 def quote(items: list[dict[str, Any]], mandate_id: str | None = None) -> dict[str, Any]:
     """
     Deterministic. Prices, tax and shipping are computed server side in integer
-    paise.
+    minor units.
 
     The agent quotes what this returns and nothing else. Any payment whose
     amount does not equal this total is refused by the gate with
@@ -144,7 +144,7 @@ def create_order(quote_id: str, decision_id: str, settlement_token: str) -> dict
     if q is None:
         return {"ok": False, "reason_code": "QUOTE_EXPIRED"}
 
-    ok, code, resolved = service.gate.redeem(settlement_token, q.total_paise)
+    ok, code, resolved = service.gate.redeem(settlement_token, q.total_minor)
     if not ok or resolved is None:
         return {"ok": False, "reason_code": code}
 

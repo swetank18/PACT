@@ -123,7 +123,7 @@ export function Console() {
                 <div className={s.auditHead}>
                   <div className={s.auditOrder}>{selectedOrder.order_id}</div>
                   <div className={s.auditMeta}>
-                    <span className={s.auditAmount}>{inr(selectedOrder.amount_paise)}</span>
+                    <span className={s.auditAmount}>{inr(selectedOrder.amount_minor)}</span>
                     <span>{selectedOrder.items_summary}</span>
                     <span className="mono">{clock(selectedOrder.at)}</span>
                   </div>

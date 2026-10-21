@@ -101,7 +101,7 @@ its protection is that a second capture 400s because the payment is no longer
 Two consequences for our implementation:
 
 1. `receipt` is at most 40 ASCII chars, so the full
-   `sha256(order_ref | amount_paise | attempt)` will not fit. We send a
+   `sha256(order_ref | amount_minor | attempt)` will not fit. We send a
    **truncated hex prefix** as `receipt` and keep the full key ourselves.
 2. Because coverage is partial and error-shaped rather than a clean replay of
    the original response, **we keep our own idempotency table** mapping key to

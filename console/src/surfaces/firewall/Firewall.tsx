@@ -74,7 +74,7 @@ function Shell({ onExit }: { onExit: () => void }) {
   );
 
   const unspent = liveMandates.reduce(
-    (n, m) => n + (headroom[m.mandate.mandate_id]?.headroom_paise ?? 0),
+    (n, m) => n + (headroom[m.mandate.mandate_id]?.headroom_minor ?? 0),
     0,
   );
 
@@ -200,7 +200,7 @@ function Shell({ onExit }: { onExit: () => void }) {
           </span>
           <span className={f.whoText}>
             <span className={f.whoName}>{prefs.display_name}</span>
-            <span className={f.whoSub}>{prefs.vpa}</span>
+            <span className={f.whoSub}>{prefs.account}</span>
           </span>
         </button>
 

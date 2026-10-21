@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS reservations (
   reservation_id TEXT PRIMARY KEY,
   mandate_id     TEXT NOT NULL,
   decision_id    TEXT NOT NULL,
-  amount_paise   INTEGER NOT NULL,
+  amount_minor   INTEGER NOT NULL,
   state          TEXT NOT NULL CHECK (state IN ('RESERVED','COMMITTED','RELEASED')),
   created_at     TEXT NOT NULL,
   expires_at     TEXT NOT NULL,
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS settlement_tokens (
   decision_id TEXT NOT NULL,
   mandate_id  TEXT NOT NULL,
   quote_id    TEXT NOT NULL,
-  amount_paise INTEGER NOT NULL,
+  amount_minor INTEGER NOT NULL,
   used_at     TEXT,
   expires_at  TEXT NOT NULL,
   created_at  TEXT NOT NULL
@@ -84,8 +84,8 @@ CREATE TABLE IF NOT EXISTS decisions (
   mandate_id  TEXT NOT NULL,
   verdict     TEXT NOT NULL,
   reason_code TEXT NOT NULL,
-  amount_paise INTEGER NOT NULL,
-  payee_vpa   TEXT NOT NULL,
+  amount_minor INTEGER NOT NULL,
+  payee   TEXT NOT NULL,
   quote_id    TEXT,
   elapsed_ms  REAL NOT NULL,
   body_json   TEXT NOT NULL,
@@ -96,7 +96,7 @@ CREATE INDEX IF NOT EXISTS ix_decisions_at ON decisions(at DESC);
 CREATE TABLE IF NOT EXISTS quotes (
   quote_id   TEXT PRIMARY KEY,
   mandate_id TEXT,
-  total_paise INTEGER NOT NULL,
+  total_minor INTEGER NOT NULL,
   body_json  TEXT NOT NULL,
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS orders (
   mandate_id     TEXT NOT NULL,
   decision_id    TEXT,
   state          TEXT NOT NULL,
-  amount_paise   INTEGER NOT NULL,
+  amount_minor   INTEGER NOT NULL,
   items_summary  TEXT NOT NULL,
   rail           TEXT NOT NULL,
   rail_order_id  TEXT,
@@ -170,6 +170,23 @@ CREATE TABLE IF NOT EXISTS counters (
 #: every boot, guarded by PRAGMA table_info. Additive and nullable only.
 ADD_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("saga_steps", "reason_code", "TEXT"),
+)
+
+#: Columns renamed after a table shipped, as (table, old, new).
+#:
+#: The contract renamed `*_paise` to `*_minor` and `payee_vpa` to `payee` on
+#: 2026-10-21, when the project took a dollar rail. A database written before
+#: that has the old names, and code querying the new ones would fail on every
+#: read of a table that already holds orders. A rename keeps every row and
+#: every value, so it is in the same class as an added column: safe to apply
+#: on every boot, guarded, idempotent.
+RENAME_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("reservations", "amount_paise", "amount_minor"),
+    ("settlement_tokens", "amount_paise", "amount_minor"),
+    ("decisions", "amount_paise", "amount_minor"),
+    ("decisions", "payee_vpa", "payee"),
+    ("quotes", "total_paise", "total_minor"),
+    ("orders", "amount_paise", "amount_minor"),
 )
 
 #: Wiped by POST /v1/admin/reset, in dependency order.
@@ -266,11 +283,18 @@ class Database:
         column the old file does not have, and every saga step would fail on an
         instance that had already taken a real order.
 
-        Additive only, and idempotent. Anything that needs to drop or retype a
-        column needs a real migration tool, and saying so here is cheaper than
-        discovering it later.
+        Additive and renaming only, and idempotent. Anything that needs to drop
+        or retype a column needs a real migration tool, and saying so here is
+        cheaper than discovering it later.
         """
         self.conn.executescript(SCHEMA)
+        for table, old, new in RENAME_COLUMNS:
+            existing = {
+                r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")
+            }
+            if old in existing and new not in existing:
+                self.conn.execute(f"ALTER TABLE {table} RENAME COLUMN {old} TO {new}")
+                log.info("migrated: %s.%s renamed to %s", table, old, new)
         for table, column, decl in ADD_COLUMNS:
             existing = {
                 r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")

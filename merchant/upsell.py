@@ -109,8 +109,8 @@ class UpsellEngine:
             approvable = (
                 headroom.merchant_in_scope
                 and product.category in headroom.categories_allowed
-                and combined_total <= headroom.headroom_paise
-                and combined_total <= headroom.max_per_txn_paise
+                and combined_total <= headroom.headroom_minor
+                and combined_total <= headroom.max_per_txn_minor
                 and headroom.payments_remaining > 0
                 and self.inventory.level(sku) > 0
             )
@@ -123,7 +123,7 @@ class UpsellEngine:
                     sku=product.sku,
                     name=product.name,
                     category=product.category,
-                    price_paise=product.price_paise,
+                    price_minor=product.price_minor,
                     reason=ADDON_REASON.get(product.sku),
                 )
             )
@@ -152,7 +152,7 @@ class UpsellEngine:
                 sku=BY_SKU[sku].sku,
                 name=BY_SKU[sku].name,
                 category=BY_SKU[sku].category,
-                price_paise=BY_SKU[sku].price_paise,
+                price_minor=BY_SKU[sku].price_minor,
                 reason=ADDON_REASON.get(sku),
             )
             for sku in self._candidates(quote)

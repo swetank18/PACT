@@ -87,7 +87,7 @@ export function OrderFeed({
                     <span className={s.caret}>{open ? "▾" : "▸"}</span>
                   </td>
                   <td className={s.at}>{clock(o.at)}</td>
-                  <td className={s.vpa}>
+                  <td className={s.payee}>
                     {shortId(o.order_id, 6)}
                     {o.recovered_from && <span className={s.recovered}> recovered</span>}
                   </td>
@@ -103,7 +103,7 @@ export function OrderFeed({
                       </>
                     )}
                   </td>
-                  <td className={s.amount}>{inr(o.amount_paise)}</td>
+                  <td className={s.amount}>{inr(o.amount_minor)}</td>
                 </tr>
                 {open && (
                   <tr>

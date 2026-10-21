@@ -36,7 +36,7 @@ def _escape(s: str) -> str:
 
 
 def _number(n) -> str:
-    """ECMAScript Number::toString. Money is integer paise, so the integer path
+    """ECMAScript Number::toString. Money is integer minor units, so the integer path
     is the one that carries load; the float path is here so the function is
     honest rather than because we intend to use it."""
     if isinstance(n, bool):

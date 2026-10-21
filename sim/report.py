@@ -120,24 +120,24 @@ def write_results(
         for m in runs:
             total.sessions += m.sessions
             total.completed += m.completed
-            total.gmv_paise += m.gmv_paise
+            total.gmv_minor += m.gmv_minor
             total.upsell_offers_made += m.upsell_offers_made
             total.upsell_offers_accepted += m.upsell_offers_accepted
             total.upsell_rejected_by_gate += m.upsell_rejected_by_gate
             total.false_blocks += m.false_blocks
             total.step_ups += m.step_ups
             total.step_ups_recovered += m.step_ups_recovered
-            total.loss_paise += m.loss_paise
+            total.loss_minor += m.loss_minor
             total.saga_recoveries += m.saga_recoveries
-        total.avg_order_value_paise = (
-            round(total.gmv_paise / total.completed) if total.completed else 0
+        total.avg_order_value_minor = (
+            round(total.gmv_minor / total.completed) if total.completed else 0
         )
         label = ARMS[arm]["label"]
         if ARMS[arm].get("human_only"):
             label += " *(modelled, not simulated)*"
         a(
             f"| **{arm}** | {label} | {rupees(round(gmv_mean))} | "
-            f"{_pct(total.completion_rate)} | {rupees(total.avg_order_value_paise)} | "
+            f"{_pct(total.completion_rate)} | {rupees(total.avg_order_value_minor)} | "
             f"{_pct(total.attach_rate)} | {_pct(total.upsell_rejection_rate)} | "
             f"{_pct(total.false_block_rate)} | {_pct(total.step_up_recovery_rate)} | "
             f"{rupees(round(loss_mean))} | {rupees(round(net_mean))} |"
@@ -289,7 +289,7 @@ def write_results(
 
     a("## Cross-check against the services\n")
     if check.agrees:
-        a(f"The harness and the merchant agree: GMV {rupees(check.engine_gmv_paise)}.\n")
+        a(f"The harness and the merchant agree: GMV {rupees(check.engine_gmv_minor)}.\n")
     else:
         a("**The harness and the services disagree. The services are right.**\n")
         for d in check.discrepancies:

@@ -227,7 +227,7 @@ def test_the_order_authorises_against_the_vaulted_wallet(api, adapter):
     assert headers["prefer"] == "return=representation"
 
     assert intent.status == "authorized"
-    assert intent.amount_paise == AMOUNT
+    assert intent.amount_minor == AMOUNT
     assert intent.raw["payment_id"] in api.authorizations
 
 
@@ -454,7 +454,7 @@ def test_status_reports_captured_only_for_a_completed_capture(api, captured, ada
     status = adapter.status(intent.intent_id)
     assert status.status == "captured"
     assert status.payment_id == capture.ref
-    assert status.amount_paise == AMOUNT
+    assert status.amount_minor == AMOUNT
 
 
 def test_status_counts_what_was_refunded(api, captured, adapter):
@@ -462,7 +462,7 @@ def test_status_counts_what_was_refunded(api, captured, adapter):
     adapter.refund(capture.ref, 10_000, "k_r")
     status = adapter.status(intent.intent_id)
     assert status.status == "partially_refunded"
-    assert status.amount_refunded_paise == 10_000
+    assert status.amount_refunded_minor == 10_000
 
 
 def test_an_authorised_order_is_not_reported_as_captured(api, adapter):
@@ -593,13 +593,13 @@ def test_the_saga_reaches_fulfilled_on_paypal(api, bought, merchant):
     assert order.rail == "paypal"
     assert order.rail_order_id in api.orders
     assert order.rail_payment_id in api.captures
-    assert api.captures[order.rail_payment_id]["amount"]["value"] == to_value(q.total_paise, "USD")
+    assert api.captures[order.rail_payment_id]["amount"]["value"] == to_value(q.total_minor, "USD")
 
 
 def test_a_stockout_on_paypal_refunds_and_returns_the_budget(api, bought, merchant, gate):
     mandate, q, decision = bought
     merchant.inventory.force_stockout("FUR-LMP-01")
-    before = gate.ledger.headroom_paise(mandate.mandate_id, mandate.constraints)
+    before = gate.ledger.headroom_minor(mandate.mandate_id, mandate.constraints)
 
     result = merchant.saga.run(quote=q, mandate_id=mandate.mandate_id,
                                decision_id=decision.decision_id)
@@ -607,7 +607,7 @@ def test_a_stockout_on_paypal_refunds_and_returns_the_budget(api, bought, mercha
     states = [s["state"] for s in merchant.audit.list_steps(result.order_id)]
     assert states.index("PAYMENT_CAPTURED") < states.index("REFUND_ISSUED") \
         < states.index("BUDGET_RELEASED")
-    assert gate.ledger.headroom_paise(mandate.mandate_id, mandate.constraints) \
-        == before + q.total_paise
+    assert gate.ledger.headroom_minor(mandate.mandate_id, mandate.constraints) \
+        == before + q.total_minor
     (refund,) = api.refunds.values()
-    assert refund["amount"]["value"] == to_value(q.total_paise, "USD")
+    assert refund["amount"]["value"] == to_value(q.total_minor, "USD")

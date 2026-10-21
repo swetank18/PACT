@@ -17,6 +17,7 @@ import json
 from dataclasses import dataclass
 
 from contracts.crypto import verify
+from contracts.legacy import upgrade_keys
 from contracts.reason_codes import ReasonCode
 from contracts.schemas import Mandate, utcnow
 from core.db import Database
@@ -91,7 +92,7 @@ class MandateStore:
         if row is None:
             return None
         return StoredMandate(
-            mandate=Mandate.model_validate(json.loads(row["body_json"])),
+            mandate=Mandate.model_validate(upgrade_keys(json.loads(row["body_json"]))),
             signature_ok=bool(row["signature_ok"]),
             revoked=bool(row["revoked"]),
         )

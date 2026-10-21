@@ -19,7 +19,7 @@ import logging
 from typing import Any
 
 from contracts.ids import new_id
-from contracts.money import Paise
+from contracts.money import MinorUnits
 from buyer.agent import BuyerAgent, Mandate, SessionResult
 from sim import hostile
 
@@ -58,10 +58,10 @@ def run_session(
     result = SessionResult(
         sim_id=new_id("sim"), persona=persona["id"], arm=arm, seed=agent.seed
     )
-    merchant_vpa = manifest["merchant_vpa"]
+    merchant_payee = manifest["merchant_payee"]
 
     try:
-        mandate = agent.issue_mandate(persona, merchant_vpa)
+        mandate = agent.issue_mandate(persona, merchant_payee)
         result.say(f"mandate {mandate.id} signed on device")
 
         # 1. Browse toward the goal.
@@ -78,7 +78,7 @@ def run_session(
                 return result
             items = [{"sku": p["sku"], "qty": 1} for p in wanted]
         quote = agent.quote(items, mandate.id)
-        result.say(f"quote {quote['quote_id']} for {quote['total_paise']} paise")
+        result.say(f"quote {quote['quote_id']} for {quote['total_minor']} paise")
 
         # 2. The upsell. This is where the arms separate on revenue.
         quote, addon_taken = _consider_addons(agent, mandate, quote, persona, result)
@@ -88,7 +88,7 @@ def run_session(
             agent,
             mandate,
             quote,
-            merchant_vpa,
+            merchant_payee,
             persona,
             result,
             carrying_addon=addon_taken,
@@ -113,21 +113,21 @@ def run_session(
 
         if final["state"] == "FULFILLED":
             result.completed = True
-            result.gmv_paise += final["amount_paise"]
-            result.loss_paise += _unauthorised(final["amount_paise"], mandate)
+            result.gmv_minor += final["amount_minor"]
+            result.loss_minor += _unauthorised(final["amount_minor"], mandate)
             if addon_taken:
                 result.upsell_accepted += 1
-            result.say(f"fulfilled, {final['amount_paise']} paise")
+            result.say(f"fulfilled, {final['amount_minor']} paise")
 
         elif final["state"] in ("ROLLED_BACK", "ALTERNATIVE_OFFERED"):
-            result.refunded_paise += final["amount_paise"]
+            result.refunded_minor += final["amount_minor"]
             # 5. The rollback recovery. Evaluate the offered alternative rather
             #    than treating a refund as the end of the session.
-            recovered = _try_recovery(agent, mandate, final, merchant_vpa, result)
+            recovered = _try_recovery(agent, mandate, final, merchant_payee, result)
             if recovered:
                 result.completed = True
                 result.saga_recoveries += 1
-                result.gmv_paise += recovered
+                result.gmv_minor += recovered
                 result.say(f"recovered, {recovered} paise")
 
         elif final["state"] == "NEEDS_ATTENTION":
@@ -141,7 +141,7 @@ def run_session(
         # attacks cost.
         if hostile_rate and hostile.should_be_hostile(agent.rng, hostile_rate):
             result.hostile = True
-            hostile.attempt(agent, mandate, merchant_vpa, result)
+            hostile.attempt(agent, mandate, merchant_payee, result)
 
     except Exception as exc:  # noqa: BLE001
         result.error = f"{type(exc).__name__}: {exc}"
@@ -150,7 +150,7 @@ def run_session(
     return result
 
 
-def _unauthorised(amount: Paise, mandate: Mandate) -> Paise:
+def _unauthorised(amount: MinorUnits, mandate: Mandate) -> MinorUnits:
     """
     Money that settled outside what the human actually authorised.
 
@@ -163,7 +163,7 @@ def _unauthorised(amount: Paise, mandate: Mandate) -> Paise:
     Defined here rather than per-arm on purpose. A loss metric that only exists
     in the arm you want to look bad is not a measurement.
     """
-    cap = mandate.constraints["max_per_txn_paise"]
+    cap = mandate.constraints["max_per_txn_minor"]
     return max(0, amount - cap)
 
 
@@ -232,7 +232,7 @@ def _authorize_with_repair(
     agent: BuyerAgent,
     mandate: Mandate,
     quote: dict[str, Any],
-    merchant_vpa: str,
+    merchant_payee: str,
     persona: dict[str, Any],
     result: SessionResult,
     *,
@@ -249,16 +249,16 @@ def _authorize_with_repair(
     legitimate sales, and exactly why arm C leaves money on the table.
     """
     if agent.gate_mode == "naive":
-        cap = mandate.constraints["max_per_txn_paise"]
-        if quote["total_paise"] > cap:
+        cap = mandate.constraints["max_per_txn_minor"]
+        if quote["total_minor"] > cap:
             # A hard cap with no way to ask. The sale is simply lost, and if the
             # purchase was legitimate that is a false block.
             result.false_blocks += 1
-            result.say(f"naive cap refused {quote['total_paise']} over {cap}; session ends")
+            result.say(f"naive cap refused {quote['total_minor']} over {cap}; session ends")
             return {"verdict": "BLOCK", "reason_code": "CEILING_PER_TXN", "_quote": quote}
 
     for attempt in range(MAX_REPAIRS + 1):
-        decision = agent.authorize(mandate, quote, merchant_vpa)
+        decision = agent.authorize(mandate, quote, merchant_payee)
         decision["_quote"] = quote
         result.decisions.append(decision)
 
@@ -333,7 +333,7 @@ def _repair(
         # Drop the most expensive line. Crude, and it is the right kind of crude:
         # the claim is that a structured refusal is actionable, not that we have
         # a clever basket optimiser.
-        items.sort(key=lambda i: i["_line"]["line_total_paise"], reverse=True)
+        items.sort(key=lambda i: i["_line"]["line_total_minor"], reverse=True)
         dropped = items.pop(0)
         result.say(f"repairing after {code}: dropped {dropped['sku']}")
 
@@ -379,7 +379,7 @@ def _await_terminal(agent: BuyerAgent, order_id: str, result: SessionResult) -> 
     """
     import time
 
-    last: dict = {"state": "UNKNOWN", "amount_paise": 0, "order_id": order_id}
+    last: dict = {"state": "UNKNOWN", "amount_minor": 0, "order_id": order_id}
     for _ in range(SAGA_POLL_ATTEMPTS):
         r = agent.http.get(f"{agent.merchant_url}/v1/orders", params={"limit": 50})
         for o in r.json().get("orders", []):
@@ -395,9 +395,9 @@ def _try_recovery(
     agent: BuyerAgent,
     mandate: Mandate,
     rolled_back: dict[str, Any],
-    merchant_vpa: str,
+    merchant_payee: str,
     result: SessionResult,
-) -> Paise:
+) -> MinorUnits:
     """
     The merchant offered something else. Decide, and if yes, buy it properly.
 
@@ -410,7 +410,7 @@ def _try_recovery(
         return 0
 
     replacement = offer["quote"]
-    decision = agent.authorize(mandate, replacement, merchant_vpa)
+    decision = agent.authorize(mandate, replacement, merchant_payee)
     if decision["verdict"] != "ALLOW":
         result.say(f"the alternative was refused: {decision['reason_code']}")
         return 0
@@ -421,4 +421,4 @@ def _try_recovery(
         return 0
     final = _await_terminal(agent, order["order_id"], result)
     result.order_ids.append(order["order_id"])
-    return final["amount_paise"] if final["state"] in ("FULFILLED", "RECOVERED") else 0
+    return final["amount_minor"] if final["state"] in ("FULFILLED", "RECOVERED") else 0

@@ -52,21 +52,21 @@ MARKETING_COPY = [
 ]
 
 
-def _mandate_for(agent: BuyerAgent, vpa: str, **overrides: Any) -> Mandate:
+def _mandate_for(agent: BuyerAgent, payee: str, **overrides: Any) -> Mandate:
     persona = {
         "goal": overrides.pop("goal", "restock office supplies for the month"),
         "mandate": {
-            "max_total_paise": 1_500_000,
-            "max_per_txn_paise": 500_000,
+            "max_total_minor": 1_500_000,
+            "max_per_txn_minor": 500_000,
             "max_count": 5,
             "categories": ["stationery", "cables", "office_furniture"],
             **overrides,
         },
     }
-    return agent.issue_mandate(persona, vpa)
+    return agent.issue_mandate(persona, payee)
 
 
-def run_all(agent: BuyerAgent, vpa: str, *, count: int = 60) -> list[BenignResult]:
+def run_all(agent: BuyerAgent, payee: str, *, count: int = 60) -> list[BenignResult]:
     out: list[BenignResult] = []
 
     # 1. Ordinary purchases across the catalog. The bulk of the set.
@@ -77,10 +77,10 @@ def run_all(agent: BuyerAgent, vpa: str, *, count: int = 60) -> list[BenignResul
     ordinary = max(0, count - EDGE_CASE_COUNT)
     skus = ["STA-NB-A5", "STA-PEN-12", "STA-STK-01", "CBL-USBC-2M", "CBL-HDMI-2M", "FUR-MAT-DSK"]
     for i in range(ordinary):
-        mandate = _mandate_for(agent, vpa)
+        mandate = _mandate_for(agent, payee)
         sku = skus[i % len(skus)]
         q = agent.quote([{"sku": sku, "qty": 1}], mandate.id)
-        d = agent.authorize(mandate, q, vpa)
+        d = agent.authorize(mandate, q, payee)
         out.append(
             BenignResult(
                 name=f"ordinary purchase / {sku}",
@@ -92,23 +92,23 @@ def run_all(agent: BuyerAgent, vpa: str, *, count: int = 60) -> list[BenignResul
 
     # 2. Exactly at the per-transaction cap. Off by one here refuses a real sale.
     q_probe = agent.quote([{"sku": "STA-NB-A5", "qty": 1}], None)
-    mandate = _mandate_for(agent, vpa, max_per_txn_paise=q_probe["total_paise"])
+    mandate = _mandate_for(agent, payee, max_per_txn_minor=q_probe["total_minor"])
     q = agent.quote([{"sku": "STA-NB-A5", "qty": 1}], mandate.id)
-    d = agent.authorize(mandate, q, vpa)
+    d = agent.authorize(mandate, q, payee)
     out.append(
         BenignResult(
             name="amount exactly at the per-transaction cap",
             verdict=d["verdict"],
             reason_code=d["reason_code"],
             passed=d["verdict"] == "ALLOW",
-            detail=f"{q['total_paise']} against a cap of {q['total_paise']}",
+            detail=f"{q['total_minor']} against a cap of {q['total_minor']}",
         )
     )
 
     # 3. Exactly at the total budget.
-    mandate = _mandate_for(agent, vpa, max_total_paise=q_probe["total_paise"])
+    mandate = _mandate_for(agent, payee, max_total_minor=q_probe["total_minor"])
     q = agent.quote([{"sku": "STA-NB-A5", "qty": 1}], mandate.id)
-    d = agent.authorize(mandate, q, vpa)
+    d = agent.authorize(mandate, q, payee)
     out.append(
         BenignResult(
             name="amount exactly at the total budget",
@@ -120,9 +120,9 @@ def run_all(agent: BuyerAgent, vpa: str, *, count: int = 60) -> list[BenignResul
 
     # 4. Marketing copy that trips a naive keyword scan.
     for copy in MARKETING_COPY:
-        mandate = _mandate_for(agent, vpa)
+        mandate = _mandate_for(agent, payee)
         q = agent.quote([{"sku": "CBL-USBC-2M", "qty": 1}], mandate.id)
-        d = agent.authorize(mandate, q, vpa, excerpt=copy)
+        d = agent.authorize(mandate, q, payee, excerpt=copy)
         out.append(
             BenignResult(
                 name=f"marketing copy / {copy[:36]}…",
@@ -139,9 +139,9 @@ def run_all(agent: BuyerAgent, vpa: str, *, count: int = 60) -> list[BenignResul
         "sort out the supply cupboard",
         "we are out of everything again",
     ):
-        mandate = _mandate_for(agent, vpa, goal=goal)
+        mandate = _mandate_for(agent, payee, goal=goal)
         q = agent.quote([{"sku": "STA-PEN-12", "qty": 1}], mandate.id)
-        d = agent.authorize(mandate, q, vpa)
+        d = agent.authorize(mandate, q, payee)
         out.append(
             BenignResult(
                 name=f"loosely phrased goal / {goal}",
@@ -157,15 +157,15 @@ def run_all(agent: BuyerAgent, vpa: str, *, count: int = 60) -> list[BenignResul
     body = {
         "v": 1,
         "mandate_id": new_id("mnd"),
-        "delegator": {"vpa": "edge@okaxis", "pubkey": pub},
+        "delegator": {"account": "edge@okaxis", "pubkey": pub},
         "delegate": {"agent_id": "buyer_agent_v1", "pubkey": pub},
         "intent": "restock before the window closes",
         "issued_at": iso(now),
         "constraints": {
-            "max_per_txn_paise": 500_000,
-            "max_total_paise": 1_500_000,
+            "max_per_txn_minor": 500_000,
+            "max_total_minor": 1_500_000,
             "max_count": 5,
-            "merchant_allowlist": [vpa],
+            "merchant_allowlist": [payee],
             "category_allowlist": ["stationery"],
             "valid_from": iso(now - timedelta(hours=1)),
             # Two seconds of runway: inside the window, but only just.
@@ -176,7 +176,7 @@ def run_all(agent: BuyerAgent, vpa: str, *, count: int = 60) -> list[BenignResul
     agent.http.post(f"{agent.gate_url}/v1/mandates", json=body)
     edge = Mandate(body=body, private_key=priv)
     q = agent.quote([{"sku": "STA-NB-A5", "qty": 1}], edge.id)
-    d = agent.authorize(edge, q, vpa)
+    d = agent.authorize(edge, q, payee)
     out.append(
         BenignResult(
             name="last seconds of the validity window",

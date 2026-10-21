@@ -118,7 +118,7 @@ export function Checkout({
     say({
       role: "agent",
       text: `I have your mandate. ${inr(
-        grant.mandate.constraints.max_total_paise,
+        grant.mandate.constraints.max_total_minor,
       )} across ${grant.mandate.constraints.max_count} purchases, ${grant.mandate.constraints.category_allowlist.join(
         ", ",
       )}. What do you need?`,
@@ -142,7 +142,7 @@ export function Checkout({
       const manifest = await merchant.manifest();
       replace(working, {
         role: "agent",
-        text: `Found ${manifest.merchant} at ${manifest.merchant_vpa}. Browsing the catalog over MCP`,
+        text: `Found ${manifest.merchant} at ${manifest.merchant_payee}. Browsing the catalog over MCP`,
         working: true,
       });
 
@@ -159,7 +159,7 @@ export function Checkout({
       replace(working, {
         role: "agent",
         text: `${q.items.length} item${q.items.length === 1 ? "" : "s"}, ${inr(
-          q.total_paise,
+          q.total_minor,
         )} all in. The merchant priced this, not me.`,
       });
       say({ role: "card", card: { kind: "quote", quote: q } });
@@ -221,8 +221,8 @@ export function Checkout({
       const unsigned: AuthorizeRequest = {
         mandate_id: grant.mandate.mandate_id,
         quote_id: finalQuote.quote_id,
-        amount_paise: finalQuote.total_paise,
-        payee_vpa: grant.mandate.constraints.merchant_allowlist[0],
+        amount_minor: finalQuote.total_minor,
+        payee: grant.mandate.constraints.merchant_allowlist[0],
         nonce: newId("dec"),
         issued_at: nowRfc3339(),
         context: {
@@ -313,7 +313,7 @@ export function Checkout({
       say({
         role: "agent",
         text: `That order was refunded — the item went out of stock after the payment cleared. Your ${inr(
-          order.amount_paise,
+          order.amount_minor,
         )} is already back in your budget. The merchant has something in stock that fits.`,
       });
       say({
@@ -371,9 +371,9 @@ export function Checkout({
         <div className={s.headroomInner}>
           <HeadroomBar
             headroom={headroom}
-            totalBudgetPaise={grant.totalBudgetPaise}
-            purchasePaise={quote?.total_paise ?? 0}
-            addonPaise={pendingAddon?.price_paise ?? 0}
+            totalBudgetMinor={grant.totalBudgetMinor}
+            purchaseMinor={quote?.total_minor ?? 0}
+            addonMinor={pendingAddon?.price_minor ?? 0}
           />
         </div>
       </div>
@@ -428,7 +428,7 @@ export function Checkout({
                 {c.kind === "gate" && <GateResult decision={c.decision} />}
                 {c.kind === "order" && (
                   <div className={s.orderDone}>
-                    <div className={s.orderTitle}>Paid {inr(c.order.amount_paise)}</div>
+                    <div className={s.orderTitle}>Paid {inr(c.order.amount_minor)}</div>
                     <div className={s.orderMeta}>
                       <span>{c.order.order_id}</span>
                       {c.order.rail_payment_id && <span>{c.order.rail_payment_id}</span>}

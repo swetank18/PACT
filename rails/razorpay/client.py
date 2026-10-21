@@ -30,7 +30,7 @@ from typing import Any
 
 import httpx
 
-from contracts.money import Paise
+from contracts.money import MinorUnits
 from contracts.schemas import utcnow
 from core.db import Database
 
@@ -74,10 +74,10 @@ def credentials_from_env() -> Credentials:
     )
 
 
-def idempotency_key(order_ref: str, amount_paise: Paise, attempt: int) -> str:
-    """`sha256(order_ref | amount_paise | attempt)`, per the shared contract."""
+def idempotency_key(order_ref: str, amount_minor: MinorUnits, attempt: int) -> str:
+    """`sha256(order_ref | amount_minor | attempt)`, per the shared contract."""
     return hashlib.sha256(
-        f"{order_ref}|{amount_paise}|{attempt}".encode()
+        f"{order_ref}|{amount_minor}|{attempt}".encode()
     ).hexdigest()
 
 
@@ -189,7 +189,7 @@ class RazorpayClient:
     # ------------------------------------------------------------- orders ----
 
     def create_order(
-        self, amount_paise: Paise, receipt: str, notes: dict, idem_key: str
+        self, amount_minor: MinorUnits, receipt: str, notes: dict, idem_key: str
     ) -> dict:
         cached = self._cached("create_order", idem_key)
         if cached is not None:
@@ -200,7 +200,7 @@ class RazorpayClient:
             "POST",
             "/orders",
             {
-                "amount": amount_paise,  # smallest sub-unit; INR paise
+                "amount": amount_minor,  # smallest sub-unit; INR paise
                 "currency": "INR",
                 "receipt": receipt[:RECEIPT_MAX],
                 "notes": notes,
@@ -218,7 +218,7 @@ class RazorpayClient:
         body = self._request("GET", f"/orders/{order_id}/payments")
         return list(body.get("items", []))
 
-    def capture(self, payment_id: str, amount_paise: Paise, idem_key: str) -> dict:
+    def capture(self, payment_id: str, amount_minor: MinorUnits, idem_key: str) -> dict:
         """
         Both `amount` and `currency` are mandatory — see API_NOTES. This is the
         call people get wrong from memory.
@@ -235,7 +235,7 @@ class RazorpayClient:
             body = self._request(
                 "POST",
                 f"/payments/{payment_id}/capture",
-                {"amount": amount_paise, "currency": "INR"},
+                {"amount": amount_minor, "currency": "INR"},
             )
         except RazorpayError as exc:
             # Razorpay 400s a second capture rather than returning the original
@@ -255,7 +255,7 @@ class RazorpayClient:
     # ------------------------------------------------------------- refunds ---
 
     def refund(
-        self, payment_id: str, amount_paise: Paise, idem_key: str, speed: str = "normal"
+        self, payment_id: str, amount_minor: MinorUnits, idem_key: str, speed: str = "normal"
     ) -> dict:
         cached = self._cached("refund", idem_key)
         if cached is not None:
@@ -266,7 +266,7 @@ class RazorpayClient:
             "POST",
             f"/payments/{payment_id}/refund",
             {
-                "amount": amount_paise,  # required for partial refunds
+                "amount": amount_minor,  # required for partial refunds
                 "speed": speed,
                 "receipt": receipt_for(idem_key),
             },

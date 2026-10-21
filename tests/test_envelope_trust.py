@@ -28,11 +28,11 @@ from contracts.schemas import Headroom, utcnow
 from merchant.gate_client import HttpGateClient
 
 
-def _envelope(key, *, headroom_paise: int = 500_000) -> Headroom:
+def _envelope(key, *, headroom_minor: int = 500_000) -> Headroom:
     envelope = Headroom(
         mandate_id="mnd_TEST",
-        headroom_paise=headroom_paise,
-        max_per_txn_paise=500_000,
+        headroom_minor=headroom_minor,
+        max_per_txn_minor=500_000,
         payments_remaining=3,
         categories_allowed=["stationery"],
         valid_until="2099-01-01T00:00:00Z",
@@ -80,7 +80,7 @@ def test_a_correctly_signed_envelope_is_accepted(keypair):
     envelope = _client(gate).headroom("mnd_TEST")
 
     assert envelope is not None
-    assert envelope.headroom_paise == 500_000
+    assert envelope.headroom_minor == 500_000
 
 
 def test_an_envelope_edited_in_transit_is_refused(keypair):
@@ -90,7 +90,7 @@ def test_an_envelope_edited_in_transit_is_refused(keypair):
     """
     priv, pub = keypair
     body = json.loads(_envelope(priv).model_dump_json())
-    body["headroom_paise"] = 99_999_900
+    body["headroom_minor"] = 99_999_900
 
     assert _client(Gate(pub, body)).headroom("mnd_TEST") is None
 

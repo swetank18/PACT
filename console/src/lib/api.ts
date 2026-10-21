@@ -13,7 +13,7 @@ import type {
   Mandate,
   MerchantStats,
   Order,
-  Paise,
+  MinorUnits,
   Quote,
   SagaStep,
 } from "./contracts";
@@ -23,7 +23,7 @@ export type Product = {
   sku: string;
   name: string;
   category: string;
-  price_paise: Paise;
+  price_minor: MinorUnits;
   in_stock: number;
   description: string;
 };
@@ -36,8 +36,8 @@ export type Product = {
 export type AuthorizeRequest = {
   mandate_id: string;
   quote_id: string;
-  amount_paise: Paise;
-  payee_vpa: string;
+  amount_minor: MinorUnits;
+  payee: string;
   nonce: string;
   issued_at: string;
   context: { page_excerpt: string; agent_reasoning: string };

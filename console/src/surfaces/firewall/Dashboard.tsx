@@ -54,7 +54,7 @@ export function Dashboard({
 
   const spendToday = decisions
     .filter((d) => d.verdict === "ALLOW" && Date.parse(d.at) >= today)
-    .reduce((n, d) => n + d.amount_paise, 0);
+    .reduce((n, d) => n + d.amount_minor, 0);
 
   const blocksToday = decisions.filter(
     (d) => d.verdict === "BLOCK" && Date.parse(d.at) >= today,
@@ -225,7 +225,7 @@ export function Dashboard({
             </div>
           ) : (
             <>
-              <div className={f.threatBig}>₹{inrPlain(threat.prevented_paise)}</div>
+              <div className={f.threatBig}>₹{inrPlain(threat.prevented_minor)}</div>
               <div className={f.threatBigLabel}>
                 of unauthorised spend the gate refused to settle
               </div>
@@ -244,7 +244,7 @@ export function Dashboard({
             <>
               <span className={f.threatN}>{threat.top_payee.n}×</span>
               <span>
-                most refused payee <span className={f.mono}>{threat.top_payee.vpa}</span>
+                most refused payee <span className={f.mono}>{threat.top_payee.payee}</span>
               </span>
             </>
           )}
@@ -277,7 +277,7 @@ export function Dashboard({
                   decision={d}
                   agentLabel={labels.agentLabel(d.mandate_id)}
                   intent={labels.intentFor(d.mandate_id)}
-                  autoApprovePaise={prefs.auto_approve_paise}
+                  autoApproveMinor={prefs.auto_approve_minor}
                   onResolved={(id) => setResolved((s) => new Set(s).add(id))}
                   onOpenDetail={() => onOpenDecision(d)}
                 />
@@ -334,8 +334,8 @@ export function Dashboard({
                 >
                   {labels.agentLabel(d.mandate_id)}
                 </span>
-                <span className={f.feedMerchant}>→ {d.payee_vpa}</span>
-                <span className={f.feedAmount}>{inr(d.amount_paise)}</span>
+                <span className={f.feedMerchant}>→ {d.payee}</span>
+                <span className={f.feedAmount}>{inr(d.amount_minor)}</span>
                 <Ago at={d.at} className={f.feedTime} />
                 <span className={f.feedChevron}>›</span>
               </button>

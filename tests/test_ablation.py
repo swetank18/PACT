@@ -20,11 +20,11 @@ import pytest
 from contracts.reason_codes import CHECK_ORDER, ReasonCode, Verdict
 from contracts.schemas import QuoteItemRequest
 from core.gate.engine import GateConfig
-from merchant.catalog import MERCHANT_VPA
+from merchant.catalog import MERCHANT_PAYEE
 
 
 def _ablate(gate, *names: str) -> None:
-    gate.config = GateConfig(merchant_vpa=MERCHANT_VPA, disabled_checks=frozenset(names))
+    gate.config = GateConfig(merchant_payee=MERCHANT_PAYEE, disabled_checks=frozenset(names))
 
 
 @pytest.fixture
@@ -70,22 +70,22 @@ def test_disabling_replay_lets_a_replay_through(gate, quote, authorize):
 
 def test_disabling_scope_lets_a_lookalike_vpa_through(gate, quote, authorize):
     mandate, q = quote
-    assert authorize(mandate, q, payee_vpa="deskkit@razorpayy").reason_code is (
+    assert authorize(mandate, q, payee="deskkit@razorpayy").reason_code is (
         ReasonCode.SCOPE_MERCHANT_NOT_ALLOWED
     )
 
     _ablate(gate, "scope")
-    assert authorize(mandate, q, payee_vpa="deskkit@razorpayy").verdict is Verdict.ALLOW
+    assert authorize(mandate, q, payee="deskkit@razorpayy").verdict is Verdict.ALLOW
 
 
 def test_disabling_quote_binding_lets_an_invented_price_through(gate, quote, authorize):
     mandate, q = quote
-    assert authorize(mandate, q, amount_paise=q.total_paise + 1).reason_code is (
+    assert authorize(mandate, q, amount_minor=q.total_minor + 1).reason_code is (
         ReasonCode.QUOTE_AMOUNT_MISMATCH
     )
 
     _ablate(gate, "quote_binding")
-    d = authorize(mandate, q, amount_paise=q.total_paise + 1)
+    d = authorize(mandate, q, amount_minor=q.total_minor + 1)
     assert d.verdict is Verdict.ALLOW, "with quote binding ablated, the hallucinated price leaks"
 
 
@@ -96,7 +96,7 @@ def test_ablating_one_check_does_not_disable_another(gate, quote, authorize):
     """
     mandate, q = quote
     _ablate(gate, "replay")
-    assert authorize(mandate, q, payee_vpa="deskkit@razorpayy").reason_code is (
+    assert authorize(mandate, q, payee="deskkit@razorpayy").reason_code is (
         ReasonCode.SCOPE_MERCHANT_NOT_ALLOWED
     )
 

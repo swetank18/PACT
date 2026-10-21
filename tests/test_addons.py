@@ -58,9 +58,9 @@ def test_every_suggested_addon_passes_the_real_gate(
 @pytest.mark.parametrize(
     "constraints,label",
     [
-        ({"max_total_paise": 100_000}, "almost no budget left"),
+        ({"max_total_minor": 100_000}, "almost no budget left"),
         ({"category_allowlist": ["cables"]}, "narrow category scope"),
-        ({"max_per_txn_paise": 90_000}, "a tight per transaction cap"),
+        ({"max_per_txn_minor": 90_000}, "a tight per transaction cap"),
         ({"max_count": 1}, "no purchases remaining after this one"),
     ],
 )
@@ -107,7 +107,7 @@ def test_nothing_is_offered_outside_the_category_allowlist(
 
 def test_a_mandate_with_no_room_gets_no_offers(quotes, gate, make_mandate, merchant):
     mandate = make_mandate(
-        constraints={"max_total_paise": 120_000, "max_per_txn_paise": 120_000}
+        constraints={"max_total_minor": 120_000, "max_per_txn_minor": 120_000}
     )
     q, headroom = _quote_and_headroom(quotes, gate, mandate, ["STA-NB-A5"])
 

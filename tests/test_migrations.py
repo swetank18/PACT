@@ -96,3 +96,96 @@ def test_every_added_column_is_nullable(tmp_path):
     for table, column, decl in ADD_COLUMNS:
         assert "NOT NULL" not in decl.upper(), f"{table}.{column} is NOT NULL"
         assert "DEFAULT" not in decl.upper(), f"{table}.{column} backfills a default"
+
+
+# ------------------------------------------------- the 2026-10-21 rename ---
+
+
+def _to_pre_rename(value, parent=None):
+    """The inverse of `contracts.legacy.upgrade_keys`: JSON as the old image
+    wrote it."""
+    if isinstance(value, dict):
+        out = {}
+        for key, inner in value.items():
+            old = {"payee": "payee_vpa", "merchant_payee": "merchant_vpa"}.get(key, key)
+            if key.endswith("_minor"):
+                old = key[: -len("_minor")] + "_paise"
+            if key == "account" and parent == "delegator":
+                old = "vpa"
+            out[old] = _to_pre_rename(inner, key)
+        return out
+    if isinstance(value, list):
+        return [_to_pre_rename(v, parent) for v in value]
+    return value
+
+
+def test_a_database_written_before_the_rename_still_reads(tmp_path, keys):
+    """
+    The contract renamed `*_paise` to `*_minor` and `payee_vpa` to `payee`.
+    A volume written by the image before that has the old column names and the
+    old keys inside every stored body. Built here from current code and then
+    turned back into that shape, so the test cannot drift from what the old
+    image actually wrote in the columns it renames.
+    """
+    import json
+    from datetime import datetime, timedelta, timezone
+
+    from contracts.crypto import sign
+    from contracts.ids import new_id
+    from contracts.schemas import Mandate, Order, QuoteItemRequest
+    from core.db import RENAME_COLUMNS
+    from core.mandate.store import MandateStore
+    from merchant.quote import QuoteEngine
+    from merchant.saga import OrderStore
+
+    priv, pub = keys
+    path = tmp_path / "pre-rename.db"
+    db = Database(f"sqlite:///{path}")
+
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    mandate = Mandate(
+        mandate_id=new_id("mnd"),
+        delegator={"account": "swetank@okaxis", "pubkey": pub},
+        delegate={"agent_id": "buyer_agent_v1", "pubkey": pub},
+        intent="restock office supplies",
+        constraints={
+            "max_per_txn_minor": 500_000, "max_total_minor": 1_500_000, "max_count": 5,
+            "merchant_allowlist": ["deskkit@razorpay"], "category_allowlist": ["stationery"],
+            "valid_from": (now - timedelta(minutes=1)).isoformat().replace("+00:00", "Z"),
+            "valid_until": (now + timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+        },
+        issued_at=now.isoformat().replace("+00:00", "Z"),
+    )
+    mandate.signature = sign(mandate.model_dump(), priv)
+    MandateStore(db).register(mandate)
+    quote = QuoteEngine(db).build([QuoteItemRequest(sku="STA-NB-A5")], mandate_id=mandate.mandate_id)
+    order = Order(
+        order_id=new_id("ord"), quote_id=quote.quote_id, mandate_id=mandate.mandate_id,
+        state="FULFILLED", amount_minor=quote.total_minor, items_summary="1x notebooks",
+        rail="mock_upi", at=quote.expires_at,
+    )
+    OrderStore(db).put(order)
+
+    # Now make it the file the old image would have left behind.
+    with db.immediate_tx() as conn:
+        for table, old, new in RENAME_COLUMNS:
+            conn.execute(f"ALTER TABLE {table} RENAME COLUMN {new} TO {old}")
+        for table in ("mandates", "quotes"):
+            for row in conn.execute(f"SELECT rowid, body_json FROM {table}").fetchall():
+                old_body = json.dumps(_to_pre_rename(json.loads(row["body_json"])))
+                conn.execute(f"UPDATE {table} SET body_json = ? WHERE rowid = ?",
+                             (old_body, row["rowid"]))
+        assert "max_total_paise" in conn.execute("SELECT body_json FROM mandates").fetchone()[0]
+
+    upgraded = Database(f"sqlite:///{path}")
+
+    for table, old, new in RENAME_COLUMNS:
+        columns = {r["name"] for r in upgraded.conn.execute(f"PRAGMA table_info({table})")}
+        assert new in columns and old not in columns, f"{table}.{old} was not renamed"
+
+    stored = MandateStore(upgraded).get(mandate.mandate_id)
+    assert stored is not None and stored.signature_ok
+    assert stored.mandate.constraints.max_total_minor == 1_500_000
+    assert stored.mandate.delegator.account == "swetank@okaxis"
+    assert QuoteEngine(upgraded).get(quote.quote_id).total_minor == quote.total_minor
+    assert OrderStore(upgraded).get(order.order_id).amount_minor == quote.total_minor

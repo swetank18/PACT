@@ -44,13 +44,13 @@ export function RevenueStrip({ stats }: { stats: MerchantStats }) {
       <Tile
         label="GMV today"
         symbol="₹"
-        value={inrPlain(stats.gmv_paise)}
+        value={inrPlain(stats.gmv_minor)}
         sub={`${stats.orders} order${stats.orders === 1 ? "" : "s"} settled`}
       />
       <Tile
         label="Avg order"
         symbol="₹"
-        value={inrPlain(stats.avg_order_value_paise)}
+        value={inrPlain(stats.avg_order_value_minor)}
         sub="headroom upsell shows up here"
       />
       <Tile
@@ -65,7 +65,7 @@ export function RevenueStrip({ stats }: { stats: MerchantStats }) {
       <Tile
         label="Recovered"
         symbol="₹"
-        value={inrPlain(stats.recovered_paise)}
+        value={inrPlain(stats.recovered_minor)}
         variant="recovered"
         sub={`${stats.recovered_orders} sale${
           stats.recovered_orders === 1 ? "" : "s"

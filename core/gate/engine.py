@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from contracts.ids import new_id
+from contracts.legacy import upgrade_keys
 from contracts.reason_codes import CHECK_ORDER, ReasonCode, Verdict, verdict_for
 from contracts.schemas import (
     AuthorizeRequest,
@@ -67,7 +68,7 @@ BUDGET_TAKING = frozenset({"ceiling"})
 
 @dataclass(frozen=True, slots=True)
 class GateConfig:
-    merchant_vpa: str
+    merchant_payee: str
     #: Ablation. Names in here are reported as SKIPPED and never run, so Lane B
     #: can rerun the attack set with one layer removed and record what leaks.
     disabled_checks: frozenset[str] = frozenset()
@@ -130,7 +131,7 @@ class Gate:
             ledger=self.ledger,
             conn_factory=lambda: self.db.conn,
             db=self.db,
-            merchant_vpa=self.config.merchant_vpa,
+            merchant_payee=self.config.merchant_payee,
             quote=quote,
         )
 
@@ -206,7 +207,7 @@ class Gate:
                 decision_id=decision_id,
                 mandate_id=request.mandate_id,
                 quote_id=request.quote_id,
-                amount_paise=request.amount_paise,
+                amount_minor=request.amount_minor,
             )
 
         decision = Decision(
@@ -215,8 +216,8 @@ class Gate:
             verdict=verdict,
             reason_code=reason,
             reason_detail=detail,
-            payee_vpa=request.payee_vpa,
-            amount_paise=request.amount_paise,
+            payee=request.payee,
+            amount_minor=request.amount_minor,
             quote_id=request.quote_id,
             elapsed_ms=round((time.perf_counter() - started) * 1000, 3),
             checks=results,
@@ -237,10 +238,10 @@ class Gate:
             row = conn.execute(
                 "SELECT body_json FROM quotes WHERE quote_id = ?", (quote_id,)
             ).fetchone()
-        return json.loads(row["body_json"]) if row else None
+        return upgrade_keys(json.loads(row["body_json"])) if row else None
 
     def _issue_token(
-        self, *, decision_id: str, mandate_id: str, quote_id: str, amount_paise: int
+        self, *, decision_id: str, mandate_id: str, quote_id: str, amount_minor: int
     ) -> str:
         token = new_id("stl")
         expires = (
@@ -250,15 +251,15 @@ class Gate:
             conn.execute(
                 """
                 INSERT INTO settlement_tokens
-                    (token, decision_id, mandate_id, quote_id, amount_paise,
+                    (token, decision_id, mandate_id, quote_id, amount_minor,
                      used_at, expires_at, created_at)
                 VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
                 """,
-                (token, decision_id, mandate_id, quote_id, amount_paise, expires, utcnow()),
+                (token, decision_id, mandate_id, quote_id, amount_minor, expires, utcnow()),
             )
         return token
 
-    def redeem_token(self, token: str, *, amount_paise: int) -> tuple[bool, ReasonCode, str | None]:
+    def redeem_token(self, token: str, *, amount_minor: int) -> tuple[bool, ReasonCode, str | None]:
         """
         Single use. Returns (ok, reason, decision_id).
 
@@ -277,7 +278,7 @@ class Gate:
         now = utcnow()
         with self.db.immediate_tx() as conn:
             row = conn.execute(
-                "SELECT decision_id, mandate_id, amount_paise, used_at, expires_at "
+                "SELECT decision_id, mandate_id, amount_minor, used_at, expires_at "
                 "FROM settlement_tokens WHERE token = ?",
                 (token,),
             ).fetchone()
@@ -287,7 +288,7 @@ class Gate:
                 return False, ReasonCode.TOKEN_ALREADY_USED, row["decision_id"]
             if row["expires_at"] < now:
                 return False, ReasonCode.TOKEN_EXPIRED, row["decision_id"]
-            if int(row["amount_paise"]) != amount_paise:
+            if int(row["amount_minor"]) != amount_minor:
                 return False, ReasonCode.QUOTE_AMOUNT_MISMATCH, row["decision_id"]
 
             # Read inside the same transaction, so a revoke landing between the

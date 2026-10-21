@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from contracts.money import MoneyError, gst, parse_paise, rupees
+from contracts.money import MoneyError, gst, parse_minor, rupees
 from contracts.reason_codes import CHECK_ORDER, REASON_TEXT, ReasonCode, Verdict, verdict_for
 from contracts.schemas import QuoteItemRequest
 
@@ -181,25 +181,25 @@ def test_money_refuses_floats():
     """A float here is always a bug: either rupees times a hundred in floating
     point, or 249.9 where 24990 was meant."""
     with pytest.raises(MoneyError):
-        parse_paise(249.9)
+        parse_minor(249.9)
     with pytest.raises(MoneyError):
-        parse_paise(100.0)  # even a clean float is refused, deliberately
+        parse_minor(100.0)  # even a clean float is refused, deliberately
 
 
 def test_money_refuses_negatives_bools_and_absurd_values():
     with pytest.raises(MoneyError):
-        parse_paise(-1)
+        parse_minor(-1)
     with pytest.raises(MoneyError):
-        parse_paise(True)
+        parse_minor(True)
     with pytest.raises(MoneyError):
-        parse_paise(10_000_000_00 + 1)
+        parse_minor(10_000_000_00 + 1)
 
 
 def test_money_accepts_ints_and_integral_strings():
-    assert parse_paise(24990) == 24990
-    assert parse_paise("24990") == 24990
+    assert parse_minor(24990) == 24990
+    assert parse_minor("24990") == 24990
     with pytest.raises(MoneyError):
-        parse_paise("249.90")
+        parse_minor("249.90")
 
 
 def test_tax_is_integer_arithmetic_with_no_float_anywhere():
@@ -305,8 +305,8 @@ def test_a_check_that_raises_becomes_a_block(gate, make_mandate, quotes, authori
         __import__("contracts.schemas", fromlist=["AuthorizeRequest"]).AuthorizeRequest(
             mandate_id=mandate.mandate_id,
             quote_id=q.quote_id,
-            amount_paise=q.total_paise,
-            payee_vpa="deskkit@razorpay",
+            amount_minor=q.total_minor,
+            payee="deskkit@razorpay",
             nonce="nonce-for-the-raising-check",
             issued_at=__import__("contracts.schemas", fromlist=["utcnow"]).utcnow(),
         )
@@ -319,14 +319,14 @@ def test_garbage_input_never_allows(gate):
     from contracts.schemas import AuthorizeRequest, utcnow
 
     hostile = [
-        {"mandate_id": "", "quote_id": "", "amount_paise": 0},
-        {"mandate_id": "../../etc/passwd", "quote_id": "x", "amount_paise": 1},
-        {"mandate_id": "mnd_" + "A" * 5000, "quote_id": "y", "amount_paise": 1},
-        {"mandate_id": "mnd_x", "quote_id": "'; DROP TABLE mandates;--", "amount_paise": 1},
+        {"mandate_id": "", "quote_id": "", "amount_minor": 0},
+        {"mandate_id": "../../etc/passwd", "quote_id": "x", "amount_minor": 1},
+        {"mandate_id": "mnd_" + "A" * 5000, "quote_id": "y", "amount_minor": 1},
+        {"mandate_id": "mnd_x", "quote_id": "'; DROP TABLE mandates;--", "amount_minor": 1},
     ]
     for payload in hostile:
         req = AuthorizeRequest(
-            payee_vpa="deskkit@razorpay",
+            payee="deskkit@razorpay",
             nonce=f"n{payload['mandate_id'][:20]}{payload['quote_id'][:10]}",
             issued_at=utcnow(),
             **payload,
@@ -343,8 +343,8 @@ def test_the_mandates_table_still_exists_after_an_injection_attempt(gate, make_m
         AuthorizeRequest(
             mandate_id="'; DROP TABLE mandates;--",
             quote_id="x",
-            amount_paise=1,
-            payee_vpa="deskkit@razorpay",
+            amount_minor=1,
+            payee="deskkit@razorpay",
             nonce="sqli-probe",
             issued_at=utcnow(),
         )

@@ -71,8 +71,8 @@ export function DecisionFeed({
                   <td>
                     <VerdictPill verdict={d.verdict} />
                   </td>
-                  <td className={s.vpa}>{d.payee_vpa}</td>
-                  <td className={s.amount}>{inr(d.amount_paise)}</td>
+                  <td className={s.payee}>{d.payee}</td>
+                  <td className={s.amount}>{inr(d.amount_minor)}</td>
                   <td className={s.reason}>
                     {d.reason_detail || reasonText(d.reason_code)}
                     <span className={s.reasonCode}>{d.reason_code}</span>

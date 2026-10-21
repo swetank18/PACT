@@ -5,7 +5,7 @@
  * engine's job and saying so is part of the pitch. What is here is division by
  * 100 for display and nothing else.
  */
-import type { Paise } from "./contracts";
+import type { MinorUnits } from "./contracts";
 
 const GROUPER = new Intl.NumberFormat("en-IN", {
   minimumFractionDigits: 0,
@@ -18,7 +18,7 @@ const GROUPER_2DP = new Intl.NumberFormat("en-IN", {
 });
 
 /** `₹ 1,24,500`. Paise are dropped when the amount is whole rupees. */
-export function inr(paise: Paise | null | undefined): string {
+export function inr(paise: MinorUnits | null | undefined): string {
   if (paise == null || Number.isNaN(paise)) return "—";
   const rupees = paise / 100;
   const body = paise % 100 === 0 ? GROUPER.format(rupees) : GROUPER_2DP.format(rupees);
@@ -26,14 +26,14 @@ export function inr(paise: Paise | null | undefined): string {
 }
 
 /** Without the symbol, for tiles that carry their own ₹ at a different size. */
-export function inrPlain(paise: Paise | null | undefined): string {
+export function inrPlain(paise: MinorUnits | null | undefined): string {
   if (paise == null || Number.isNaN(paise)) return "—";
   const rupees = paise / 100;
   return paise % 100 === 0 ? GROUPER.format(rupees) : GROUPER_2DP.format(rupees);
 }
 
 /** Rupees typed by a human into the grant form, back to integer paise. */
-export function rupeesToPaise(rupees: string | number): Paise {
+export function majorToMinor(rupees: string | number): MinorUnits {
   const n = typeof rupees === "number" ? rupees : Number.parseFloat(rupees.replace(/[^0-9.]/g, ""));
   if (!Number.isFinite(n)) return 0;
   // Round rather than truncate so 1234.565 does not silently lose a paisa.

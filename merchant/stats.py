@@ -14,7 +14,7 @@ and therefore the one to be most careful about.
 
 from __future__ import annotations
 
-from contracts.money import Paise
+from contracts.money import MinorUnits
 from contracts.schemas import MerchantStats
 from core.db import Database
 from merchant.upsell import UpsellEngine
@@ -32,7 +32,7 @@ class StatsService:
         with self.db.read_tx() as conn:
             settled = conn.execute(
                 f"""
-                SELECT COUNT(*) AS n, COALESCE(SUM(amount_paise), 0) AS gmv
+                SELECT COUNT(*) AS n, COALESCE(SUM(amount_minor), 0) AS gmv
                 FROM orders WHERE state IN ({','.join('?' * len(SETTLED_STATES))})
                 """,  # noqa: S608 - fixed tuple
                 SETTLED_STATES,
@@ -40,7 +40,7 @@ class StatsService:
 
             recovered = conn.execute(
                 f"""
-                SELECT COUNT(*) AS n, COALESCE(SUM(amount_paise), 0) AS amt
+                SELECT COUNT(*) AS n, COALESCE(SUM(amount_minor), 0) AS amt
                 FROM orders
                 WHERE state IN ({','.join('?' * len(SETTLED_STATES))})
                   AND recovered_from IS NOT NULL
@@ -53,20 +53,20 @@ class StatsService:
             ).fetchone()
 
         orders = int(settled["n"])
-        gmv: Paise = int(settled["gmv"])
+        gmv: MinorUnits = int(settled["gmv"])
         counters = self.upsell.counters
 
         return MerchantStats(
-            gmv_paise=gmv,
+            gmv_minor=gmv,
             orders=orders,
-            avg_order_value_paise=round(gmv / orders) if orders else 0,
+            avg_order_value_minor=round(gmv / orders) if orders else 0,
             upsell_offers_made=counters.offers_made,
             upsell_offers_accepted=counters.offers_accepted,
             upsell_offers_filtered_by_headroom=counters.offers_filtered_by_headroom,
             upsell_attach_rate=(
                 counters.offers_accepted / counters.offers_made if counters.offers_made else 0.0
             ),
-            recovered_paise=int(recovered["amt"]),
+            recovered_minor=int(recovered["amt"]),
             recovered_orders=int(recovered["n"]),
             needs_attention=int(attention["n"]),
         )

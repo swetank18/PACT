@@ -75,7 +75,7 @@ def audit(a: Auditor, *, excerpt: str = EXCERPT):
         intent="restock the office stationery cupboard",
         excerpt=excerpt,
         reasoning="the lamp fits the desk refresh",
-        amount_paise=249900,
+        amount_minor=249900,
     )
 
 

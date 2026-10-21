@@ -12,7 +12,7 @@ from the type. When a judge asks whether this leaks buyer data, the answer is
 that the schema physically cannot carry it, and `tests/test_headroom.py`
 asserts the field set rather than trusting the reading.
 
-Note what `headroom_paise` is and is not: it is what is **left**, never what the
+Note what `headroom_minor` is and is not: it is what is **left**, never what the
 budget was. A merchant that learns "₹8,900 remaining" learns what it can sell.
 A merchant that learns "₹8,900 of ₹15,000 remaining" learns how rich the buyer
 is and how much they have already spent elsewhere. The difference is one
@@ -88,12 +88,12 @@ class HeadroomService:
         mandates: MandateStore,
         ledger: Ledger,
         *,
-        merchant_vpa: str,
+        merchant_payee: str,
         signing_key: Ed25519PrivateKey | None = None,
     ) -> None:
         self.mandates = mandates
         self.ledger = ledger
-        self.merchant_vpa = merchant_vpa
+        self.merchant_payee = merchant_payee
         self.signing_key = signing_key or load_or_create_gate_key()
 
     @property
@@ -116,12 +116,12 @@ class HeadroomService:
 
         envelope = Headroom(
             mandate_id=mandate_id,
-            headroom_paise=0 if dead else max(0, c.max_total_paise - spent),
-            max_per_txn_paise=0 if dead else c.max_per_txn_paise,
+            headroom_minor=0 if dead else max(0, c.max_total_minor - spent),
+            max_per_txn_minor=0 if dead else c.max_per_txn_minor,
             payments_remaining=0 if dead else max(0, c.max_count - used),
             categories_allowed=[] if dead else list(c.category_allowlist),
             valid_until=c.valid_until,
-            merchant_in_scope=(not dead) and self.merchant_vpa in c.merchant_allowlist,
+            merchant_in_scope=(not dead) and self.merchant_payee in c.merchant_allowlist,
             as_of=utcnow(),
         )
         envelope.signature = sign(envelope.model_dump(), self.signing_key)

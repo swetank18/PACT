@@ -23,7 +23,7 @@ import threading
 from dataclasses import dataclass, field, replace
 
 from contracts.ids import new_id
-from contracts.money import Paise
+from contracts.money import MinorUnits
 from core.rail import RailAdapter, RailIntent, RailResult, RailStatus
 
 log = logging.getLogger("pact.rail.mock_upi")
@@ -32,10 +32,10 @@ log = logging.getLogger("pact.rail.mock_upi")
 @dataclass
 class _Intent:
     intent_id: str
-    amount_paise: Paise
+    amount_minor: MinorUnits
     status: str = "created"
     payment_id: str | None = None
-    refunded_paise: Paise = 0
+    refunded_minor: MinorUnits = 0
 
 
 @dataclass
@@ -113,9 +113,9 @@ class MockUpiAdapter(RailAdapter):
 
     # -------------------------------------------------------------- rail ---
 
-    def create_intent(self, amount_paise: Paise, ref: str, idem_key: str) -> RailIntent:
+    def create_intent(self, amount_minor: MinorUnits, ref: str, idem_key: str) -> RailIntent:
         with self._lock:
-            intent = _Intent(intent_id=new_id("ord").replace("ord_", "mupi_"), amount_paise=amount_paise)
+            intent = _Intent(intent_id=new_id("ord").replace("ord_", "mupi_"), amount_minor=amount_minor)
             self._intents[intent.intent_id] = intent
             # A UPI Circle payment is authorised the moment the delegate
             # presents the mandate, so it lands here already authorised.
@@ -125,12 +125,12 @@ class MockUpiAdapter(RailAdapter):
             self._forget_oldest()
         return RailIntent(
             intent_id=intent.intent_id,
-            amount_paise=amount_paise,
+            amount_minor=amount_minor,
             status=intent.status,
             raw={"ref": ref, "payment_id": intent.payment_id},
         )
 
-    def capture(self, intent_id: str, amount_paise: Paise, idem_key: str) -> RailResult:
+    def capture(self, intent_id: str, amount_minor: MinorUnits, idem_key: str) -> RailResult:
         with self._lock:
             if idem_key in self._idem:
                 # RailResult is a slots dataclass and has no __dict__; replace
@@ -154,7 +154,7 @@ class MockUpiAdapter(RailAdapter):
             result = RailResult(ok=True, ref=intent.payment_id, status="captured")
             return self._remember(idem_key, result)
 
-    def refund(self, intent_id: str, amount_paise: Paise, idem_key: str) -> RailResult:
+    def refund(self, intent_id: str, amount_minor: MinorUnits, idem_key: str) -> RailResult:
         with self._lock:
             if idem_key in self._idem:
                 return replace(self._idem[idem_key], replayed=True)
@@ -173,7 +173,7 @@ class MockUpiAdapter(RailAdapter):
                     error_detail="the refund could not be processed",
                 )
 
-            intent.refunded_paise += amount_paise
+            intent.refunded_minor += amount_minor
             status = "pending" if self.failures.refund_pending else "processed"
             result = RailResult(
                 ok=True, ref=new_id("ord").replace("ord_", "mrfnd_"), status=status
@@ -184,12 +184,12 @@ class MockUpiAdapter(RailAdapter):
         with self._lock:
             intent = self._intents.get(intent_id) or self._by_payment.get(intent_id)
             if intent is None:
-                return RailStatus(intent_id=intent_id, status="not_found", amount_paise=0)
+                return RailStatus(intent_id=intent_id, status="not_found", amount_minor=0)
             return RailStatus(
                 intent_id=intent.intent_id,
                 status=intent.status,
-                amount_paise=intent.amount_paise,
-                amount_refunded_paise=intent.refunded_paise,
+                amount_minor=intent.amount_minor,
+                amount_refunded_minor=intent.refunded_minor,
                 payment_id=intent.payment_id,
             )
 

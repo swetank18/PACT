@@ -19,6 +19,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
+from contracts.legacy import upgrade_keys
 from contracts.reason_codes import ReasonCode
 from contracts.schemas import Decision, SagaStep, utcnow
 from core.db import Database
@@ -95,8 +96,8 @@ class AuditStore:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO decisions
-                    (decision_id, mandate_id, verdict, reason_code, amount_paise,
-                     payee_vpa, quote_id, elapsed_ms, body_json, at)
+                    (decision_id, mandate_id, verdict, reason_code, amount_minor,
+                     payee, quote_id, elapsed_ms, body_json, at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
@@ -104,8 +105,8 @@ class AuditStore:
                     decision.mandate_id,
                     str(decision.verdict),
                     str(decision.reason_code),
-                    decision.amount_paise,
-                    decision.payee_vpa,
+                    decision.amount_minor,
+                    decision.payee,
                     decision.quote_id,
                     decision.elapsed_ms,
                     json.dumps(body, separators=(",", ":")),
@@ -123,7 +124,7 @@ class AuditStore:
                 "SELECT body_json FROM decisions ORDER BY at DESC, rowid DESC LIMIT ?",
                 (limit,),
             ).fetchall()
-        return [{**json.loads(r["body_json"]), "settlement_token": None} for r in rows]
+        return [{**upgrade_keys(json.loads(r["body_json"])), "settlement_token": None} for r in rows]
 
     def get_decision(self, decision_id: str) -> dict | None:
         with self.db.read_tx() as conn:
@@ -132,7 +133,7 @@ class AuditStore:
             ).fetchone()
         if row is None:
             return None
-        return {**json.loads(row["body_json"]), "settlement_token": None}
+        return {**upgrade_keys(json.loads(row["body_json"])), "settlement_token": None}
 
     def update_decision(self, decision: Decision) -> None:
         """Used when a STEP_UP is resolved, so the trail shows the final state."""
@@ -202,7 +203,7 @@ class AuditStore:
                 "state": r["state"],
                 "action": r["action"],
                 "outcome": r["outcome"],
-                "detail": json.loads(r["detail_json"]),
+                "detail": upgrade_keys(json.loads(r["detail_json"])),
                 "ref": r["ref"],
                 "at": r["at"],
                 "reason_code": r["reason_code"],

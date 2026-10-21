@@ -71,7 +71,7 @@ export function Analytics() {
     const m = new Map<string, number>();
     for (const d of decisions) {
       if (d.verdict !== "ALLOW") continue;
-      m.set(d.payee_vpa, (m.get(d.payee_vpa) ?? 0) + d.amount_paise);
+      m.set(d.payee, (m.get(d.payee) ?? 0) + d.amount_minor);
     }
     return [...m.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -84,7 +84,7 @@ export function Analytics() {
     for (const d of decisions) {
       if (d.verdict !== "ALLOW") continue;
       const name = labels.agentLabel(d.mandate_id);
-      m.set(name, (m.get(name) ?? 0) + d.amount_paise);
+      m.set(name, (m.get(name) ?? 0) + d.amount_minor);
     }
     return [...m.entries()]
       .sort((a, b) => b[1] - a[1])

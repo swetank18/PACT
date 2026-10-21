@@ -12,10 +12,10 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass, field
 
-from contracts.money import Paise
+from contracts.money import MinorUnits
 
 MERCHANT_NAME = "DeskKit"
-MERCHANT_VPA = "deskkit@razorpay"
+MERCHANT_PAYEE = "deskkit@razorpay"
 CURRENCY = "INR"
 
 
@@ -24,7 +24,7 @@ class Product:
     sku: str
     name: str
     category: str
-    price_paise: Paise
+    price_minor: MinorUnits
     description: str
     tags: tuple[str, ...]
     initial_stock: int
@@ -164,7 +164,7 @@ class Inventory:
             self._forced = None
 
 
-def search(query: str | None, category: str | None = None, max_price_paise: int | None = None) -> list[Product]:
+def search(query: str | None, category: str | None = None, max_price_minor: int | None = None) -> list[Product]:
     """
     Keyword search over ten items. Anything cleverer here would be theatre.
     """
@@ -174,7 +174,7 @@ def search(query: str | None, category: str | None = None, max_price_paise: int 
     for p in CATALOG:
         if category and p.category != category:
             continue
-        if max_price_paise is not None and p.price_paise > max_price_paise:
+        if max_price_minor is not None and p.price_minor > max_price_minor:
             continue
         hay = " ".join((p.name, p.category, p.description, *p.tags)).lower()
         score = sum(1 for t in terms if t in hay)
@@ -182,12 +182,12 @@ def search(query: str | None, category: str | None = None, max_price_paise: int 
             scored.append((score, p))
 
     if scored:
-        scored.sort(key=lambda x: (-x[0], x[1].price_paise))
+        scored.sort(key=lambda x: (-x[0], x[1].price_minor))
         return [p for _, p in scored]
 
     # An empty result makes a demo look broken rather than honest. Fall back the
     # way a real catalog search with a relevance floor would.
     pool = [p for p in CATALOG if (not category or p.category == category)]
-    if max_price_paise is not None:
-        pool = [p for p in pool if p.price_paise <= max_price_paise]
-    return sorted(pool, key=lambda p: p.price_paise)[:3]
+    if max_price_minor is not None:
+        pool = [p for p in pool if p.price_minor <= max_price_minor]
+    return sorted(pool, key=lambda p: p.price_minor)[:3]

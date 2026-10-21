@@ -15,7 +15,7 @@ import { gate } from "../../lib/api";
 import type { Mandate } from "../../lib/contracts";
 import { signPayload } from "../../lib/crypto";
 import { getDeviceKey, newId, type DeviceKey } from "../../lib/device";
-import { inr, nowRfc3339, rupeesToPaise } from "../../lib/money";
+import { inr, nowRfc3339, majorToMinor } from "../../lib/money";
 import { Button, Pill, SignatureBlock } from "../../components/ui";
 import s from "./Grant.module.css";
 
@@ -30,7 +30,7 @@ function hoursFromNow(h: number): string {
 export type GrantResult = {
   mandate: Mandate;
   signature: string;
-  totalBudgetPaise: number;
+  totalBudgetMinor: number;
 };
 
 export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
@@ -45,7 +45,7 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
     "cables",
   ]);
   const [merchants, setMerchants] = useState<string[]>(["deskkit@razorpay"]);
-  const [vpa, setVpa] = useState("swetank@okaxis");
+  const [account, setAccount] = useState("swetank@okaxis");
 
   const [device, setDevice] = useState<DeviceKey | null>(null);
   const [signing, setSigning] = useState(false);
@@ -58,20 +58,20 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
     void getDeviceKey().then(setDevice);
   }, []);
 
-  const totalPaise = rupeesToPaise(totalRupees);
-  const perTxnPaise = rupeesToPaise(perTxnRupees);
+  const totalMinor = majorToMinor(totalRupees);
+  const perTxnMinor = majorToMinor(perTxnRupees);
 
   const problems = useMemo(() => {
     const out: string[] = [];
     if (!goal.trim()) out.push("Say what the agent is for.");
-    if (totalPaise <= 0) out.push("Set a budget.");
-    if (perTxnPaise <= 0) out.push("Set a per purchase limit.");
-    if (perTxnPaise > totalPaise) out.push("The per purchase limit is above the whole budget.");
+    if (totalMinor <= 0) out.push("Set a budget.");
+    if (perTxnMinor <= 0) out.push("Set a per purchase limit.");
+    if (perTxnMinor > totalMinor) out.push("The per purchase limit is above the whole budget.");
     if (Number(maxCount) < 1) out.push("Allow at least one purchase.");
     if (categories.length === 0) out.push("Pick at least one category.");
     if (merchants.length === 0) out.push("Pick at least one merchant.");
     return out;
-  }, [goal, totalPaise, perTxnPaise, maxCount, categories, merchants]);
+  }, [goal, totalMinor, perTxnMinor, maxCount, categories, merchants]);
 
   const toggle = (list: string[], set: (v: string[]) => void, value: string) =>
     set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
@@ -87,12 +87,12 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
       const unsigned: Mandate = {
         v: 1,
         mandate_id: newId("mnd"),
-        delegator: { vpa: vpa.trim(), pubkey: device.publicKeyB64u },
+        delegator: { account: account.trim(), pubkey: device.publicKeyB64u },
         delegate: { agent_id: "buyer_agent_v1", pubkey: device.publicKeyB64u },
         intent: goal.trim(),
         constraints: {
-          max_per_txn_paise: perTxnPaise,
-          max_total_paise: totalPaise,
+          max_per_txn_minor: perTxnMinor,
+          max_total_minor: totalMinor,
           max_count: Number(maxCount),
           merchant_allowlist: merchants,
           category_allowlist: categories,
@@ -131,7 +131,7 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
         setRegistered("failed");
       }
 
-      onGranted({ mandate, signature, totalBudgetPaise: totalPaise });
+      onGranted({ mandate, signature, totalBudgetMinor: totalMinor });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -181,7 +181,7 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
               inputMode="decimal"
               onChange={(e) => setTotalRupees(e.target.value)}
             />
-            <span className={s.hint}>{inr(totalPaise)} across the whole mandate</span>
+            <span className={s.hint}>{inr(totalMinor)} across the whole mandate</span>
           </div>
 
           <div className={s.field}>
@@ -195,7 +195,7 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
               inputMode="decimal"
               onChange={(e) => setPerTxnRupees(e.target.value)}
             />
-            <span className={s.hint}>{inr(perTxnPaise)} in any single payment</span>
+            <span className={s.hint}>{inr(perTxnMinor)} in any single payment</span>
           </div>
         </div>
 
@@ -265,14 +265,14 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
         </div>
 
         <div className={s.field}>
-          <label className={s.label} htmlFor="vpa">
+          <label className={s.label} htmlFor="account">
             Paying from
           </label>
           <input
-            id="vpa"
+            id="account"
             className={`${s.input} mono`}
-            value={vpa}
-            onChange={(e) => setVpa(e.target.value)}
+            value={account}
+            onChange={(e) => setAccount(e.target.value)}
           />
         </div>
 
@@ -307,8 +307,8 @@ export function Grant({ onGranted }: { onGranted: (r: GrantResult) => void }) {
           <div className={s.summary}>
             <span className={s.summaryLabel}>Budget</span>
             <span className={s.summaryValue}>
-              {inr(result.mandate.constraints.max_total_paise)} total ·{" "}
-              {inr(result.mandate.constraints.max_per_txn_paise)} per purchase
+              {inr(result.mandate.constraints.max_total_minor)} total ·{" "}
+              {inr(result.mandate.constraints.max_per_txn_minor)} per purchase
             </span>
 
             <span className={s.summaryLabel}>Purchases</span>

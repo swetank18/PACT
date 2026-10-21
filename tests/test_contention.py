@@ -28,7 +28,7 @@ import pytest
 _TMP = tempfile.mkdtemp(prefix="pact-contention-")
 os.environ.setdefault("PACT_DB_URL", f"sqlite:///{_TMP}/gate.db")
 os.environ.setdefault("PACT_GATE_KEY_PATH", f"{_TMP}/gate_signing_key.hex")
-# The gate refuses to start without a merchant VPA — deliberately, because an
+# The gate refuses to start without a merchant payee — deliberately, because an
 # empty one silently turns the whole growth feature off with health checks
 # green. Give it the same profile the deployment runs.
 os.environ.setdefault("PACT_PROFILE", "razorpay-track01")
@@ -85,8 +85,8 @@ def _authorize_body() -> dict:
     return {
         "mandate_id": "mnd_test",
         "quote_id": "qte_test",
-        "amount_paise": 1000,
-        "payee_vpa": "merchant@bank",
+        "amount_minor": 1000,
+        "payee": "merchant@bank",
         "nonce": "nonce_test",
         "issued_at": "2026-09-05T00:00:00Z",
         "signature": "not-a-real-signature",

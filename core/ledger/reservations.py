@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from contracts.ids import new_id
-from contracts.money import Paise
+from contracts.money import MinorUnits
 from contracts.reason_codes import ReasonCode
 from contracts.schemas import Constraints, parse_rfc3339, utcnow
 from core.db import Database
@@ -47,14 +47,14 @@ class ReservationOutcome:
     reason_code: ReasonCode
     reservation_id: str | None = None
     #: Populated on failure so the decision can say what was left.
-    headroom_paise: Paise = 0
+    headroom_minor: MinorUnits = 0
     detail: str = ""
 
 
-def _sum_active(conn: sqlite3.Connection, mandate_id: str) -> tuple[Paise, int]:
+def _sum_active(conn: sqlite3.Connection, mandate_id: str) -> tuple[MinorUnits, int]:
     row = conn.execute(
         """
-        SELECT COALESCE(SUM(amount_paise), 0) AS spent, COUNT(*) AS used
+        SELECT COALESCE(SUM(amount_minor), 0) AS spent, COUNT(*) AS used
         FROM reservations
         WHERE mandate_id = ? AND state IN ('RESERVED', 'COMMITTED')
         """,
@@ -74,7 +74,7 @@ class Ledger:
         *,
         mandate_id: str,
         decision_id: str,
-        amount_paise: Paise,
+        amount_minor: MinorUnits,
         constraints: Constraints,
     ) -> ReservationOutcome:
         """
@@ -85,15 +85,15 @@ class Ledger:
         difference between a mandate that holds and one that overspends under
         concurrency.
         """
-        if amount_paise > constraints.max_per_txn_paise:
+        if amount_minor > constraints.max_per_txn_minor:
             # Checked outside the transaction because it needs no ledger state,
             # and taking a write lock to reject it would be gratuitous.
             return ReservationOutcome(
                 ok=False,
                 reason_code=ReasonCode.CEILING_PER_TXN,
                 detail=(
-                    f"{amount_paise} paise is over the per transaction limit of "
-                    f"{constraints.max_per_txn_paise}"
+                    f"{amount_minor} paise is over the per transaction limit of "
+                    f"{constraints.max_per_txn_minor}"
                 ),
             )
 
@@ -104,40 +104,40 @@ class Ledger:
 
         with self.db.immediate_tx() as conn:
             spent, used = _sum_active(conn, mandate_id)
-            remaining = constraints.max_total_paise - spent
+            remaining = constraints.max_total_minor - spent
 
             if used + 1 > constraints.max_count:
                 return ReservationOutcome(
                     ok=False,
                     reason_code=ReasonCode.CEILING_COUNT,
-                    headroom_paise=max(0, remaining),
+                    headroom_minor=max(0, remaining),
                     detail=f"{used} of {constraints.max_count} purchases already used",
                 )
 
-            if spent + amount_paise > constraints.max_total_paise:
+            if spent + amount_minor > constraints.max_total_minor:
                 return ReservationOutcome(
                     ok=False,
                     reason_code=ReasonCode.CEILING_TOTAL,
-                    headroom_paise=max(0, remaining),
-                    detail=f"{amount_paise} paise against {max(0, remaining)} remaining",
+                    headroom_minor=max(0, remaining),
+                    detail=f"{amount_minor} paise against {max(0, remaining)} remaining",
                 )
 
             reservation_id = new_id("rsv")
             conn.execute(
                 """
                 INSERT INTO reservations
-                    (reservation_id, mandate_id, decision_id, amount_paise,
+                    (reservation_id, mandate_id, decision_id, amount_minor,
                      state, created_at, expires_at)
                 VALUES (?, ?, ?, ?, 'RESERVED', ?, ?)
                 """,
-                (reservation_id, mandate_id, decision_id, amount_paise, now, expires),
+                (reservation_id, mandate_id, decision_id, amount_minor, now, expires),
             )
 
         return ReservationOutcome(
             ok=True,
             reason_code=ReasonCode.OK,
             reservation_id=reservation_id,
-            headroom_paise=max(0, remaining - amount_paise),
+            headroom_minor=max(0, remaining - amount_minor),
         )
 
     # ----------------------------------------------------------- lifecycle ---
@@ -152,7 +152,7 @@ class Ledger:
             )
         return cur.rowcount > 0
 
-    def release(self, decision_id: str) -> Paise:
+    def release(self, decision_id: str) -> MinorUnits:
         """
         Rollback or expiry. The headroom returns.
 
@@ -162,7 +162,7 @@ class Ledger:
         """
         with self.db.immediate_tx() as conn:
             row = conn.execute(
-                "SELECT COALESCE(SUM(amount_paise), 0) AS amt FROM reservations "
+                "SELECT COALESCE(SUM(amount_minor), 0) AS amt FROM reservations "
                 "WHERE decision_id = ? AND state IN ('RESERVED', 'COMMITTED')",
                 (decision_id,),
             ).fetchone()
@@ -192,13 +192,13 @@ class Ledger:
 
     # ------------------------------------------------------------ headroom ---
 
-    def spent_and_count(self, mandate_id: str) -> tuple[Paise, int]:
+    def spent_and_count(self, mandate_id: str) -> tuple[MinorUnits, int]:
         with self.db.read_tx() as conn:
             return _sum_active(conn, mandate_id)
 
-    def headroom_paise(self, mandate_id: str, constraints: Constraints) -> Paise:
+    def headroom_minor(self, mandate_id: str, constraints: Constraints) -> MinorUnits:
         spent, _ = self.spent_and_count(mandate_id)
-        return max(0, constraints.max_total_paise - spent)
+        return max(0, constraints.max_total_minor - spent)
 
     def payments_remaining(self, mandate_id: str, constraints: Constraints) -> int:
         _, used = self.spent_and_count(mandate_id)
@@ -211,7 +211,7 @@ class Ledger:
         *,
         mandate_id: str,
         decision_id: str,
-        amount_paise: Paise,
+        amount_minor: MinorUnits,
         constraints: Constraints,
     ) -> ReservationOutcome:
         """
@@ -226,11 +226,11 @@ class Ledger:
         with self.db.read_tx() as conn:
             spent, used = _sum_active(conn, mandate_id)
 
-        if amount_paise > constraints.max_per_txn_paise:
+        if amount_minor > constraints.max_per_txn_minor:
             return ReservationOutcome(ok=False, reason_code=ReasonCode.CEILING_PER_TXN)
         if used + 1 > constraints.max_count:
             return ReservationOutcome(ok=False, reason_code=ReasonCode.CEILING_COUNT)
-        if spent + amount_paise > constraints.max_total_paise:
+        if spent + amount_minor > constraints.max_total_minor:
             return ReservationOutcome(ok=False, reason_code=ReasonCode.CEILING_TOTAL)
 
         now = utcnow()
@@ -242,11 +242,11 @@ class Ledger:
             conn.execute(
                 """
                 INSERT INTO reservations
-                    (reservation_id, mandate_id, decision_id, amount_paise,
+                    (reservation_id, mandate_id, decision_id, amount_minor,
                      state, created_at, expires_at)
                 VALUES (?, ?, ?, ?, 'RESERVED', ?, ?)
                 """,
-                (reservation_id, mandate_id, decision_id, amount_paise, now, expires),
+                (reservation_id, mandate_id, decision_id, amount_minor, now, expires),
             )
         return ReservationOutcome(
             ok=True, reason_code=ReasonCode.OK, reservation_id=reservation_id

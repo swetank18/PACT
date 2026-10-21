@@ -35,7 +35,7 @@ from merchant.catalog import (
     CURRENCY,
     Inventory,
     MERCHANT_NAME,
-    MERCHANT_VPA,
+    MERCHANT_PAYEE,
     search,
 )
 from merchant.gate_client import GATE_URL, HttpGateClient
@@ -153,7 +153,7 @@ async def manifest() -> dict:
     """So an unknown agent can discover us cold, with no partnership."""
     return AgentCommerceManifest(
         merchant=MERCHANT_NAME,
-        merchant_vpa=MERCHANT_VPA,
+        merchant_payee=MERCHANT_PAYEE,
         mcp_endpoint=f"http://localhost:8100/mcp",
         categories=list(CATEGORIES),
         currency=CURRENCY,
@@ -170,15 +170,15 @@ async def manifest() -> dict:
 
 @app.get("/v1/catalog")
 async def catalog(q: str | None = None, category: str | None = None,
-                  max_price_paise: int | None = None) -> dict:
-    products = search(q, category, max_price_paise)
+                  max_price_minor: int | None = None) -> dict:
+    products = search(q, category, max_price_minor)
     return {
         "products": [
             {
                 "sku": p.sku,
                 "name": p.name,
                 "category": p.category,
-                "price_paise": p.price_paise,
+                "price_minor": p.price_minor,
                 "in_stock": service.inventory.level(p.sku),
                 "description": p.description,
             }
@@ -194,7 +194,7 @@ async def get_product(sku: str) -> dict:
         raise HTTPException(404, "no such sku")
     return {
         "sku": p.sku, "name": p.name, "category": p.category,
-        "price_paise": p.price_paise, "in_stock": service.inventory.level(p.sku),
+        "price_minor": p.price_minor, "in_stock": service.inventory.level(p.sku),
         "description": p.description, "tags": list(p.tags),
     }
 
@@ -266,7 +266,7 @@ async def create_order(request: CreateOrderRequest) -> dict:
     # before doing anything else: an order placed without a redeemed token is an
     # order placed without authority.
     ok, code, decision_id = await asyncio.to_thread(
-        service.gate.redeem, request.settlement_token, q.total_paise
+        service.gate.redeem, request.settlement_token, q.total_minor
     )
     if not ok or decision_id is None:
         raise HTTPException(403, {"reason_code": code})
@@ -449,7 +449,7 @@ async def simulate_webhook(payload: dict) -> dict:
                     "entity": {
                         "id": order.rail_payment_id,
                         "status": "captured" if event == "payment.captured" else "authorized",
-                        "amount": order.amount_paise,
+                        "amount": order.amount_minor,
                     }
                 }
             },

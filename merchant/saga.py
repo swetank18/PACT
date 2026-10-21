@@ -35,8 +35,9 @@ import time
 from dataclasses import dataclass
 
 from contracts.ids import new_id
+from contracts.legacy import upgrade_keys
 from contracts.reason_codes import ReasonCode
-from contracts.money import Paise, rupees
+from contracts.money import MinorUnits, rupees
 from contracts.schemas import Addon, Order, Quote, QuoteItemRequest, utcnow
 from core.audit.store import AuditStore
 from core.db import Database
@@ -78,7 +79,7 @@ class OrderStore:
             conn.execute(
                 """
                 INSERT INTO orders
-                    (order_id, quote_id, mandate_id, decision_id, state, amount_paise,
+                    (order_id, quote_id, mandate_id, decision_id, state, amount_minor,
                      items_summary, rail, rail_order_id, rail_payment_id,
                      recovered_from, alternative_json, at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -96,7 +97,7 @@ class OrderStore:
                     order.mandate_id,
                     None,
                     order.state,
-                    order.amount_paise,
+                    order.amount_minor,
                     order.items_summary,
                     order.rail,
                     order.rail_order_id,
@@ -167,13 +168,13 @@ class OrderStore:
             quote_id=row["quote_id"],
             mandate_id=row["mandate_id"],
             state=row["state"],
-            amount_paise=row["amount_paise"],
+            amount_minor=row["amount_minor"],
             items_summary=row["items_summary"],
             rail=row["rail"],
             rail_order_id=row["rail_order_id"],
             rail_payment_id=row["rail_payment_id"],
             recovered_from=row["recovered_from"],
-            alternative=Addon.model_validate(json.loads(row["alternative_json"]))
+            alternative=Addon.model_validate(upgrade_keys(json.loads(row["alternative_json"])))
             if row["alternative_json"]
             else None,
             at=row["at"],
@@ -234,7 +235,7 @@ class SagaRunner:
             quote_id=quote.quote_id,
             mandate_id=mandate_id,
             state="QUOTED",
-            amount_paise=quote.total_paise,
+            amount_minor=quote.total_minor,
             items_summary=", ".join(f"{l.qty}x {l.name}" for l in quote.items),
             rail=self.rail.name,
             at=utcnow(),
@@ -242,7 +243,7 @@ class SagaRunner:
         self.orders.put(order)
         self.orders.set_decision(order.order_id, decision_id)
 
-        self._step(order, "QUOTED", "quote", "OK", rupees(quote.total_paise), quote.quote_id)
+        self._step(order, "QUOTED", "quote", "OK", rupees(quote.total_minor), quote.quote_id)
         self._pause()
 
         # 1. Soft hold on stock.
@@ -266,12 +267,12 @@ class SagaRunner:
         self._pause()
 
         # 2. Move the money.
-        idem = idempotency_key(order.order_id, quote.total_paise, 1)
-        intent = self.rail.create_intent(quote.total_paise, ref=order.order_id, idem_key=idem)
+        idem = idempotency_key(order.order_id, quote.total_minor, 1)
+        intent = self.rail.create_intent(quote.total_minor, ref=order.order_id, idem_key=idem)
         order.rail_order_id = intent.intent_id
         payment_ref = intent.raw.get("payment_id") or intent.intent_id
 
-        capture = self.rail.capture(payment_ref, quote.total_paise, idem)
+        capture = self.rail.capture(payment_ref, quote.total_minor, idem)
         if not capture.ok:
             for sku, qty in held:
                 self.inventory.restore(sku, qty)
@@ -330,7 +331,7 @@ class SagaRunner:
         # Compensation 2: give the budget back.
         released = self.gate.release(decision_id)
         self._step(order, "BUDGET_RELEASED", "release_reservation", "OK",
-                   f"{rupees(released or order.amount_paise)} back to headroom")
+                   f"{rupees(released or order.amount_minor)} back to headroom")
         self._pause()
 
         # 4. The growth move: offer the nearest compliant alternative.
@@ -352,9 +353,9 @@ class SagaRunner:
         so a refund that actually succeeded but whose response we lost does not
         become a second refund.
         """
-        idem = idempotency_key(order.order_id, order.amount_paise, 99)
+        idem = idempotency_key(order.order_id, order.amount_minor, 99)
         for attempt in range(COMPENSATION_ATTEMPTS):
-            result = self.rail.refund(order.rail_payment_id or "", order.amount_paise, idem)
+            result = self.rail.refund(order.rail_payment_id or "", order.amount_minor, idem)
             if result.ok:
                 return result
             log.warning(
@@ -389,17 +390,17 @@ class SagaRunner:
                 headroom is None
                 or (
                     p.category in headroom.categories_allowed
-                    and p.price_paise <= headroom.headroom_paise
-                    and p.price_paise <= headroom.max_per_txn_paise
+                    and p.price_minor <= headroom.headroom_minor
+                    and p.price_minor <= headroom.max_per_txn_minor
                     and headroom.payments_remaining > 0
                 )
             )
         ]
         if not candidates:
             return None
-        best = min(candidates, key=lambda p: abs(p.price_paise - target.unit_paise))
+        best = min(candidates, key=lambda p: abs(p.price_minor - target.unit_minor))
         return Addon(sku=best.sku, name=best.name, category=best.category,
-                     price_paise=best.price_paise, reason="In stock, and it fits what you allowed")
+                     price_minor=best.price_minor, reason="In stock, and it fits what you allowed")
 
     # ----------------------------------------------------------- recovery ----
 

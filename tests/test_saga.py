@@ -64,11 +64,11 @@ def test_a_stockout_after_capture_refunds_and_returns_the_budget(bought, merchan
     mandate, q, decision = bought
     merchant.inventory.force_stockout("FUR-LMP-01")
 
-    before = gate.ledger.headroom_paise(mandate.mandate_id, mandate.constraints)
+    before = gate.ledger.headroom_minor(mandate.mandate_id, mandate.constraints)
     result = merchant.saga.run(
         quote=q, mandate_id=mandate.mandate_id, decision_id=decision.decision_id
     )
-    after = gate.ledger.headroom_paise(mandate.mandate_id, mandate.constraints)
+    after = gate.ledger.headroom_minor(mandate.mandate_id, mandate.constraints)
 
     states = [s["state"] for s in merchant.audit.list_steps(result.order_id)]
     assert "PAYMENT_CAPTURED" in states, "the money must move before the interesting failure"
@@ -80,7 +80,7 @@ def test_a_stockout_after_capture_refunds_and_returns_the_budget(bought, merchan
     # The compensations run in reverse: refund before budget release.
     assert states.index("REFUND_ISSUED") < states.index("BUDGET_RELEASED")
 
-    assert after == before + q.total_paise, "the headroom must come back"
+    assert after == before + q.total_minor, "the headroom must come back"
 
 
 def test_the_refund_carries_the_rails_reference(bought, merchant):
@@ -112,7 +112,7 @@ def test_an_alternative_is_offered_and_it_fits_the_remaining_headroom(
     assert order.alternative is not None
 
     headroom = gate.headroom_service.for_mandate(mandate.mandate_id)
-    assert order.alternative.price_paise <= headroom.headroom_paise
+    assert order.alternative.price_minor <= headroom.headroom_minor
     assert order.alternative.category in headroom.categories_allowed
 
 
@@ -163,7 +163,7 @@ def test_the_refunded_order_is_not_counted_as_revenue(bought, merchant, authoriz
     )
 
     stats = merchant.stats.compute()
-    assert stats.gmv_paise == 0, "a refunded order is not GMV"
+    assert stats.gmv_minor == 0, "a refunded order is not GMV"
     assert stats.orders == 0
 
     replacement, original = merchant.saga.offer_replacement_quote(result.order_id)
@@ -175,8 +175,8 @@ def test_the_refunded_order_is_not_counted_as_revenue(bought, merchant, authoriz
 
     stats = merchant.stats.compute()
     assert stats.orders == 1
-    assert stats.gmv_paise == replacement.total_paise
-    assert stats.recovered_paise == replacement.total_paise
+    assert stats.gmv_minor == replacement.total_minor
+    assert stats.recovered_minor == replacement.total_minor
     assert stats.recovered_orders == 1
 
 
@@ -225,14 +225,14 @@ def test_a_failed_capture_rolls_back_without_charging(bought, merchant, rail, ga
     mandate, q, decision = bought
     rail.failures.capture_fails = True
 
-    before = gate.ledger.headroom_paise(mandate.mandate_id, mandate.constraints)
+    before = gate.ledger.headroom_minor(mandate.mandate_id, mandate.constraints)
     result = merchant.saga.run(
         quote=q, mandate_id=mandate.mandate_id, decision_id=decision.decision_id
     )
-    after = gate.ledger.headroom_paise(mandate.mandate_id, mandate.constraints)
+    after = gate.ledger.headroom_minor(mandate.mandate_id, mandate.constraints)
 
     assert result.final_state == "ROLLED_BACK"
-    assert after == before + q.total_paise
+    assert after == before + q.total_minor
     # Stock must go back too, or a failed capture quietly destroys inventory.
     assert merchant.inventory.level("FUR-LMP-01") == 20
 
@@ -341,7 +341,7 @@ def test_a_double_refund_refunds_once(rail):
 
     assert first.ref == second.ref
     assert second.replayed
-    assert rail.status(intent.intent_id).amount_refunded_paise == 100_000
+    assert rail.status(intent.intent_id).amount_refunded_minor == 100_000
 
 
 def test_the_rail_does_not_remember_every_purchase_forever(rail):
@@ -395,23 +395,23 @@ def test_a_settlement_token_can_only_be_spent_once(bought, gate):
     """One ALLOW must not pay for two orders."""
     mandate, q, decision = bought
 
-    ok, code, _ = gate.redeem_token(decision.settlement_token, amount_paise=q.total_paise)
+    ok, code, _ = gate.redeem_token(decision.settlement_token, amount_minor=q.total_minor)
     assert ok and code is ReasonCode.OK
 
-    ok2, code2, _ = gate.redeem_token(decision.settlement_token, amount_paise=q.total_paise)
+    ok2, code2, _ = gate.redeem_token(decision.settlement_token, amount_minor=q.total_minor)
     assert not ok2
     assert code2 is ReasonCode.TOKEN_ALREADY_USED
 
 
 def test_a_token_cannot_be_redeemed_for_a_different_amount(bought, gate):
     mandate, q, decision = bought
-    ok, code, _ = gate.redeem_token(decision.settlement_token, amount_paise=q.total_paise + 1)
+    ok, code, _ = gate.redeem_token(decision.settlement_token, amount_minor=q.total_minor + 1)
     assert not ok
     assert code is ReasonCode.QUOTE_AMOUNT_MISMATCH
 
 
 def test_an_unknown_token_is_refused(gate):
-    ok, code, _ = gate.redeem_token("stl_NOTREAL", amount_paise=1)
+    ok, code, _ = gate.redeem_token("stl_NOTREAL", amount_minor=1)
     assert not ok
     assert code is ReasonCode.TOKEN_INVALID
 
@@ -435,7 +435,7 @@ def test_revoking_a_mandate_kills_the_tokens_already_issued_against_it(bought, g
     assert gate.mandates.revoke(mandate.mandate_id)
 
     ok, code, decision_id = gate.redeem_token(
-        decision.settlement_token, amount_paise=q.total_paise
+        decision.settlement_token, amount_minor=q.total_minor
     )
     assert not ok
     assert code is ReasonCode.MANDATE_REVOKED
@@ -454,7 +454,7 @@ def test_a_revoked_mandates_token_stays_unspent_rather_than_being_burned(bought,
     """
     mandate, q, decision = bought
     gate.mandates.revoke(mandate.mandate_id)
-    gate.redeem_token(decision.settlement_token, amount_paise=q.total_paise)
+    gate.redeem_token(decision.settlement_token, amount_minor=q.total_minor)
 
     with gate.db.read_tx() as conn:
         row = conn.execute(

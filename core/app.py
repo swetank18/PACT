@@ -34,26 +34,26 @@ from core.mandate.store import MandateStore
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
 log = logging.getLogger("pact.gate.app")
 
-#: From the profile, never a literal here. See core/config.py — a default VPA
+#: From the profile, never a literal here. See core/config.py — a default payee
 #: hardcoded in the rail-agnostic layer is exactly the coupling the layering
 #: test greps for.
 PROFILE = config.load()
-MERCHANT_VPA = PROFILE.merchant_vpa
+MERCHANT_PAYEE = PROFILE.merchant_payee
 SWEEP_INTERVAL_SECONDS = 10
 
-if not MERCHANT_VPA:
+if not MERCHANT_PAYEE:
     # Fail at boot, loudly, rather than at runtime, silently.
     #
-    # With no merchant VPA the scope check can never match, so every purchase is
+    # With no merchant payee the scope check can never match, so every purchase is
     # refused SCOPE_MERCHANT_NOT_ALLOWED and every headroom envelope reports
     # merchant_in_scope false — which makes the upsell filter withhold
     # everything, because it fails closed. The result is a system where health
     # checks are green, the console renders, and nothing can ever be bought.
     # That is far harder to diagnose than not starting.
     raise RuntimeError(
-        "No merchant VPA configured, so the gate would refuse every purchase "
+        "No merchant payee configured, so the gate would refuse every purchase "
         "and offer nothing. Set PACT_PROFILE to a file in profiles/ (for "
-        "example PACT_PROFILE=razorpay-track01) or set PACT_MERCHANT_VPA."
+        "example PACT_PROFILE=razorpay-track01) or set PACT_MERCHANT_PAYEE."
     )
 
 
@@ -67,7 +67,7 @@ class GateService:
         self.mandates = MandateStore(self.db)
         self.ledger = Ledger(self.db)
         self.auditor = Auditor()
-        self.config = GateConfig(merchant_vpa=MERCHANT_VPA)
+        self.config = GateConfig(merchant_payee=MERCHANT_PAYEE)
         self.gate = Gate(
             self.db,
             config=self.config,
@@ -77,13 +77,13 @@ class GateService:
             audit=self.audit,
         )
         self.headroom = HeadroomService(
-            self.mandates, self.ledger, merchant_vpa=MERCHANT_VPA
+            self.mandates, self.ledger, merchant_payee=MERCHANT_PAYEE
         )
 
     def set_disabled_checks(self, names: set[str]) -> None:
         """Ablation. Rebuilds the gate with a new config; cheap and explicit."""
         self.config = GateConfig(
-            merchant_vpa=MERCHANT_VPA, disabled_checks=frozenset(names)
+            merchant_payee=MERCHANT_PAYEE, disabled_checks=frozenset(names)
         )
         self.gate.config = self.config
 
@@ -217,9 +217,9 @@ async def redeem(payload: dict) -> dict:
     token's uniqueness is ledger state and the ledger lives here.
     """
     token = str(payload.get("settlement_token", ""))
-    amount = int(payload.get("amount_paise", 0))
+    amount = int(payload.get("amount_minor", 0))
     ok, code, decision_id = await asyncio.to_thread(
-        service.gate.redeem_token, token, amount_paise=amount
+        service.gate.redeem_token, token, amount_minor=amount
     )
     return {"ok": ok, "reason_code": str(code), "decision_id": decision_id}
 
@@ -237,8 +237,8 @@ async def release_reservation(payload: dict) -> dict:
     """Rollback. The headroom returns."""
     decision_id = str(payload.get("decision_id", ""))
     released = await asyncio.to_thread(service.ledger.release, decision_id)
-    service.bus.publish("budget_released", {"decision_id": decision_id, "amount_paise": released})
-    return {"ok": released > 0, "released_paise": released}
+    service.bus.publish("budget_released", {"decision_id": decision_id, "amount_minor": released})
+    return {"ok": released > 0, "released_minor": released}
 
 
 # ----------------------------------------------------------------- decisions --
@@ -350,7 +350,7 @@ async def resolve_step_up(decision_id: str, payload: dict) -> dict:
         decision_id=decision_id,
         mandate_id=decision.mandate_id,
         quote_id=decision.quote_id or "",
-        amount_paise=decision.amount_paise,
+        amount_minor=decision.amount_minor,
     )
     decision.settlement_token = token
     await asyncio.to_thread(service.audit.update_decision, decision)

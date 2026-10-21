@@ -26,8 +26,8 @@ import { Slides } from "../src/surfaces/slides/Slides";
 
 const headroom: Headroom = {
   mandate_id: "mnd_TEST",
-  headroom_paise: 890000,
-  max_per_txn_paise: 500000,
+  headroom_minor: 890000,
+  max_per_txn_minor: 500000,
   payments_remaining: 3,
   categories_allowed: ["stationery", "cables"],
   valid_until: "2026-08-31T10:00:00Z",
@@ -43,8 +43,8 @@ const decision: Decision = {
   verdict: "BLOCK",
   reason_code: "QUOTE_AMOUNT_MISMATCH",
   reason_detail: "payment 4,90,000 does not match quote 2,49,900",
-  payee_vpa: "deskkit@razorpay",
-  amount_paise: 490000,
+  payee: "deskkit@razorpay",
+  amount_minor: 490000,
   elapsed_ms: 2.1,
   checks: [
     { name: "request_signature", status: "PASS", ms: 0.9 },
@@ -61,15 +61,15 @@ const quote: Quote = {
       sku: "STA-NB-A5",
       name: "A5 ruled notebook, 5 pack",
       qty: 2,
-      unit_paise: 74900,
-      line_total_paise: 149800,
+      unit_minor: 74900,
+      line_total_minor: 149800,
       category: "stationery",
     },
   ],
-  subtotal_paise: 149800,
-  tax_paise: 26964,
-  shipping_paise: 0,
-  total_paise: 176764,
+  subtotal_minor: 149800,
+  tax_minor: 26964,
+  shipping_minor: 0,
+  total_minor: 176764,
   expires_at: "2099-01-01T00:00:00Z",
   headroom_fit: null,
 };
@@ -79,7 +79,7 @@ const order: Order = {
   quote_id: "qte_TEST",
   mandate_id: "mnd_TEST",
   state: "NEEDS_ATTENTION",
-  amount_paise: 176764,
+  amount_minor: 176764,
   items_summary: "2x A5 ruled notebook",
   rail: "mock_upi",
   at: "2026-08-30T14:22:05Z",
@@ -131,14 +131,14 @@ describe("components render without throwing", () => {
     expect(renderToString(<HeadroomBar headroom={null} />)).toContain("No mandate yet");
     expect(
       renderToString(
-        <HeadroomBar headroom={{ ...headroom, headroom_paise: 0 }} purchasePaise={1} />,
+        <HeadroomBar headroom={{ ...headroom, headroom_minor: 0 }} purchaseMinor={1} />,
       ),
     ).toBeTruthy();
   });
 
   it("headroom bar warns when the purchase exceeds remaining authority", () => {
     const html = renderToString(
-      <HeadroomBar headroom={headroom} purchasePaise={900000} totalBudgetPaise={1500000} />,
+      <HeadroomBar headroom={headroom} purchaseMinor={900000} totalBudgetMinor={1500000} />,
     );
     expect(html).toContain("the gate would refuse this");
   });
@@ -188,7 +188,7 @@ describe("components render without throwing", () => {
     expect(
       renderToString(
         <UpsellCard
-          addons={[{ sku: "A", name: "Gel pens", category: "stationery", price_paise: 42000 }]}
+          addons={[{ sku: "A", name: "Gel pens", category: "stationery", price_minor: 42000 }]}
           filteredOut={2}
           onAccept={() => {}}
           onDecline={() => {}}

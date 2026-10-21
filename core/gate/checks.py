@@ -61,11 +61,11 @@ class CheckContext:
     ledger: Ledger
     conn_factory: Callable[[], sqlite3.Connection]
     db: object  # core.db.Database; typed loosely to keep this module rail free
-    merchant_vpa: str
+    merchant_payee: str
     quote: dict | None = None
     #: Set by the ceiling check so the engine can hand it to the token issuer.
     reservation_id: str | None = None
-    headroom_paise: int = 0
+    headroom_minor: int = 0
 
     @property
     def mandate(self) -> Mandate | None:
@@ -208,12 +208,12 @@ def check_scope(ctx: CheckContext) -> CheckOutcome:
     assert ctx.mandate is not None
     c = ctx.mandate.constraints
 
-    if ctx.request.payee_vpa not in c.merchant_allowlist:
-        # Named explicitly, because the lookalike-VPA attack is only obvious on
+    if ctx.request.payee not in c.merchant_allowlist:
+        # Named explicitly, because the lookalike-payee attack is only obvious on
         # screen when the near-miss string is visible next to the allowed one.
         return _fail(
             ReasonCode.SCOPE_MERCHANT_NOT_ALLOWED,
-            f"{ctx.request.payee_vpa} is not on the allowlist "
+            f"{ctx.request.payee} is not on the allowlist "
             f"({', '.join(c.merchant_allowlist)})",
         )
 
@@ -247,11 +247,11 @@ def check_ceiling(ctx: CheckContext) -> CheckOutcome:
     outcome = ctx.ledger.reserve(
         mandate_id=ctx.request.mandate_id,
         decision_id=ctx.decision_id,
-        amount_paise=ctx.request.amount_paise,
+        amount_minor=ctx.request.amount_minor,
         constraints=ctx.mandate.constraints,
     )
     ctx.reservation_id = outcome.reservation_id
-    ctx.headroom_paise = outcome.headroom_paise
+    ctx.headroom_minor = outcome.headroom_minor
     if not outcome.ok:
         return _fail(outcome.reason_code, outcome.detail)
     return PASS
@@ -282,11 +282,11 @@ def check_quote_binding(ctx: CheckContext) -> CheckOutcome:
     if parse_rfc3339(utcnow()) > expires:
         return _fail(ReasonCode.QUOTE_EXPIRED, f"expired at {ctx.quote['expires_at']}")
 
-    quoted = int(ctx.quote["total_paise"])
-    if quoted != ctx.request.amount_paise:
+    quoted = int(ctx.quote["total_minor"])
+    if quoted != ctx.request.amount_minor:
         return _fail(
             ReasonCode.QUOTE_AMOUNT_MISMATCH,
-            f"payment {ctx.request.amount_paise} does not match quote {quoted}",
+            f"payment {ctx.request.amount_minor} does not match quote {quoted}",
         )
     return PASS
 
@@ -352,7 +352,7 @@ def check_intent(ctx: CheckContext, auditor) -> CheckOutcome:  # noqa: ANN001
         intent=ctx.mandate.intent,
         excerpt=excerpt,
         reasoning=reasoning,
-        amount_paise=ctx.request.amount_paise,
+        amount_minor=ctx.request.amount_minor,
     )
     if verdict.injection_span is not None:
         return CheckOutcome(

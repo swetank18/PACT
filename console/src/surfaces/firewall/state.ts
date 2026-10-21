@@ -12,7 +12,7 @@
  * enforced by the gate. The kill switch is the clearest case — it does not set
  * a flag here and call the agents paused, it revokes the mandates server side.
  */
-import type { Mandate, Paise } from "../../lib/contracts";
+import type { Mandate, MinorUnits } from "../../lib/contracts";
 
 /* ------------------------------------------------------------ storage ----- */
 
@@ -47,9 +47,9 @@ function write(key: string, value: unknown): void {
  * only moment the remainder can be read.
  */
 export type Remainder = {
-  headroom_paise: Paise;
+  headroom_minor: MinorUnits;
   payments_remaining: number;
-  max_per_txn_paise: Paise;
+  max_per_txn_minor: MinorUnits;
 };
 
 export type StoredMandate = {
@@ -88,7 +88,7 @@ export type StoredAgent = {
 
 export type Prefs = {
   display_name: string;
-  vpa: string;
+  account: string;
   notify: {
     blocked: boolean;
     step_up: boolean;
@@ -101,7 +101,7 @@ export type Prefs = {
    * screen only — the gate does not know about it — so it is described that
    * way on the settings page rather than implied to be a server-side rule.
    */
-  auto_approve_paise: Paise;
+  auto_approve_minor: MinorUnits;
   sound_on_block: boolean;
 };
 
@@ -114,9 +114,9 @@ export type KillState = {
 
 export const DEFAULT_PREFS: Prefs = {
   display_name: "Swetank",
-  vpa: "swetank@okaxis",
+  account: "swetank@okaxis",
   notify: { blocked: true, step_up: true, expiry: true, weekly: true, every_allow: false },
-  auto_approve_paise: 10000,
+  auto_approve_minor: 10000,
   sound_on_block: false,
 };
 
@@ -131,14 +131,14 @@ export type Template = {
   intent: string;
   categories: string[];
   merchants: string[];
-  per_txn_paise: Paise;
-  total_paise: Paise;
+  per_txn_minor: MinorUnits;
+  total_minor: MinorUnits;
   count: number;
   hours: number;
 };
 
 /**
- * Categories and merchant VPAs are the ones this merchant actually publishes
+ * Categories and merchant payees are the ones this merchant actually publishes
  * in its manifest. A template offering a category the catalog does not carry
  * produces a mandate that can never be used.
  */
@@ -150,8 +150,8 @@ export const TEMPLATES: Template[] = [
     intent: "restock office supplies for the month",
     categories: ["stationery", "office_furniture", "cables"],
     merchants: ["deskkit@razorpay"],
-    per_txn_paise: 200000,
-    total_paise: 800000,
+    per_txn_minor: 200000,
+    total_minor: 800000,
     count: 10,
     hours: 720,
   },
@@ -162,8 +162,8 @@ export const TEMPLATES: Template[] = [
     intent: "buy a desk lamp",
     categories: ["office_furniture"],
     merchants: ["deskkit@razorpay"],
-    per_txn_paise: 500000,
-    total_paise: 500000,
+    per_txn_minor: 500000,
+    total_minor: 500000,
     count: 1,
     hours: 24,
   },
@@ -174,8 +174,8 @@ export const TEMPLATES: Template[] = [
     intent: "replace printer consumables when they run low",
     categories: ["printers"],
     merchants: ["deskkit@razorpay", "officebasket@okhdfc"],
-    per_txn_paise: 100000,
-    total_paise: 300000,
+    per_txn_minor: 100000,
+    total_minor: 300000,
     count: 3,
     hours: 720,
   },
@@ -186,8 +186,8 @@ export const TEMPLATES: Template[] = [
     intent: "kit out a new desk for a joiner",
     categories: ["office_furniture", "cables", "storage"],
     merchants: ["deskkit@razorpay"],
-    per_txn_paise: 1500000,
-    total_paise: 2500000,
+    per_txn_minor: 1500000,
+    total_minor: 2500000,
     count: 3,
     hours: 168,
   },

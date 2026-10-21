@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { Decision } from "../../lib/contracts";
 import { reasonText } from "../../lib/contracts";
-import { inr, ms, rupeesToPaise } from "../../lib/money";
+import { inr, ms, majorToMinor } from "../../lib/money";
 import { useLive } from "../../lib/store";
 import { useLabels } from "./labels";
 import { Ago, Empty, SkeletonRows, VerdictBadge } from "./parts";
@@ -56,17 +56,17 @@ export function Transactions({
   );
 
   const filtered = useMemo(() => {
-    const minP = min ? rupeesToPaise(min) : null;
-    const maxP = max ? rupeesToPaise(max) : null;
+    const minP = min ? majorToMinor(min) : null;
+    const maxP = max ? majorToMinor(max) : null;
     const sinceT = since ? new Date(since).getTime() : null;
 
     return decisions.filter((d) => {
       if (verdict !== "ALL" && d.verdict !== verdict) return false;
       if (agentQuery !== "all" && labels.agentLabel(d.mandate_id) !== agentQuery) return false;
-      if (merchantQuery && !d.payee_vpa.toLowerCase().includes(merchantQuery.toLowerCase()))
+      if (merchantQuery && !d.payee.toLowerCase().includes(merchantQuery.toLowerCase()))
         return false;
-      if (minP !== null && d.amount_paise < minP) return false;
-      if (maxP !== null && d.amount_paise > maxP) return false;
+      if (minP !== null && d.amount_minor < minP) return false;
+      if (maxP !== null && d.amount_minor > maxP) return false;
       if (sinceT !== null && Date.parse(d.at) < sinceT) return false;
       return true;
     });
@@ -139,7 +139,7 @@ export function Transactions({
                   decision={d}
                   agentLabel={labels.agentLabel(d.mandate_id)}
                   intent={labels.intentFor(d.mandate_id)}
-                  autoApprovePaise={prefs.auto_approve_paise}
+                  autoApproveMinor={prefs.auto_approve_minor}
                   onResolved={(id) => {
                     setResolved((s) => new Set(s).add(id));
                     void refetchAll();
@@ -175,7 +175,7 @@ export function Transactions({
             <input
               className={`${f.input} ${f.small}`}
               style={{ width: 200 }}
-              placeholder="Merchant VPA…"
+              placeholder="Merchant…"
               value={merchantQuery}
               onChange={(e) => setMerchantQuery(e.target.value)}
               aria-label="Search merchant"
@@ -266,8 +266,8 @@ export function Transactions({
                           >
                             {labels.agentLabel(d.mandate_id)}
                           </td>
-                          <td className={f.mono}>{d.payee_vpa}</td>
-                          <td className={f.numCell}>{inr(d.amount_paise)}</td>
+                          <td className={f.mono}>{d.payee}</td>
+                          <td className={f.numCell}>{inr(d.amount_minor)}</td>
                           <td className={f.cardSub}>{reasonText(d.reason_code)}</td>
                           <td className={`${f.mono} ${f.numCell}`}>{ms(d.elapsed_ms)}</td>
                           <td>

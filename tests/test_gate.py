@@ -35,7 +35,7 @@ def test_happy_path_allows_and_issues_a_single_use_token(quote, authorize):
 
 def test_the_chain_is_reported_in_contract_order_always(quote, authorize):
     mandate, q = quote
-    d = authorize(mandate, q, amount_paise=q.total_paise + 1)
+    d = authorize(mandate, q, amount_minor=q.total_minor + 1)
 
     assert [c.name for c in d.checks] == list(CHECK_ORDER), (
         "the chain must be reported in frozen order and never truncated"
@@ -44,7 +44,7 @@ def test_the_chain_is_reported_in_contract_order_always(quote, authorize):
 
 def test_everything_after_the_failure_is_skipped_not_omitted(quote, authorize):
     mandate, q = quote
-    d = authorize(mandate, q, payee_vpa="deskkit@razorpayy")
+    d = authorize(mandate, q, payee="deskkit@razorpayy")
 
     names = [c.name for c in d.checks]
     idx = names.index("scope")
@@ -81,8 +81,8 @@ def test_request_signed_by_the_wrong_key_is_blocked(quote, authorize, gate):
     req = AuthorizeRequest(
         mandate_id=mandate.mandate_id,
         quote_id=q.quote_id,
-        amount_paise=q.total_paise,
-        payee_vpa="deskkit@razorpay",
+        amount_minor=q.total_minor,
+        payee="deskkit@razorpay",
         nonce=new_id("dec"),
         issued_at=iso(datetime.now(timezone.utc)),
     )
@@ -132,7 +132,7 @@ def test_stale_request_is_blocked(quote, authorize):
 
 def test_lookalike_merchant_vpa_is_blocked(quote, authorize):
     mandate, q = quote
-    d = authorize(mandate, q, payee_vpa="deskkit@razorpayy")
+    d = authorize(mandate, q, payee="deskkit@razorpayy")
     assert d.reason_code is ReasonCode.SCOPE_MERCHANT_NOT_ALLOWED
     # The near-miss must be visible; that is the only way it reads as an attack.
     assert "deskkit@razorpayy" in d.reason_detail

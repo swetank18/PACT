@@ -90,7 +90,7 @@ class FakeRazorpay:
         self._n += 1
         return f"{prefix}_{self._n:014d}"
 
-    def authorized_payment(self, order_id: str, amount_paise: int) -> str:
+    def authorized_payment(self, order_id: str, amount_minor: int) -> str:
         """
         A payment sitting in `authorized`, as one is after a customer pays but
         before the merchant captures. Nothing in our code creates this — the
@@ -98,7 +98,7 @@ class FakeRazorpay:
         """
         pid = self._id("pay")
         self.payments[pid] = {
-            "id": pid, "entity": "payment", "amount": amount_paise, "currency": "INR",
+            "id": pid, "entity": "payment", "amount": amount_minor, "currency": "INR",
             "status": "authorized", "order_id": order_id, "captured": False,
             "amount_refunded": 0, "created_at": int(time.time()),
         }

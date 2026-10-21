@@ -55,8 +55,8 @@ type ExportRow = {
   verdict: string;
   reason_code: string;
   mandate_id: string;
-  payee_vpa: string;
-  amount_paise: number;
+  payee: string;
+  amount_minor: number;
   elapsed_ms: number;
   prev_hash: string;
   hash: string;
@@ -77,8 +77,8 @@ function chain(decisions: Decision[]): ExportRow[] {
       verdict: d.verdict,
       reason_code: String(d.reason_code),
       mandate_id: d.mandate_id,
-      payee_vpa: d.payee_vpa,
-      amount_paise: d.amount_paise,
+      payee: d.payee,
+      amount_minor: d.amount_minor,
       elapsed_ms: d.elapsed_ms,
       prev_hash: prev,
     };
@@ -155,14 +155,14 @@ export function Settings() {
             />
           </div>
           <div className={f.field}>
-            <label className={f.label} htmlFor="set-vpa">
+            <label className={f.label} htmlFor="set-account">
               Paying from
             </label>
             <input
-              id="set-vpa"
+              id="set-account"
               className={`${f.input} ${f.mono}`}
-              value={prefs.vpa}
-              onChange={(e) => setPrefs({ ...prefs, vpa: e.target.value })}
+              value={prefs.account}
+              onChange={(e) => setPrefs({ ...prefs, account: e.target.value })}
             />
             <span className={f.hint}>
               Goes into every mandate you sign from here as the delegator.
@@ -234,14 +234,14 @@ export function Settings() {
           min={0}
           max={50000}
           step={1000}
-          value={prefs.auto_approve_paise}
-          onChange={(e) => setPrefs({ ...prefs, auto_approve_paise: Number(e.target.value) })}
+          value={prefs.auto_approve_minor}
+          onChange={(e) => setPrefs({ ...prefs, auto_approve_minor: Number(e.target.value) })}
           aria-label="Auto-approve threshold"
         />
         <div className={f.barLabel}>
-          {prefs.auto_approve_paise === 0
+          {prefs.auto_approve_minor === 0
             ? "Off — every step-up waits for you."
-            : `Step-ups at or under ₹${inrPlain(prefs.auto_approve_paise)} are approved from this screen without asking.`}
+            : `Step-ups at or under ₹${inrPlain(prefs.auto_approve_minor)} are approved from this screen without asking.`}
         </div>
         <div className={f.note} style={{ marginTop: 12 }}>
           <span>ℹ️</span>
@@ -287,7 +287,7 @@ export function Settings() {
             <span className={f.label}>Rows</span>
             <div style={{ paddingTop: 9 }}>
               {rows.length} decision{rows.length === 1 ? "" : "s"} ·{" "}
-              {inr(rows.reduce((n, r) => n + r.amount_paise, 0))}
+              {inr(rows.reduce((n, r) => n + r.amount_minor, 0))}
             </div>
           </div>
         </div>

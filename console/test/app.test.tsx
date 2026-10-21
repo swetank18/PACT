@@ -62,14 +62,14 @@ class FakeEventSource {
 }
 
 const STATS: MerchantStats = {
-  gmv_paise: 12450000,
+  gmv_minor: 12450000,
   orders: 15,
-  avg_order_value_paise: 830000,
+  avg_order_value_minor: 830000,
   upsell_offers_made: 22,
   upsell_offers_accepted: 9,
   upsell_offers_filtered_by_headroom: 6,
   upsell_attach_rate: 0.41,
-  recovered_paise: 1820000,
+  recovered_minor: 1820000,
   recovered_orders: 2,
   needs_attention: 1,
 };
@@ -79,7 +79,7 @@ const ORDER: Order = {
   quote_id: "qte_1",
   mandate_id: "mnd_1",
   state: "PAYMENT_CAPTURED",
-  amount_paise: 249900,
+  amount_minor: 249900,
   items_summary: "1x Adjustable desk lamp",
   rail: "mock_upi",
   at: "2026-08-30T14:22:05Z",
@@ -91,8 +91,8 @@ const DECISION: Decision = {
   verdict: "BLOCK",
   reason_code: "QUOTE_AMOUNT_MISMATCH",
   reason_detail: "payment 4,90,000 does not match quote 2,49,900",
-  payee_vpa: "deskkit@razorpay",
-  amount_paise: 490000,
+  payee: "deskkit@razorpay",
+  amount_minor: 490000,
   elapsed_ms: 2.4,
   checks: [{ name: "quote_binding", status: "FAIL", ms: 0.2 }],
   at: "2026-08-30T14:22:05Z",

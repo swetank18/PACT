@@ -29,12 +29,12 @@ import type { StoredMandate } from "../src/surfaces/firewall/state";
 const MANDATE: Mandate = {
   v: 1,
   mandate_id: "mnd_TEST",
-  delegator: { vpa: "swetank@okaxis", pubkey: "pk" },
+  delegator: { account: "swetank@okaxis", pubkey: "pk" },
   delegate: { agent_id: "buyer_agent_v1", pubkey: "pk" },
   intent: "restock office supplies",
   constraints: {
-    max_per_txn_paise: 300000,
-    max_total_paise: 300000,
+    max_per_txn_minor: 300000,
+    max_total_minor: 300000,
     max_count: 1,
     merchant_allowlist: ["deskkit@razorpay"],
     category_allowlist: ["stationery"],
@@ -52,8 +52,8 @@ const STORED: StoredMandate = {
 
 const HEADROOM: Headroom = {
   mandate_id: "mnd_TEST",
-  headroom_paise: 60000,
-  max_per_txn_paise: 300000,
+  headroom_minor: 60000,
+  max_per_txn_minor: 300000,
   payments_remaining: 1,
   categories_allowed: ["stationery"],
   valid_until: MANDATE.constraints.valid_until,
@@ -69,8 +69,8 @@ const BLOCKED: Decision = {
   verdict: "BLOCK",
   reason_code: "SCOPE_MERCHANT_NOT_ALLOWED",
   reason_detail: "giftcard-store@upi is not in the approved merchant list",
-  payee_vpa: "giftcard-store@upi",
-  amount_paise: 500000,
+  payee: "giftcard-store@upi",
+  amount_minor: 500000,
   elapsed_ms: 3.1,
   checks: [
     { name: "request_signature", status: "PASS", ms: 0.4 },
@@ -131,7 +131,7 @@ function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Respon
         : url.includes("/v1/orders")
           ? { orders: [] }
           : url.includes("agent-commerce.json")
-            ? { categories: ["stationery"], merchant_vpa: "deskkit@razorpay" }
+            ? { categories: ["stationery"], merchant_payee: "deskkit@razorpay" }
             : { ok: true };
 
   return Promise.resolve(
@@ -225,12 +225,12 @@ describe("the health score is a function of what the gate reports", () => {
   });
 
   it("is healthy when nothing has been spent and nothing was refused", () => {
-    const fresh = { ...HEADROOM, headroom_paise: 300000 };
+    const fresh = { ...HEADROOM, headroom_minor: 300000 };
     expect(healthFor(STORED, fresh, 0).word).toBe("HEALTHY");
   });
 
   it("goes critical once the budget is gone and attempts are being refused", () => {
-    const drained = { ...HEADROOM, headroom_paise: 0, payments_remaining: 0 };
+    const drained = { ...HEADROOM, headroom_minor: 0, payments_remaining: 0 };
     expect(healthFor(STORED, drained, 5).word).toBe("CRITICAL");
   });
 
@@ -242,7 +242,7 @@ describe("the health score is a function of what the gate reports", () => {
 
 describe("mandate status", () => {
   it("is Spent, not Active, when the envelope reports nothing left", () => {
-    expect(statusOf(STORED, { ...HEADROOM, headroom_paise: 0 })).toBe("Spent");
+    expect(statusOf(STORED, { ...HEADROOM, headroom_minor: 0 })).toBe("Spent");
   });
 
   it("separates a kill-switch pause from a deliberate revocation", () => {
@@ -272,17 +272,17 @@ describe("a revoked mandate is not reported as a spent one", () => {
   // The gate reports zero headroom on anything revoked, by design. Read
   // literally that is indistinguishable from "fully spent", which is a
   // different and false claim about a mandate the kill switch paused.
-  const dead: Headroom = { ...HEADROOM, headroom_paise: 0, payments_remaining: 0 };
+  const dead: Headroom = { ...HEADROOM, headroom_minor: 0, payments_remaining: 0 };
 
   it("reads a paused mandate from the remainder captured before the revoke", () => {
     const paused = {
       ...STORED,
       revoked_at: at,
       revoked_reason: "kill_switch" as const,
-      remainder: { headroom_paise: 60000, payments_remaining: 1, max_per_txn_paise: 300000 },
+      remainder: { headroom_minor: 60000, payments_remaining: 1, max_per_txn_minor: 300000 },
     };
     const hr = effectiveHeadroom(paused, dead)!;
-    expect(hr.headroom_paise).toBe(60000);
+    expect(hr.headroom_minor).toBe(60000);
     expect(hr.payments_remaining).toBe(1);
     // And so the health dot describes the mandate rather than the revocation.
     expect(healthFor(paused, hr, 0).word).toBe("WATCH");
@@ -303,29 +303,29 @@ describe("the threat summary counts what was refused", () => {
     ...BLOCKED,
     decision_id: "dec_INJ",
     reason_code: "INTENT_INJECTION_SUSPECTED",
-    amount_paise: 100000,
+    amount_minor: 100000,
   };
   const replay: Decision = {
     ...BLOCKED,
     decision_id: "dec_REP",
     reason_code: "NONCE_REPLAY",
-    amount_paise: 250000,
+    amount_minor: 250000,
   };
-  const allowed: Decision = { ...BLOCKED, decision_id: "dec_OK", verdict: "ALLOW", amount_paise: 999 };
+  const allowed: Decision = { ...BLOCKED, decision_id: "dec_OK", verdict: "ALLOW", amount_minor: 999 };
 
   it("sums only what was blocked, and attributes each reason", () => {
     const t = threatSummary([BLOCKED, injection, replay, allowed]);
     expect(t.blocks).toBe(3);
-    expect(t.prevented_paise).toBe(500000 + 100000 + 250000);
+    expect(t.prevented_minor).toBe(500000 + 100000 + 250000);
     expect(t.injections).toBe(1);
     expect(t.replays).toBe(1);
-    expect(t.top_payee?.vpa).toBe("giftcard-store@upi");
+    expect(t.top_payee?.payee).toBe("giftcard-store@upi");
   });
 
   it("reports nothing rather than something reassuring when there is no data", () => {
     const t = threatSummary([]);
     expect(t.blocks).toBe(0);
-    expect(t.prevented_paise).toBe(0);
+    expect(t.prevented_minor).toBe(0);
     expect(t.window).toBeNull();
   });
 });
@@ -496,7 +496,7 @@ describe("the firewall surface", () => {
     await type("#fw-intent", "restock office supplies");
 
     await click("Next →"); // scope
-    await type("#fw-vpa", "deskkit@razorpay");
+    await type("#fw-merchant", "deskkit@razorpay");
     await click("Add");
     await click("Next →"); // caps
     await click("Next →"); // window

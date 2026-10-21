@@ -68,7 +68,7 @@
   white-space: nowrap;
 }
 
-.vpa {
+.payee {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   color: var(--text-dim);

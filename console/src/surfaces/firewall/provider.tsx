@@ -19,7 +19,7 @@ import {
 } from "react";
 
 import { gate } from "../../lib/api";
-import type { Headroom, Mandate, Paise } from "../../lib/contracts";
+import type { Headroom, Mandate, MinorUnits } from "../../lib/contracts";
 import { signPayload } from "../../lib/crypto";
 import { getDeviceKey, newId, type DeviceKey } from "../../lib/device";
 import { nowRfc3339 } from "../../lib/money";
@@ -47,8 +47,8 @@ export type MandateDraft = {
   agent_id: string;
   merchants: string[];
   categories: string[];
-  per_txn_paise: Paise;
-  total_paise: Paise;
+  per_txn_minor: MinorUnits;
+  total_minor: MinorUnits;
   count: number;
   valid_from: string;
   valid_until: string;
@@ -256,12 +256,12 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
       const unsigned: Mandate = {
         v: 1,
         mandate_id: newId("mnd"),
-        delegator: { vpa: prefs.vpa.trim(), pubkey: key.publicKeyB64u },
+        delegator: { account: prefs.account.trim(), pubkey: key.publicKeyB64u },
         delegate: { agent_id: draft.agent_id || DEFAULT_AGENT_ID, pubkey: key.publicKeyB64u },
         intent: draft.intent.trim(),
         constraints: {
-          max_per_txn_paise: draft.per_txn_paise,
-          max_total_paise: draft.total_paise,
+          max_per_txn_minor: draft.per_txn_minor,
+          max_total_minor: draft.total_minor,
           max_count: draft.count,
           merchant_allowlist: draft.merchants,
           category_allowlist: draft.categories,
@@ -293,7 +293,7 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
         replaces: replaces ?? null,
       };
     },
-    [prefs.vpa],
+    [prefs.account],
   );
 
   const sign = useCallback(
@@ -359,9 +359,9 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
     envelopes.forEach((r, i) => {
       if (r.status === "fulfilled") {
         remainders.set(live[i].mandate.mandate_id, {
-          headroom_paise: r.value.headroom_paise,
+          headroom_minor: r.value.headroom_minor,
           payments_remaining: r.value.payments_remaining,
-          max_per_txn_paise: r.value.max_per_txn_paise,
+          max_per_txn_minor: r.value.max_per_txn_minor,
         });
       }
     });
@@ -405,7 +405,7 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
       const c = m.mandate.constraints;
       // Nothing left, or the window has closed. Re-issuing would be inventing
       // authority the human never granted.
-      if (!r || r.headroom_paise <= 0 || r.payments_remaining <= 0) continue;
+      if (!r || r.headroom_minor <= 0 || r.payments_remaining <= 0) continue;
       if (Date.parse(c.valid_until) <= Date.now()) continue;
 
       try {
@@ -416,8 +416,8 @@ export function FirewallProvider({ children }: { children: ReactNode }) {
               agent_id: m.mandate.delegate.agent_id,
               merchants: [...c.merchant_allowlist],
               categories: [...c.category_allowlist],
-              per_txn_paise: Math.min(r.max_per_txn_paise || c.max_per_txn_paise, r.headroom_paise),
-              total_paise: r.headroom_paise,
+              per_txn_minor: Math.min(r.max_per_txn_minor || c.max_per_txn_minor, r.headroom_minor),
+              total_minor: r.headroom_minor,
               count: r.payments_remaining,
               valid_from: nowRfc3339(),
               valid_until: c.valid_until,

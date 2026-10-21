@@ -6,7 +6,7 @@
  * here invents a number the engine did not produce, which is the rule that
  * makes the health dot and the threat card safe to put in front of someone.
  */
-import type { Decision, Headroom, Paise } from "../../lib/contracts";
+import type { Decision, Headroom, MinorUnits } from "../../lib/contracts";
 import type { StoredAgent, StoredMandate } from "./state";
 
 export type Band = "green" | "amber" | "red";
@@ -50,8 +50,8 @@ export function healthFor(
 
   // Spend and count come from the envelope, which is the ledger's own answer.
   // Without it we say so rather than guessing at zero.
-  const spent = hr ? Math.max(0, c.max_total_paise - hr.headroom_paise) : 0;
-  const usedFrac = c.max_total_paise > 0 ? spent / c.max_total_paise : 0;
+  const spent = hr ? Math.max(0, c.max_total_minor - hr.headroom_minor) : 0;
+  const usedFrac = c.max_total_minor > 0 ? spent / c.max_total_minor : 0;
   const countUsed = hr ? Math.max(0, c.max_count - hr.payments_remaining) : 0;
   const countFrac = c.max_count > 0 ? countUsed / c.max_count : 0;
 
@@ -106,7 +106,7 @@ export type MandateStatus = "Active" | "Expired" | "Revoked" | "Paused" | "Spent
 export function statusOf(sm: StoredMandate, hr: Headroom | undefined, now = Date.now()): MandateStatus {
   if (sm.revoked_at) return sm.revoked_reason === "kill_switch" ? "Paused" : "Revoked";
   if (Date.parse(sm.mandate.constraints.valid_until) <= now) return "Expired";
-  if (hr && hr.headroom_paise === 0) return "Spent";
+  if (hr && hr.headroom_minor === 0) return "Spent";
   if (hr && hr.payments_remaining === 0) return "Spent";
   return "Active";
 }
@@ -131,21 +131,21 @@ export function effectiveHeadroom(
   if (!sm.remainder || !hr) return undefined;
   return {
     ...hr,
-    headroom_paise: sm.remainder.headroom_paise,
+    headroom_minor: sm.remainder.headroom_minor,
     payments_remaining: sm.remainder.payments_remaining,
-    max_per_txn_paise: sm.remainder.max_per_txn_paise,
+    max_per_txn_minor: sm.remainder.max_per_txn_minor,
   };
 }
 
 /* ------------------------------------------------------------- threats ---- */
 
 export type ThreatSummary = {
-  prevented_paise: Paise;
+  prevented_minor: MinorUnits;
   injections: number;
   replays: number;
   blocks: number;
   step_ups: number;
-  top_payee: { vpa: string; n: number } | null;
+  top_payee: { payee: string; n: number } | null;
   /** The two hour bucket with the most blocks in it, local time. */
   window: { from: number; to: number; n: number } | null;
 };
@@ -165,19 +165,19 @@ export function threatSummary(decisions: Decision[], days = 7, now = Date.now())
   const hours = new Array<number>(12).fill(0);
 
   for (const d of blocked) {
-    payees.set(d.payee_vpa, (payees.get(d.payee_vpa) ?? 0) + 1);
+    payees.set(d.payee, (payees.get(d.payee) ?? 0) + 1);
     const t = Date.parse(d.at);
     if (!Number.isNaN(t)) hours[Math.floor(new Date(t).getHours() / 2)] += 1;
   }
 
-  let top: { vpa: string; n: number } | null = null;
-  for (const [vpa, n] of payees) if (!top || n > top.n) top = { vpa, n };
+  let top: { payee: string; n: number } | null = null;
+  for (const [payee, n] of payees) if (!top || n > top.n) top = { payee, n };
 
   let bucket = -1;
   for (let i = 0; i < hours.length; i++) if (bucket === -1 || hours[i] > hours[bucket]) bucket = i;
 
   return {
-    prevented_paise: blocked.reduce((n, d) => n + d.amount_paise, 0),
+    prevented_minor: blocked.reduce((n, d) => n + d.amount_minor, 0),
     injections: blocked.filter((d) => d.reason_code === INJECTION).length,
     replays: blocked.filter((d) => d.reason_code === REPLAY).length,
     blocks: blocked.length,

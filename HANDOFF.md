@@ -125,9 +125,9 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **266 Python tests, 55 console
+~11k lines of Python, ~10k of TypeScript. **267 Python tests, 55 console
 tests**, all green — one Python test skips unless the clone predates the key
-purge, so a run reports 265 passed and 1 skipped — plus two GitHub Actions
+purge, so a run reports 266 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every
 console surface against it on every push.
 
@@ -154,7 +154,7 @@ Development, services on separate ports with hot reload:
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh                            # 8000 gate, 8100 merchant, 8110 hooks, 8300 beats
 cd console && npm install && npm run dev    # 5173
-./scripts/test.sh                           # 215 tests
+./scripts/test.sh                           # 267 tests
 ```
 
 `scripts/test.sh` exists because a ROS install on this machine puts broken pytest
@@ -424,6 +424,20 @@ percentage, and `core/gate/auditor.py` answers `matches_intent` as a **boolean**
 The meter renders the engine's actual answer and says on screen that the auditor
 answers yes or no — inventing a percentage to fill the bar would have been the
 one thing on that screen a judge could not check.
+
+**The contract speaks minor units and payees, not paise and VPAs.** Renamed on
+2026-10-21, when the project took a dollar rail: `*_paise` → `*_minor`,
+`payee_vpa` → `payee`, `merchant_vpa` → `merchant_payee`, and the delegator's
+`vpa` → `account`. A US judge reading `"max_total_paise": 50000` for $500 would
+reasonably take it for a bug. The values never changed, only the names, and a
+database written before the rename still works: `core/db.py` renames the columns
+on boot (`RENAME_COLUMNS`), and every read of a stored JSON body goes through
+`contracts/legacy.py`, which renames the keys. A mandate stored before the rename
+keeps working, because its signature was verified at registration over the numbers
+it still carries; it is not re-verifiable against its new form, and nothing tries.
+Two things deliberately still say "vpa" or "paise": the injection pattern in
+`core/gate/checks.py` that looks for UPI-flavoured instructions, and Razorpay's own
+API notes, where paise is the unit the vendor actually uses.
 
 **Contracts are generated, not duplicated.** `scripts/gen_ts_contracts.py`
 produces `contracts/generated.ts` from the Python enum; the console re-exports

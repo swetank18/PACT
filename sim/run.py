@@ -225,12 +225,12 @@ def _model_arm_a(
 
         if rng.random() < HUMAN_COMPLETION_RATE:
             m.completed += 1
-            m.gmv_paise += total
+            m.gmv_minor += total
             m.upsell_offers_made += 1
             if rng.random() < HUMAN_ADDON_RATE:
                 m.upsell_offers_accepted += 1
 
-    m.avg_order_value_paise = round(m.gmv_paise / m.completed) if m.completed else 0
+    m.avg_order_value_minor = round(m.gmv_minor / m.completed) if m.completed else 0
     return m
 
 
@@ -245,7 +245,7 @@ def run_attacks() -> list[attacks.AttackResult]:
         with httpx.Client(timeout=10) as c:
             reset(c)
         return attacks.run_all(
-            agent, personas[0], manifest["merchant_vpa"], auditor_enabled=auditor_enabled()
+            agent, personas[0], manifest["merchant_payee"], auditor_enabled=auditor_enabled()
         )
     finally:
         agent.close()
@@ -257,7 +257,7 @@ def run_benign(count: int = 60) -> list[benign.BenignResult]:
         manifest = agent.discover()
         with httpx.Client(timeout=10) as c:
             reset(c)
-        return benign.run_all(agent, manifest["merchant_vpa"], count=count)
+        return benign.run_all(agent, manifest["merchant_payee"], count=count)
     finally:
         agent.close()
 
@@ -269,7 +269,7 @@ def run_chaos() -> list[chaos.ChaosResult]:
         manifest = agent.discover()
         with httpx.Client(timeout=10) as c:
             reset(c)
-        return chaos.run_all(agent, personas[0], manifest["merchant_vpa"])
+        return chaos.run_all(agent, personas[0], manifest["merchant_payee"])
     finally:
         agent.close()
 
@@ -306,7 +306,7 @@ def run_ablation() -> dict[str, dict[str, str]]:
                 results = attacks.run_all(
                     agent,
                     personas[0],
-                    manifest["merchant_vpa"],
+                    manifest["merchant_payee"],
                     auditor_enabled=auditor_enabled(),
                 )
             finally:

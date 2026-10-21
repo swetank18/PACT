@@ -7,7 +7,7 @@ and so `openapi.json` falls out of FastAPI for free.
 
 Two rules this file enforces structurally rather than by convention:
 
-  * Money is `int` paise. There is no float in any model here.
+  * Money is `int` minor units. There is no float in any model here.
   * The headroom envelope cannot carry the delegator's identity, the intent
     text, the total budget or the spend history, because those fields do not
     exist on it. Privacy by construction means the schema physically cannot
@@ -21,7 +21,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from contracts.money import Paise, parse_paise
+from contracts.money import MinorUnits, parse_minor
 from contracts.reason_codes import ReasonCode, Verdict
 
 
@@ -55,7 +55,7 @@ class Party(Strict):
 
 
 class Delegator(Party):
-    vpa: str
+    account: str
 
 
 class Delegate(Party):
@@ -63,18 +63,18 @@ class Delegate(Party):
 
 
 class Constraints(Strict):
-    max_per_txn_paise: Paise
-    max_total_paise: Paise
+    max_per_txn_minor: MinorUnits
+    max_total_minor: MinorUnits
     max_count: int = Field(ge=1)
     merchant_allowlist: list[str]
     category_allowlist: list[str]
     valid_from: str
     valid_until: str
 
-    @field_validator("max_per_txn_paise", "max_total_paise", mode="before")
+    @field_validator("max_per_txn_minor", "max_total_minor", mode="before")
     @classmethod
-    def _paise(cls, v: Any) -> int:
-        return parse_paise(v)
+    def _minor(cls, v: Any) -> int:
+        return parse_minor(v)
 
 
 class Mandate(Strict):
@@ -104,8 +104,8 @@ class Headroom(Strict):
     """
 
     mandate_id: str
-    headroom_paise: Paise
-    max_per_txn_paise: Paise
+    headroom_minor: MinorUnits
+    max_per_txn_minor: MinorUnits
     payments_remaining: int
     categories_allowed: list[str]
     valid_until: str
@@ -121,25 +121,25 @@ class LineItem(Strict):
     sku: str
     name: str
     qty: int = Field(ge=1)
-    unit_paise: Paise
-    line_total_paise: Paise
+    unit_minor: MinorUnits
+    line_total_minor: MinorUnits
     category: str
 
 
 class HeadroomFit(Strict):
     fits: bool
-    headroom_paise: Paise
-    headroom_after_paise: Paise
+    headroom_minor: MinorUnits
+    headroom_after_minor: MinorUnits
     categories_ok: bool
 
 
 class Quote(Strict):
     quote_id: str
     items: list[LineItem]
-    subtotal_paise: Paise
-    tax_paise: Paise
-    shipping_paise: Paise
-    total_paise: Paise
+    subtotal_minor: MinorUnits
+    tax_minor: MinorUnits
+    shipping_minor: MinorUnits
+    total_minor: MinorUnits
     expires_at: str
     headroom_fit: HeadroomFit | None = None
 
@@ -166,7 +166,7 @@ class Addon(Strict):
     sku: str
     name: str
     category: str
-    price_paise: Paise
+    price_minor: MinorUnits
     reason: str | None = None
 
 
@@ -200,17 +200,17 @@ class AuthorizeContext(Strict):
 class AuthorizeRequest(Strict):
     mandate_id: str
     quote_id: str
-    amount_paise: Paise
-    payee_vpa: str
+    amount_minor: MinorUnits
+    payee: str
     nonce: str
     issued_at: str
     context: AuthorizeContext = Field(default_factory=AuthorizeContext)
     signature: str | None = None
 
-    @field_validator("amount_paise", mode="before")
+    @field_validator("amount_minor", mode="before")
     @classmethod
-    def _paise(cls, v: Any) -> int:
-        return parse_paise(v)
+    def _minor(cls, v: Any) -> int:
+        return parse_minor(v)
 
 
 class InjectedSpan(Strict):
@@ -233,8 +233,8 @@ class Decision(Strict):
     verdict: Verdict
     reason_code: ReasonCode
     reason_detail: str = ""
-    payee_vpa: str
-    amount_paise: Paise
+    payee: str
+    amount_minor: MinorUnits
     quote_id: str | None = None
     order_id: str | None = None
     elapsed_ms: float
@@ -287,7 +287,7 @@ class Order(Strict):
     quote_id: str
     mandate_id: str
     state: SagaState
-    amount_paise: Paise
+    amount_minor: MinorUnits
     items_summary: str
     rail: str
     rail_order_id: str | None = None
@@ -312,14 +312,14 @@ class CreateOrderRequest(Strict):
 
 
 class MerchantStats(Strict):
-    gmv_paise: Paise = 0
+    gmv_minor: MinorUnits = 0
     orders: int = 0
-    avg_order_value_paise: Paise = 0
+    avg_order_value_minor: MinorUnits = 0
     upsell_offers_made: int = 0
     upsell_offers_accepted: int = 0
     upsell_offers_filtered_by_headroom: int = 0
     upsell_attach_rate: float = 0.0
-    recovered_paise: Paise = 0
+    recovered_minor: MinorUnits = 0
     recovered_orders: int = 0
     needs_attention: int = 0
 
@@ -332,7 +332,7 @@ class AgentCommerceManifest(Strict):
     us cold, without a partnership and without being told our endpoints."""
 
     merchant: str
-    merchant_vpa: str
+    merchant_payee: str
     mcp_endpoint: str
     categories: list[str]
     currency: str

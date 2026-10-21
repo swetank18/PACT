@@ -34,9 +34,9 @@ class ChaosResult:
     detail: str = ""
 
 
-def _buy(agent: BuyerAgent, mandate: Mandate, vpa: str, sku: str) -> dict[str, Any] | None:
+def _buy(agent: BuyerAgent, mandate: Mandate, payee: str, sku: str) -> dict[str, Any] | None:
     q = agent.quote([{"sku": sku, "qty": 1}], mandate.id)
-    d = agent.authorize(mandate, q, vpa)
+    d = agent.authorize(mandate, q, payee)
     if d["verdict"] != "ALLOW":
         return None
     agent.create_order(q["quote_id"], d)
@@ -55,10 +55,10 @@ def _saga(agent: BuyerAgent, order_id: str) -> list[str]:
     return [s["state"] for s in r.json().get("steps", [])] if r.status_code == 200 else []
 
 
-def chs_01_stockout_after_capture(agent: BuyerAgent, mandate: Mandate, vpa: str) -> ChaosResult:
+def chs_01_stockout_after_capture(agent: BuyerAgent, mandate: Mandate, payee: str) -> ChaosResult:
     """Capture succeeds, fulfilment does not. The brief's graceful failure."""
     agent.http.post(f"{agent.merchant_url}/admin/force_stockout", json={"sku": "FUR-LMP-01"})
-    order = _buy(agent, mandate, vpa, "FUR-LMP-01")
+    order = _buy(agent, mandate, payee, "FUR-LMP-01")
     steps = _saga(agent, order["order_id"]) if order else []
 
     required = ["PAYMENT_CAPTURED", "ROLLING_BACK", "REFUND_ISSUED", "BUDGET_RELEASED"]
@@ -74,14 +74,14 @@ def chs_01_stockout_after_capture(agent: BuyerAgent, mandate: Mandate, vpa: str)
     )
 
 
-def chs_02_webhook_never_delivered(agent: BuyerAgent, mandate: Mandate, vpa: str) -> ChaosResult:
+def chs_02_webhook_never_delivered(agent: BuyerAgent, mandate: Mandate, payee: str) -> ChaosResult:
     """
     No webhook ever arrives. The reconciliation poller resolves the true state.
 
     Simulated by rewinding the order to pre-capture and letting the poller find
     it — the same code path a dropped webhook produces.
     """
-    order = _buy(agent, mandate, vpa, "STA-NB-A5")
+    order = _buy(agent, mandate, payee, "STA-NB-A5")
     if not order:
         return ChaosResult("chs_02", "webhook never delivered", "poller resolves",
                            "no order", False, [], "")
@@ -108,9 +108,9 @@ def chs_02_webhook_never_delivered(agent: BuyerAgent, mandate: Mandate, vpa: str
     )
 
 
-def chs_03_duplicate_webhook(agent: BuyerAgent, mandate: Mandate, vpa: str) -> ChaosResult:
+def chs_03_duplicate_webhook(agent: BuyerAgent, mandate: Mandate, payee: str) -> ChaosResult:
     """The same event three times. Idempotent, so nothing changes."""
-    order = _buy(agent, mandate, vpa, "STA-PEN-12")
+    order = _buy(agent, mandate, payee, "STA-PEN-12")
     if not order or not order.get("rail_payment_id"):
         return ChaosResult("chs_03", "duplicate webhook", "no op", "no order", False, [], "")
 
@@ -136,9 +136,9 @@ def chs_03_duplicate_webhook(agent: BuyerAgent, mandate: Mandate, vpa: str) -> C
     )
 
 
-def chs_04_out_of_order_webhook(agent: BuyerAgent, mandate: Mandate, vpa: str) -> ChaosResult:
+def chs_04_out_of_order_webhook(agent: BuyerAgent, mandate: Mandate, payee: str) -> ChaosResult:
     """`payment.authorized` after `payment.captured`. Must not walk backwards."""
-    order = _buy(agent, mandate, vpa, "CBL-USBC-2M")
+    order = _buy(agent, mandate, payee, "CBL-USBC-2M")
     if not order:
         return ChaosResult("chs_04", "out of order webhook", "converges", "no order", False, [], "")
 
@@ -158,7 +158,7 @@ def chs_04_out_of_order_webhook(agent: BuyerAgent, mandate: Mandate, vpa: str) -
     )
 
 
-def chs_05_refund_itself_fails(agent: BuyerAgent, mandate: Mandate, vpa: str) -> ChaosResult:
+def chs_05_refund_itself_fails(agent: BuyerAgent, mandate: Mandate, payee: str) -> ChaosResult:
     """
     The compensation fails. Retries, then NEEDS_ATTENTION, never silent.
 
@@ -166,7 +166,7 @@ def chs_05_refund_itself_fails(agent: BuyerAgent, mandate: Mandate, vpa: str) ->
     """
     agent.http.post(f"{agent.merchant_url}/admin/inject_failure", json={"refund_fails": True})
     agent.http.post(f"{agent.merchant_url}/admin/force_stockout", json={"sku": "FUR-MAT-DSK"})
-    order = _buy(agent, mandate, vpa, "FUR-MAT-DSK")
+    order = _buy(agent, mandate, payee, "FUR-MAT-DSK")
     agent.http.post(f"{agent.merchant_url}/admin/inject_failure", json={"refund_fails": False})
 
     steps = _saga(agent, order["order_id"]) if order else []
@@ -196,10 +196,10 @@ SCENARIOS = [
 ]
 
 
-def run_all(agent: BuyerAgent, persona: dict[str, Any], vpa: str) -> list[ChaosResult]:
+def run_all(agent: BuyerAgent, persona: dict[str, Any], payee: str) -> list[ChaosResult]:
     out = []
     for scenario in SCENARIOS:
         # A fresh mandate per scenario, so one scenario's spend cannot make the
         # next one fail for an unrelated reason.
-        out.append(scenario(agent, agent.issue_mandate(persona, vpa), vpa))
+        out.append(scenario(agent, agent.issue_mandate(persona, payee), payee))
     return out

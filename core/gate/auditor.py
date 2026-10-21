@@ -89,7 +89,7 @@ class Auditor:
         return bool(self.api_key)
 
     def audit(
-        self, *, intent: str, excerpt: str, reasoning: str, amount_paise: int
+        self, *, intent: str, excerpt: str, reasoning: str, amount_minor: int
     ) -> AuditVerdict:
         """
         One call, hard timeout, fail closed to STEP_UP.
@@ -108,7 +108,7 @@ class Auditor:
         user = json.dumps(
             {
                 "stated_goal": intent,
-                "amount_paise": amount_paise,
+                "amount_minor": amount_minor,
                 "agent_reasoning": reasoning[:2000],
                 "page_text_UNTRUSTED": excerpt[:4000],
             }

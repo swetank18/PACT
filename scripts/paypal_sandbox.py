@@ -86,7 +86,7 @@ def main() -> int:
         intent = adapter.create_intent(args.cents, ref=ref, idem_key=f"{ref}-1")
         print(f"\n  order {intent.intent_id}, authorization {intent.raw['payment_id']}")
         check("order status after create", intent.raw.get("order_status"), "COMPLETED")
-        check("authorised amount", intent.amount_paise, args.cents)
+        check("authorised amount", intent.amount_minor, args.cents)
 
         capture = adapter.capture(intent.raw["payment_id"], args.cents, f"{ref}-1")
         check("capture ok", capture.ok, True)
@@ -104,7 +104,7 @@ def main() -> int:
         print(f"  ·   refund status {refund.status} (completed or pending are both documented)")
 
         after = adapter.status(intent.intent_id)
-        check("refunded amount read back", after.amount_refunded_paise,
+        check("refunded amount read back", after.amount_refunded_minor,
               args.cents if refund.status == "completed" else 0)
     except PayPalError as exc:
         print(f"\n  PayPal refused: {exc.code} {exc.description} (debug_id {exc.debug_id})")

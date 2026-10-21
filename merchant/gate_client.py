@@ -19,7 +19,7 @@ from typing import Protocol
 import httpx
 
 from contracts.crypto import verify
-from contracts.money import Paise
+from contracts.money import MinorUnits
 from contracts.reason_codes import ReasonCode
 from contracts.schemas import Headroom
 
@@ -30,9 +30,9 @@ GATE_URL = os.environ.get("PACT_GATE_URL", "http://localhost:8000")
 
 class GateClient(Protocol):
     def headroom(self, mandate_id: str) -> Headroom | None: ...
-    def redeem(self, token: str, amount_paise: Paise) -> tuple[bool, str, str | None]: ...
+    def redeem(self, token: str, amount_minor: MinorUnits) -> tuple[bool, str, str | None]: ...
     def commit(self, decision_id: str) -> bool: ...
-    def release(self, decision_id: str) -> Paise: ...
+    def release(self, decision_id: str) -> MinorUnits: ...
 
 
 class HttpGateClient(GateClient):
@@ -104,7 +104,7 @@ class HttpGateClient(GateClient):
             # cached key would then reject every envelope for the life of the
             # process, turning the growth feature off with health checks green.
             # That exact failure has happened here once already, from an empty
-            # merchant VPA, and it is the reason this retries rather than
+            # merchant payee, and it is the reason this retries rather than
             # refusing on the first mismatch.
         log.error(
             "headroom envelope for %s failed signature verification against the "
@@ -113,11 +113,11 @@ class HttpGateClient(GateClient):
         )
         return False
 
-    def redeem(self, token: str, amount_paise: Paise) -> tuple[bool, str, str | None]:
+    def redeem(self, token: str, amount_minor: MinorUnits) -> tuple[bool, str, str | None]:
         try:
             r = self._client.post(
                 "/v1/settlement/redeem",
-                json={"settlement_token": token, "amount_paise": amount_paise},
+                json={"settlement_token": token, "amount_minor": amount_minor},
             )
             r.raise_for_status()
             body = r.json()
@@ -146,11 +146,11 @@ class HttpGateClient(GateClient):
             log.error("commit failed for %s: %s", decision_id, exc)
             return False
 
-    def release(self, decision_id: str) -> Paise:
+    def release(self, decision_id: str) -> MinorUnits:
         try:
             r = self._client.post("/v1/settlement/release", json={"decision_id": decision_id})
             r.raise_for_status()
-            return int(r.json().get("released_paise", 0))
+            return int(r.json().get("released_minor", 0))
         except httpx.HTTPError as exc:
             # A release that does not happen is budget the buyer never gets
             # back. Loud, and the saga treats it as a failed compensation.
@@ -168,12 +168,12 @@ class InProcessGateClient(GateClient):
     def headroom(self, mandate_id: str) -> Headroom | None:
         return self.headroom_service.for_mandate(mandate_id)
 
-    def redeem(self, token: str, amount_paise: Paise) -> tuple[bool, str, str | None]:
-        ok, code, decision_id = self.gate.redeem_token(token, amount_paise=amount_paise)
+    def redeem(self, token: str, amount_minor: MinorUnits) -> tuple[bool, str, str | None]:
+        ok, code, decision_id = self.gate.redeem_token(token, amount_minor=amount_minor)
         return ok, str(code), decision_id
 
     def commit(self, decision_id: str) -> bool:
         return self.gate.ledger.commit(decision_id)
 
-    def release(self, decision_id: str) -> Paise:
+    def release(self, decision_id: str) -> MinorUnits:
         return self.gate.ledger.release(decision_id)

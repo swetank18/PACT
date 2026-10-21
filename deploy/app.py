@@ -58,7 +58,7 @@ CONSOLE_DIST = Path(os.environ.get("PACT_CONSOLE_DIST", REPO / "console" / "dist
 # client at import time, and a client built against the wrong URL would fail
 # every headroom lookup — which fails *closed*, so the upsell would silently
 # offer nothing and the growth demo would quietly do nothing at all.
-# Without a profile the gate has no merchant VPA and refuses to start. Default
+# Without a profile the gate has no merchant payee and refuses to start. Default
 # it here so a bare `docker run` works, while still letting the environment win.
 os.environ.setdefault("PACT_PROFILE", "razorpay-track01")
 

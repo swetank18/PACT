@@ -64,9 +64,9 @@ and the growth demo quietly does nothing at all.
 
 That second one is not hypothetical. It happened while building this, via a
 different route: with no `PACT_PROFILE` set the gate booted with an empty
-merchant VPA, every headroom envelope reported `merchant_in_scope: false`, and
+merchant payee, every headroom envelope reported `merchant_in_scope: false`, and
 the upsell withheld everything. Health checks were green throughout. The gate
-now refuses to start without a merchant VPA rather than running in that state.
+now refuses to start without a merchant payee rather than running in that state.
 
 ## One worker, deliberately
 
@@ -80,7 +80,7 @@ workers. Scaling means Postgres and a real queue, not `--workers 4`.
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `PORT` | `8080` | |
-| `PACT_PROFILE` | `razorpay-track01` | Sets the merchant VPA. **Required** — the gate will not start without one. |
+| `PACT_PROFILE` | `razorpay-track01` | Sets the merchant payee. **Required** — the gate will not start without one. |
 | `PACT_DB_URL` | `sqlite:////data/pact.db` | Mount a volume on `/data`. |
 | `PACT_GATE_KEY_PATH` | `/data/gate_signing_key.hex` | Lose this and headroom envelopes already issued stop verifying. |
 | `PACT_SAGA_STEP_DELAY_S` | `0.35` | Paces the rollback for the stage. `0` for the simulation. |

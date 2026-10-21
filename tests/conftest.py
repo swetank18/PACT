@@ -16,7 +16,7 @@ from core.gate.engine import Gate, GateConfig
 from core.ledger.headroom import HeadroomService
 from core.ledger.reservations import Ledger
 from core.mandate.store import MandateStore
-from merchant.catalog import MERCHANT_VPA, Inventory
+from merchant.catalog import MERCHANT_PAYEE, Inventory
 from merchant.gate_client import InProcessGateClient
 from merchant.quote import QuoteEngine
 from merchant.saga import OrderStore, SagaRunner
@@ -51,14 +51,14 @@ def gate(db, tmp_path):
     ledger = Ledger(db)
     g = Gate(
         db,
-        config=GateConfig(merchant_vpa=MERCHANT_VPA),
+        config=GateConfig(merchant_payee=MERCHANT_PAYEE),
         auditor=Auditor(api_key=None),  # deterministic mode; no network in tests
         mandates=mandates,
         ledger=ledger,
         audit=audit,
     )
     g.headroom_service = HeadroomService(
-        mandates, ledger, merchant_vpa=MERCHANT_VPA, signing_key=Ed25519PrivateKey.generate()
+        mandates, ledger, merchant_payee=MERCHANT_PAYEE, signing_key=Ed25519PrivateKey.generate()
     )
     return g
 
@@ -70,10 +70,10 @@ def make_mandate(gate, keys):
     def _make(**overrides):
         now = datetime.now(timezone.utc)
         constraints = {
-            "max_per_txn_paise": 500_000,
-            "max_total_paise": 1_500_000,
+            "max_per_txn_minor": 500_000,
+            "max_total_minor": 1_500_000,
             "max_count": 5,
-            "merchant_allowlist": [MERCHANT_VPA],
+            "merchant_allowlist": [MERCHANT_PAYEE],
             "category_allowlist": ["stationery", "cables", "office_furniture"],
             "valid_from": iso(now - timedelta(minutes=1)),
             "valid_until": iso(now + timedelta(days=1)),
@@ -81,7 +81,7 @@ def make_mandate(gate, keys):
         constraints.update(overrides.pop("constraints", {}))
         m = Mandate(
             mandate_id=overrides.pop("mandate_id", new_id("mnd")),
-            delegator={"vpa": "swetank@okaxis", "pubkey": pub},
+            delegator={"account": "swetank@okaxis", "pubkey": pub},
             delegate={"agent_id": "buyer_agent_v1", "pubkey": pub},
             intent=overrides.pop("intent", "restock office supplies for the month"),
             constraints=constraints,
@@ -109,8 +109,8 @@ def authorize(gate, keys):
         payload = {
             "mandate_id": mandate.mandate_id,
             "quote_id": quote.quote_id,
-            "amount_paise": quote.total_paise,
-            "payee_vpa": MERCHANT_VPA,
+            "amount_minor": quote.total_minor,
+            "payee": MERCHANT_PAYEE,
             "nonce": new_id("dec"),
             "issued_at": iso(datetime.now(timezone.utc)),
             "context": {

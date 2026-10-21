@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from contracts.ids import new_id
-from contracts.money import Paise
+from contracts.money import MinorUnits
 from buyer.agent import BuyerAgent, Mandate, SessionResult
 
 #: Share of sessions that are adversarial. An assumption, stated everywhere it
@@ -61,7 +61,7 @@ class HostileOutcome:
     verdict: str
     reason_code: str
     settled: bool
-    loss_paise: Paise = 0
+    loss_minor: MinorUnits = 0
     detail: str = ""
 
 
@@ -72,7 +72,7 @@ def should_be_hostile(rng: random.Random, rate: float = HOSTILE_SESSION_RATE) ->
 def attempt(
     agent: BuyerAgent,
     mandate: Mandate,
-    merchant_vpa: str,
+    merchant_payee: str,
     result: SessionResult,
     *,
     behaviour: str | None = None,
@@ -90,28 +90,28 @@ def attempt(
         decision = agent.authorize(
             mandate,
             quote,
-            merchant_vpa,
+            merchant_payee,
             payee_override="settlements@okaxis",
             excerpt=INJECTED_PAGE,
         )
         # The money went to an attacker. The whole amount is the loss.
-        loss = quote["total_paise"]
+        loss = quote["total_minor"]
         detail = "payment redirected to settlements@okaxis"
 
     elif behaviour == "price_inflation":
-        inflated = quote["total_paise"] + 250_000
-        decision = agent.authorize(mandate, quote, merchant_vpa, amount_override=inflated)
+        inflated = quote["total_minor"] + 250_000
+        decision = agent.authorize(mandate, quote, merchant_payee, amount_override=inflated)
         # The buyer disputes the difference between what they agreed and what
         # they were charged.
-        loss = inflated - quote["total_paise"]
-        detail = f"charged {inflated} against a quote of {quote['total_paise']}"
+        loss = inflated - quote["total_minor"]
+        detail = f"charged {inflated} against a quote of {quote['total_minor']}"
 
     else:  # replay
         nonce = new_id("dec")
-        agent.authorize(mandate, quote, merchant_vpa, nonce_override=nonce)
-        decision = agent.authorize(mandate, quote, merchant_vpa, nonce_override=nonce)
+        agent.authorize(mandate, quote, merchant_payee, nonce_override=nonce)
+        decision = agent.authorize(mandate, quote, merchant_payee, nonce_override=nonce)
         # The duplicate charge is refunded and the merchant carries the cost.
-        loss = quote["total_paise"]
+        loss = quote["total_minor"]
         detail = "the same signed request submitted twice"
 
     settled = decision["verdict"] == "ALLOW"
@@ -120,13 +120,13 @@ def attempt(
         verdict=decision["verdict"],
         reason_code=decision["reason_code"],
         settled=settled,
-        loss_paise=loss if settled else 0,
+        loss_minor=loss if settled else 0,
         detail=detail,
     )
 
     result.decisions.append(decision)
     if settled:
-        result.loss_paise += outcome.loss_paise
+        result.loss_minor += outcome.loss_minor
         result.say(f"HOSTILE {behaviour} settled: {detail}")
     else:
         result.say(f"HOSTILE {behaviour} refused: {decision['reason_code']}")

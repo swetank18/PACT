@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
-from contracts.money import Paise
+from contracts.money import MinorUnits
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +26,7 @@ class RailIntent:
     elsewhere."""
 
     intent_id: str
-    amount_paise: Paise
+    amount_minor: MinorUnits
     status: str
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -50,8 +50,8 @@ class RailResult:
 class RailStatus:
     intent_id: str
     status: str
-    amount_paise: Paise
-    amount_refunded_paise: Paise = 0
+    amount_minor: MinorUnits
+    amount_refunded_minor: MinorUnits = 0
     payment_id: str | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -65,11 +65,11 @@ class RailAdapter(Protocol):
 
     name: str
 
-    def create_intent(self, amount_paise: Paise, ref: str, idem_key: str) -> RailIntent: ...
+    def create_intent(self, amount_minor: MinorUnits, ref: str, idem_key: str) -> RailIntent: ...
 
-    def capture(self, intent_id: str, amount_paise: Paise, idem_key: str) -> RailResult: ...
+    def capture(self, intent_id: str, amount_minor: MinorUnits, idem_key: str) -> RailResult: ...
 
-    def refund(self, intent_id: str, amount_paise: Paise, idem_key: str) -> RailResult: ...
+    def refund(self, intent_id: str, amount_minor: MinorUnits, idem_key: str) -> RailResult: ...
 
     def status(self, intent_id: str) -> RailStatus: ...
 

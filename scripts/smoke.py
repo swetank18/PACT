@@ -195,9 +195,9 @@ def check_beat_1(base: str) -> str:
     r = request(base, "/api/sim/demo/beat/1", "POST")
     if not r.get("completed"):
         raise Failure(f"beat 1 did not complete: {r}")
-    if r.get("gmv_paise", 0) <= 0:
+    if r.get("gmv_minor", 0) <= 0:
         raise Failure(f"beat 1 booked no GMV: {r}")
-    return f"purchase completed, {r['gmv_paise']} paise"
+    return f"purchase completed, {r['gmv_minor']} paise"
 
 
 def check_beat_2(base: str) -> str:
@@ -208,7 +208,7 @@ def check_beat_2(base: str) -> str:
         raise Failure(f"beat 2 offered no addon: {r}")
     if not r.get("upsell_accepted"):
         raise Failure(f"beat 2 offered but did not land the addon: {r}")
-    return f"addon offered and accepted, {r['gmv_paise']} paise"
+    return f"addon offered and accepted, {r['gmv_minor']} paise"
 
 
 def check_beat_3(base: str) -> str:
@@ -245,9 +245,9 @@ def check_beat_5(base: str) -> str:
     r = request(base, "/api/sim/demo/beat/5", "POST")
     if not r.get("recovered"):
         raise Failure(f"beat 5 did not recover the sale: {r}")
-    if r.get("refunded_paise", 0) <= 0:
+    if r.get("refunded_minor", 0) <= 0:
         raise Failure(f"beat 5 recovered without refunding: {r}")
-    return f"rolled back, {r['refunded_paise']} paise refunded, sale recovered"
+    return f"rolled back, {r['refunded_minor']} paise refunded, sale recovered"
 
 
 def check_beat_6(base: str) -> str:

@@ -32,11 +32,11 @@ from contracts.schemas import Mandate, QuoteItemRequest
 from core.db import Database
 from core.ledger.reservations import Ledger
 from core.mandate.store import MandateStore
-from merchant.catalog import MERCHANT_VPA
+from merchant.catalog import MERCHANT_PAYEE
 from tests.conftest import iso
 
 CONCURRENCY = 20
-PER_PAYMENT_PAISE = 100_000
+PER_PAYMENT_MINOR = 100_000
 
 
 @pytest.fixture
@@ -49,10 +49,10 @@ def _mandate_on(db: Database, **constraint_overrides) -> Mandate:
     priv, pub = generate_keypair()
     now = datetime.now(timezone.utc)
     constraints = {
-        "max_per_txn_paise": PER_PAYMENT_PAISE,
-        "max_total_paise": 5 * PER_PAYMENT_PAISE,
+        "max_per_txn_minor": PER_PAYMENT_MINOR,
+        "max_total_minor": 5 * PER_PAYMENT_MINOR,
         "max_count": 50,  # not the binding constraint unless a test says so
-        "merchant_allowlist": [MERCHANT_VPA],
+        "merchant_allowlist": [MERCHANT_PAYEE],
         "category_allowlist": ["stationery"],
         "valid_from": iso(now - timedelta(minutes=1)),
         "valid_until": iso(now + timedelta(days=1)),
@@ -60,7 +60,7 @@ def _mandate_on(db: Database, **constraint_overrides) -> Mandate:
     constraints.update(constraint_overrides)
     m = Mandate(
         mandate_id=new_id("mnd"),
-        delegator={"vpa": "swetank@okaxis", "pubkey": pub},
+        delegator={"account": "swetank@okaxis", "pubkey": pub},
         delegate={"agent_id": "buyer_agent_v1", "pubkey": pub},
         intent="restock office supplies",
         constraints=constraints,
@@ -80,7 +80,7 @@ def _fire(fn, mandate, n: int) -> list:
         return fn(
             mandate_id=mandate.mandate_id,
             decision_id=new_id("dec"),
-            amount_paise=PER_PAYMENT_PAISE,
+            amount_minor=PER_PAYMENT_MINOR,
             constraints=mandate.constraints,
         )
 
@@ -97,13 +97,13 @@ def test_atomic_reservation_never_exceeds_the_total_cap(file_db):
     spent, _ = ledger.spent_and_count(mandate.mandate_id)
 
     assert len(approved) == 5, f"expected exactly 5 approvals, got {len(approved)}"
-    assert spent == 5 * PER_PAYMENT_PAISE
-    assert spent <= mandate.constraints.max_total_paise
+    assert spent == 5 * PER_PAYMENT_MINOR
+    assert spent <= mandate.constraints.max_total_minor
 
 
 def test_the_count_ceiling_holds_under_concurrency_too(file_db):
     mandate = _mandate_on(
-        file_db, max_total_paise=100 * PER_PAYMENT_PAISE, max_count=3
+        file_db, max_total_minor=100 * PER_PAYMENT_MINOR, max_count=3
     )
     ledger = Ledger(file_db)
 
@@ -119,7 +119,7 @@ def test_the_naive_ledger_overspends(file_db, capsys):
     outcomes = _fire(ledger.naive_reserve, mandate, CONCURRENCY)
     approved = len([o for o in outcomes if o.ok])
     spent, _ = ledger.spent_and_count(mandate.mandate_id)
-    cap = mandate.constraints.max_total_paise
+    cap = mandate.constraints.max_total_minor
 
     assert approved > 5, (
         f"the naive ledger approved {approved}, not more than the cap allows. "
@@ -129,7 +129,7 @@ def test_the_naive_ledger_overspends(file_db, capsys):
 
     with capsys.disabled():
         print(
-            f"\n    atomic: 5 approved, {5 * PER_PAYMENT_PAISE} paise, cap {cap}"
+            f"\n    atomic: 5 approved, {5 * PER_PAYMENT_MINOR} paise, cap {cap}"
             f"\n    naive:  {approved} approved, {spent} paise, cap {cap} "
             f"-> overspent by {spent - cap}\n"
         )
@@ -144,9 +144,9 @@ def test_a_blocked_request_gives_its_budget_back(quotes, authorize, make_mandate
     mandate = make_mandate()
     q = quotes.build([QuoteItemRequest(sku="STA-NB-A5")], mandate_id=mandate.mandate_id)
 
-    before = gate.ledger.headroom_paise(mandate.mandate_id, mandate.constraints)
-    d = authorize(mandate, q, amount_paise=q.total_paise + 50_000)
-    after = gate.ledger.headroom_paise(mandate.mandate_id, mandate.constraints)
+    before = gate.ledger.headroom_minor(mandate.mandate_id, mandate.constraints)
+    d = authorize(mandate, q, amount_minor=q.total_minor + 50_000)
+    after = gate.ledger.headroom_minor(mandate.mandate_id, mandate.constraints)
 
     assert d.verdict == "BLOCK"
     assert after == before, "a blocked request must not hold budget"
@@ -164,7 +164,7 @@ def test_a_step_up_keeps_its_reservation(db, make_mandate, gate):
     outcome = ledger.reserve(
         mandate_id=mandate.mandate_id,
         decision_id=decision_id,
-        amount_paise=50_000,
+        amount_minor=50_000,
         constraints=mandate.constraints,
     )
     assert outcome.ok
@@ -177,7 +177,7 @@ def test_the_sweeper_releases_expired_reservations(db, make_mandate):
     assert ledger.reserve(
         mandate_id=mandate.mandate_id,
         decision_id=new_id("dec"),
-        amount_paise=50_000,
+        amount_minor=50_000,
         constraints=mandate.constraints,
     ).ok
 
@@ -199,7 +199,7 @@ def test_the_sweeper_never_expires_committed_money(db, make_mandate):
     ledger.reserve(
         mandate_id=mandate.mandate_id,
         decision_id=decision_id,
-        amount_paise=50_000,
+        amount_minor=50_000,
         constraints=mandate.constraints,
     )
     ledger.commit(decision_id)

@@ -86,7 +86,7 @@ def beat_1() -> dict:
             manifest=manifest,
             force_skus=BEAT_BASKETS[1],
         )
-        return {"beat": 1, "completed": r.completed, "gmv_paise": r.gmv_paise,
+        return {"beat": 1, "completed": r.completed, "gmv_minor": r.gmv_minor,
                 "transcript": r.transcript}
     finally:
         agent.close()
@@ -102,7 +102,7 @@ def beat_2() -> dict:
         r = run_session(
             agent, persona, arm="demo", manifest=manifest, force_skus=BEAT_BASKETS[2]
         )
-        return {"beat": 2, "completed": r.completed, "gmv_paise": r.gmv_paise,
+        return {"beat": 2, "completed": r.completed, "gmv_minor": r.gmv_minor,
                 "upsell_offered": r.upsell_offered, "upsell_accepted": r.upsell_accepted,
                 "transcript": r.transcript}
     finally:
@@ -159,13 +159,13 @@ def beat_4() -> dict:
     agent = _agent()
     try:
         manifest = agent.discover()
-        vpa = manifest["merchant_vpa"]
+        payee = manifest["merchant_payee"]
         persona = _persona("p_office_manager")
         out = []
-        out += attacks.atk_05_price_hallucination(agent, agent.issue_mandate(persona, vpa), vpa)[:1]
-        out += attacks.atk_04_lookalike_vpa(agent, agent.issue_mandate(persona, vpa), vpa)[:1]
-        out += attacks.atk_02_replay(agent, agent.issue_mandate(persona, vpa), vpa)
-        out += attacks.atk_01_injection(agent, agent.issue_mandate(persona, vpa), vpa)[:1]
+        out += attacks.atk_05_price_hallucination(agent, agent.issue_mandate(persona, payee), payee)[:1]
+        out += attacks.atk_04_lookalike_payee(agent, agent.issue_mandate(persona, payee), payee)[:1]
+        out += attacks.atk_02_replay(agent, agent.issue_mandate(persona, payee), payee)
+        out += attacks.atk_01_injection(agent, agent.issue_mandate(persona, payee), payee)[:1]
         return {
             "beat": 4,
             "attacks": [
@@ -199,8 +199,8 @@ def beat_5() -> dict:
         return {
             "beat": 5,
             "recovered": r.saga_recoveries > 0,
-            "refunded_paise": r.refunded_paise,
-            "gmv_paise": r.gmv_paise,
+            "refunded_minor": r.refunded_minor,
+            "gmv_minor": r.gmv_minor,
             "orders": r.order_ids,
             "transcript": r.transcript,
         }

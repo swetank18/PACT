@@ -15,7 +15,7 @@ from typing import Any, Sequence
 
 import httpx
 
-from contracts.money import Paise
+from contracts.money import MinorUnits
 from buyer.agent import SessionResult
 
 
@@ -24,9 +24,9 @@ class ArmMetrics:
     arm: str
     sessions: int = 0
 
-    gmv_paise: Paise = 0
+    gmv_minor: MinorUnits = 0
     completed: int = 0
-    avg_order_value_paise: Paise = 0
+    avg_order_value_minor: MinorUnits = 0
 
     upsell_offers_made: int = 0
     upsell_offers_accepted: int = 0
@@ -37,13 +37,13 @@ class ArmMetrics:
     false_blocks: int = 0
 
     saga_recoveries: int = 0
-    refunded_paise: Paise = 0
-    loss_paise: Paise = 0
+    refunded_minor: MinorUnits = 0
+    loss_minor: MinorUnits = 0
     errors: int = 0
 
     @property
     def gmv_per_100(self) -> float:
-        return (self.gmv_paise / self.sessions * 100) if self.sessions else 0.0
+        return (self.gmv_minor / self.sessions * 100) if self.sessions else 0.0
 
     @property
     def completion_rate(self) -> float:
@@ -81,9 +81,9 @@ class ArmMetrics:
         return self.step_ups_recovered / self.step_ups if self.step_ups else 0.0
 
     @property
-    def net_revenue_paise(self) -> Paise:
+    def net_revenue_minor(self) -> MinorUnits:
         """GMV minus what was lost and what was refunded. The bottom line."""
-        return self.gmv_paise - self.loss_paise
+        return self.gmv_minor - self.loss_minor
 
     @property
     def loss_per_100(self) -> float:
@@ -94,19 +94,19 @@ class ArmMetrics:
         loss look three times larger than it is. Every money column in the table
         is per 100 sessions.
         """
-        return (self.loss_paise / self.sessions * 100) if self.sessions else 0.0
+        return (self.loss_minor / self.sessions * 100) if self.sessions else 0.0
 
     @property
     def net_per_100(self) -> float:
-        return (self.net_revenue_paise / self.sessions * 100) if self.sessions else 0.0
+        return (self.net_revenue_minor / self.sessions * 100) if self.sessions else 0.0
 
     def to_row(self) -> dict[str, Any]:
         return {
             "arm": self.arm,
             "sessions": self.sessions,
-            "gmv_per_100_paise": round(self.gmv_per_100),
+            "gmv_per_100_minor": round(self.gmv_per_100),
             "completion_rate": round(self.completion_rate, 4),
-            "aov_paise": self.avg_order_value_paise,
+            "aov_minor": self.avg_order_value_minor,
             "offers_made": self.upsell_offers_made,
             "offers_accepted": self.upsell_offers_accepted,
             "offers_rejected_by_gate": self.upsell_rejected_by_gate,
@@ -115,8 +115,8 @@ class ArmMetrics:
             "false_block_rate": round(self.false_block_rate, 4),
             "step_up_recovery_rate": round(self.step_up_recovery_rate, 4),
             "saga_recoveries": self.saga_recoveries,
-            "loss_paise": self.loss_paise,
-            "net_per_100_paise": round(self.net_per_100),
+            "loss_minor": self.loss_minor,
+            "net_per_100_minor": round(self.net_per_100),
             "errors": self.errors,
         }
 
@@ -124,9 +124,9 @@ class ArmMetrics:
 def aggregate(arm: str, sessions: Sequence[SessionResult]) -> ArmMetrics:
     m = ArmMetrics(arm=arm, sessions=len(sessions))
     for s in sessions:
-        m.gmv_paise += s.gmv_paise
-        m.loss_paise += s.loss_paise
-        m.refunded_paise += s.refunded_paise
+        m.gmv_minor += s.gmv_minor
+        m.loss_minor += s.loss_minor
+        m.refunded_minor += s.refunded_minor
         m.upsell_offers_made += s.upsell_offered
         m.upsell_offers_accepted += s.upsell_accepted
         m.upsell_rejected_by_gate += s.upsell_rejected_by_gate
@@ -139,7 +139,7 @@ def aggregate(arm: str, sessions: Sequence[SessionResult]) -> ArmMetrics:
         if s.error:
             m.errors += 1
 
-    m.avg_order_value_paise = round(m.gmv_paise / m.completed) if m.completed else 0
+    m.avg_order_value_minor = round(m.gmv_minor / m.completed) if m.completed else 0
     return m
 
 
@@ -159,8 +159,8 @@ def mean_and_range(values: Sequence[float]) -> tuple[float, float, float]:
 class CrossCheck:
     """What the engine says, next to what the harness says."""
 
-    engine_gmv_paise: Paise = 0
-    harness_gmv_paise: Paise = 0
+    engine_gmv_minor: MinorUnits = 0
+    harness_gmv_minor: MinorUnits = 0
     engine_decisions: int = 0
     harness_decisions: int = 0
     discrepancies: list[str] = field(default_factory=list)
@@ -202,15 +202,15 @@ def cross_check(
         check.discrepancies.append(f"could not reach the services: {exc}")
         return check
 
-    check.engine_gmv_paise = int(stats.get("gmv_paise", 0))
-    check.harness_gmv_paise = sum(s.gmv_paise for s in sessions)
+    check.engine_gmv_minor = int(stats.get("gmv_minor", 0))
+    check.harness_gmv_minor = sum(s.gmv_minor for s in sessions)
     check.engine_decisions = len(decisions.get("decisions", []))
     check.harness_decisions = sum(len(s.decisions) for s in sessions)
 
-    if check.engine_gmv_paise != check.harness_gmv_paise:
+    if check.engine_gmv_minor != check.harness_gmv_minor:
         check.discrepancies.append(
-            f"GMV: merchant says {check.engine_gmv_paise}, harness says "
-            f"{check.harness_gmv_paise}. The merchant is right; the harness has a bug."
+            f"GMV: merchant says {check.engine_gmv_minor}, harness says "
+            f"{check.harness_gmv_minor}. The merchant is right; the harness has a bug."
         )
     # The decision log is capped at 200 rows, so a long run legitimately shows
     # fewer engine decisions than the harness made. Only the other direction is

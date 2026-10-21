@@ -172,8 +172,8 @@ function SlideGrowth() {
       <div className={s.mech}>
         <div className={s.mechBox}>
           <span className={s.mechLabel}>What the merchant is told</span>
-          <pre className={s.mechCode}>{`headroom_paise        8,90,000
-max_per_txn_paise     5,00,000
+          <pre className={s.mechCode}>{`headroom_minor        8,90,000
+max_per_txn_minor     5,00,000
 payments_remaining    3
 categories_allowed    stationery, cables
 valid_until           2026-08-31T10:00:00Z
@@ -189,9 +189,9 @@ signature             signed by the gate`}</pre>
 
         <div className={s.mechBox}>
           <span className={s.mechLabel}>What the merchant may offer</span>
-          <pre className={s.mechCode}>{`line_total <= headroom_paise
+          <pre className={s.mechCode}>{`line_total <= headroom_minor
 category   in categories_allowed
-line_total <= max_per_txn_paise
+line_total <= max_per_txn_minor
 payments_remaining > 0`}</pre>
           <span className="faint" style={{ fontSize: "var(--fs-sm)" }}>
             Four conditions, checked before the offer is made rather than after it is refused.

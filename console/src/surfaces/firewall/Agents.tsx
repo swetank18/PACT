@@ -354,7 +354,7 @@ function AgentDetail({
                         <HealthDot health={healthFor(sm, hr, blocks)} />
                       </td>
                       <td>{sm.mandate.intent}</td>
-                      <td className={f.numCell}>{inr(sm.mandate.constraints.max_total_paise)}</td>
+                      <td className={f.numCell}>{inr(sm.mandate.constraints.max_total_minor)}</td>
                       <td>
                         <StatusBadge status={statusOf(sm, hr)} />
                       </td>
@@ -391,8 +391,8 @@ function AgentDetail({
                     <td>
                       <VerdictBadge verdict={d.verdict} />
                     </td>
-                    <td className={f.mono}>{d.payee_vpa}</td>
-                    <td className={f.numCell}>{inr(d.amount_paise)}</td>
+                    <td className={f.mono}>{d.payee}</td>
+                    <td className={f.numCell}>{inr(d.amount_minor)}</td>
                     <td>
                       <Ago at={d.at} />
                     </td>

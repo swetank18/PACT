@@ -54,7 +54,7 @@ import httpx  # noqa: E402
 from buyer.agent import BuyerAgent, iso  # noqa: E402
 from contracts.money import rupees  # noqa: E402
 
-PER_TXN_PAISE = 500_000
+PER_TXN_MINOR = 500_000
 
 
 def percentiles(values: list[float]) -> str:
@@ -69,7 +69,7 @@ def percentiles(values: list[float]) -> str:
     )
 
 
-def persona(total_paise: int, count: int) -> dict[str, Any]:
+def persona(total_minor: int, count: int) -> dict[str, Any]:
     """A persona in the shape sim/personas.yaml uses, with the ceiling set here
     rather than drawn from the file — the point is a known, tight limit."""
     return {
@@ -79,8 +79,8 @@ def persona(total_paise: int, count: int) -> dict[str, Any]:
         "addon_receptivity": 0.0,
         "step_up_approval": 0.0,
         "mandate": {
-            "max_total_paise": total_paise,
-            "max_per_txn_paise": PER_TXN_PAISE,
+            "max_total_minor": total_minor,
+            "max_per_txn_minor": PER_TXN_MINOR,
             "max_count": count,
             "categories": ["stationery", "cables", "office_furniture"],
             "valid_hours": 24,
@@ -113,16 +113,16 @@ def ceiling_mode(base: str, allowed: int, racers_each: int) -> int:
     setup = agent_for(base)
     racers = allowed * racers_each
     try:
-        vpa = setup.discover()["merchant_vpa"]
+        payee = setup.discover()["merchant_payee"]
         # Priced first, with no mandate, so the budget can be set to exactly
         # `allowed` purchases and nothing else can be the binding constraint.
-        unit = setup.quote([{"sku": "FUR-LMP-01", "qty": 1}], None)["total_paise"]
+        unit = setup.quote([{"sku": "FUR-LMP-01", "qty": 1}], None)["total_minor"]
         # max_count deliberately generous. Otherwise the count ceiling binds
         # first and this measures a comparison against an integer instead of the
         # SUM over reservations computed inside BEGIN IMMEDIATE — which is the
         # thing the whole design rests on and the only one with a real race in
         # it.
-        mandate = setup.issue_mandate(persona(unit * allowed, racers + 10), vpa)
+        mandate = setup.issue_mandate(persona(unit * allowed, racers + 10), payee)
     finally:
         setup.close()
 
@@ -139,12 +139,12 @@ def ceiling_mode(base: str, allowed: int, racers_each: int) -> int:
         try:
             q = agent.quote([{"sku": "FUR-LMP-01", "qty": 1}], mandate.id)
             started = time.perf_counter()
-            decision = agent.authorize(mandate, q, vpa)
+            decision = agent.authorize(mandate, q, payee)
             elapsed = time.perf_counter() - started
             if decision["verdict"] != "ALLOW":
                 return decision["reason_code"], 0, elapsed
             agent.create_order(q["quote_id"], decision)
-            return "SETTLED", q["total_paise"], elapsed
+            return "SETTLED", q["total_minor"], elapsed
         except httpx.HTTPStatusError as exc:
             # Classified by the reason code, not by the status.
             #
@@ -238,7 +238,7 @@ def throughput_mode(base: str, sessions: int, concurrency: int) -> int:
     """Independent buyers, a full purchase each, all at once."""
     setup = agent_for(base)
     try:
-        vpa = setup.discover()["merchant_vpa"]
+        payee = setup.discover()["merchant_payee"]
     finally:
         setup.close()
 
@@ -246,9 +246,9 @@ def throughput_mode(base: str, sessions: int, concurrency: int) -> int:
         agent = agent_for(base)
         started = time.perf_counter()
         try:
-            mandate = agent.issue_mandate(persona(PER_TXN_PAISE * 3, 3), vpa)
+            mandate = agent.issue_mandate(persona(PER_TXN_MINOR * 3, 3), payee)
             quote = agent.quote([{"sku": "STA-NB-A5", "qty": 1}], mandate.id)
-            decision = agent.authorize(mandate, quote, vpa)
+            decision = agent.authorize(mandate, quote, payee)
             if decision["verdict"] != "ALLOW":
                 return False, time.perf_counter() - started, decision["reason_code"]
             agent.create_order(quote["quote_id"], decision)

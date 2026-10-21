@@ -38,7 +38,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from contracts.money import Paise
+from contracts.money import MinorUnits
 from contracts.schemas import utcnow
 from core.db import Database
 
@@ -91,7 +91,7 @@ class PayPalError(RuntimeError):
 # --------------------------------------------------------------- money ----
 
 
-def to_value(amount_minor: Paise, currency: str) -> str:
+def to_value(amount_minor: MinorUnits, currency: str) -> str:
     """Integer minor units to PayPal's decimal string. Never via a float."""
     if isinstance(amount_minor, bool) or not isinstance(amount_minor, int):
         raise ValueError(f"amount must be integer minor units, got {amount_minor!r}")
@@ -104,7 +104,7 @@ def to_value(amount_minor: Paise, currency: str) -> str:
     return f"{amount_minor // unit}.{amount_minor % unit:0{places}d}"
 
 
-def from_value(value: str, currency: str) -> Paise:
+def from_value(value: str, currency: str) -> MinorUnits:
     """
     PayPal's decimal string back to integer minor units. Refuses a value with
     more decimals than the currency has, because rounding it would invent or
@@ -349,7 +349,7 @@ class PayPalClient:
     # ------------------------------------------------------------- orders ----
 
     def create_authorized_order(
-        self, amount_minor: Paise, ref: str, vault_id: str, idem_key: str
+        self, amount_minor: MinorUnits, ref: str, vault_id: str, idem_key: str
     ) -> dict:
         """
         Create and authorise in one call against a vaulted wallet: the shape
@@ -398,7 +398,7 @@ class PayPalClient:
     def get_authorization(self, authorization_id: str) -> dict:
         return self._request("GET", f"/v2/payments/authorizations/{authorization_id}")
 
-    def capture(self, authorization_id: str, amount_minor: Paise, idem_key: str) -> dict:
+    def capture(self, authorization_id: str, amount_minor: MinorUnits, idem_key: str) -> dict:
         """
         Capture exactly the amount the gate allowed, and say it is the last
         capture, so the authorization cannot be drawn on again.
@@ -460,7 +460,7 @@ class PayPalClient:
 
     # ------------------------------------------------------------- refunds ---
 
-    def refund(self, capture_id: str, amount_minor: Paise, idem_key: str) -> dict:
+    def refund(self, capture_id: str, amount_minor: MinorUnits, idem_key: str) -> dict:
         """
         Always with an amount. An empty body refunds "whatever is left", and a
         retry of that after a partial refund would be a different refund.

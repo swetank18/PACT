@@ -46,7 +46,7 @@ def test_every_persona_has_what_the_harness_needs(personas):
         assert 0.0 <= p["addon_receptivity"] <= 1.0
         assert 0.0 <= p["step_up_approval"] <= 1.0
         m = p["mandate"]
-        assert m["max_per_txn_paise"] <= m["max_total_paise"]
+        assert m["max_per_txn_minor"] <= m["max_total_minor"]
         assert m["max_count"] >= 1
         assert m["categories"]
 
@@ -77,7 +77,7 @@ def test_the_awkward_personas_are_actually_awkward(personas):
     tight = by_id["p_tight_budget"]["mandate"]
     narrow = by_id["p_narrow_category"]["mandate"]
     assert tight["max_count"] == 1
-    assert tight["max_total_paise"] <= 500_000
+    assert tight["max_total_minor"] <= 500_000
     assert len(narrow["categories"]) == 1
 
 
@@ -131,17 +131,17 @@ def test_aggregate_counts_what_the_names_say():
     m = aggregate(
         "D",
         [
-            _session(completed=True, gmv_paise=100_000, upsell_offered=2, upsell_accepted=1),
+            _session(completed=True, gmv_minor=100_000, upsell_offered=2, upsell_accepted=1),
             _session(completed=False, upsell_offered=1),
-            _session(completed=True, gmv_paise=50_000, loss_paise=10_000),
+            _session(completed=True, gmv_minor=50_000, loss_minor=10_000),
         ],
     )
     assert m.sessions == 3
     assert m.completed == 2
-    assert m.gmv_paise == 150_000
-    assert m.avg_order_value_paise == 75_000
+    assert m.gmv_minor == 150_000
+    assert m.avg_order_value_minor == 75_000
     assert m.attach_rate == pytest.approx(1 / 3)
-    assert m.net_revenue_paise == 140_000
+    assert m.net_revenue_minor == 140_000
 
 
 def test_every_money_metric_is_reported_per_hundred_sessions():
@@ -149,7 +149,7 @@ def test_every_money_metric_is_reported_per_hundred_sessions():
     A multi-seed total sitting next to a per-100 mean makes the loss look
     several times larger than it is. Both are per 100.
     """
-    m = ArmMetrics(arm="D", sessions=200, gmv_paise=400_000, loss_paise=40_000)
+    m = ArmMetrics(arm="D", sessions=200, gmv_minor=400_000, loss_minor=40_000)
     assert m.gmv_per_100 == 200_000
     assert m.loss_per_100 == 20_000
     assert m.net_per_100 == 180_000

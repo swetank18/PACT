@@ -25,7 +25,7 @@ import json
 import logging
 from collections.abc import Callable
 
-from contracts.money import Paise
+from contracts.money import MinorUnits
 from core.rail import RailAdapter, RailIntent, RailResult, RailStatus
 from rails.paypal.client import PayPalClient, PayPalError, from_value
 
@@ -68,7 +68,7 @@ class PayPalAdapter(RailAdapter):
         #: interface does not change, only this function.
         self.vault_id_for = vault_id_for or (lambda _ref: client.credentials.vault_id)
 
-    def create_intent(self, amount_paise: Paise, ref: str, idem_key: str) -> RailIntent:
+    def create_intent(self, amount_minor: MinorUnits, ref: str, idem_key: str) -> RailIntent:
         vault_id = self.vault_id_for(ref)
         if not vault_id:
             raise PayPalError(
@@ -76,7 +76,7 @@ class PayPalAdapter(RailAdapter):
                 "no vaulted PayPal wallet to charge; set PAYPAL_VAULT_ID", {},
             )
 
-        body = self.client.create_authorized_order(amount_paise, ref, vault_id, idem_key)
+        body = self.client.create_authorized_order(amount_minor, ref, vault_id, idem_key)
         authorization = _first(body, "authorizations")
         status = str((authorization or {}).get("status", ""))
 
@@ -93,18 +93,18 @@ class PayPalAdapter(RailAdapter):
         amount = authorization.get("amount") or {}
         return RailIntent(
             intent_id=str(body["id"]),
-            amount_paise=from_value(amount["value"], amount["currency_code"])
-            if amount else amount_paise,
+            amount_minor=from_value(amount["value"], amount["currency_code"])
+            if amount else amount_minor,
             status="authorized",
             raw={"payment_id": authorization["id"], "order_status": body.get("status"),
                  "replayed": bool(body.get("_replayed"))},
         )
 
-    def capture(self, intent_id: str, amount_paise: Paise, idem_key: str) -> RailResult:
+    def capture(self, intent_id: str, amount_minor: MinorUnits, idem_key: str) -> RailResult:
         """`intent_id` here is the authorization id, which `create_intent`
         returned as `payment_id` — the saga captures what that names."""
         try:
-            body = self.client.capture(intent_id, amount_paise, idem_key)
+            body = self.client.capture(intent_id, amount_minor, idem_key)
         except PayPalError as exc:
             self._void(intent_id, idem_key)
             return _failed(exc)
@@ -134,11 +134,11 @@ class PayPalAdapter(RailAdapter):
         except PayPalError as exc:
             log.warning("could not void %s after a failed capture: %s", authorization_id, exc)
 
-    def refund(self, intent_id: str, amount_paise: Paise, idem_key: str) -> RailResult:
+    def refund(self, intent_id: str, amount_minor: MinorUnits, idem_key: str) -> RailResult:
         """`intent_id` is the capture id, which the saga stored as the order's
         `rail_payment_id`."""
         try:
-            body = self.client.refund(intent_id, amount_paise, idem_key)
+            body = self.client.refund(intent_id, amount_minor, idem_key)
         except PayPalError as exc:
             return _failed(exc)
 
@@ -184,8 +184,8 @@ class PayPalAdapter(RailAdapter):
         return RailStatus(
             intent_id=intent_id,
             status=status,
-            amount_paise=amount,
-            amount_refunded_paise=refunded,
+            amount_minor=amount,
+            amount_refunded_minor=refunded,
             payment_id=payment_id,
             raw=body,
         )
@@ -218,7 +218,7 @@ def _first(order: dict, kind: str) -> dict | None:
     return found[0] if found else None
 
 
-def _minor(money: dict | None, currency: str) -> Paise:
+def _minor(money: dict | None, currency: str) -> MinorUnits:
     if not money:
         return 0
     return from_value(money["value"], money.get("currency_code", currency))

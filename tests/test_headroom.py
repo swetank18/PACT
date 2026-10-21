@@ -19,8 +19,8 @@ from contracts.schemas import Headroom, QuoteItemRequest
 #: change and should require deleting a line from this test, deliberately.
 ALLOWED_FIELDS = {
     "mandate_id",
-    "headroom_paise",
-    "max_per_txn_paise",
+    "headroom_minor",
+    "max_per_txn_minor",
     "payments_remaining",
     "categories_allowed",
     "valid_until",
@@ -32,7 +32,7 @@ ALLOWED_FIELDS = {
 #: Things a merchant must not learn about a buyer.
 FORBIDDEN_SUBSTRINGS = (
     "delegator",
-    "vpa",
+    "account",
     "intent",
     "max_total",
     "total_budget",
@@ -56,7 +56,7 @@ def test_the_serialised_envelope_contains_no_buyer_identity(
     gate, make_mandate, quotes, authorize
 ):
     mandate = make_mandate()
-    # Spend something first. At zero spend `headroom_paise` legitimately equals
+    # Spend something first. At zero spend `headroom_minor` legitimately equals
     # the budget, which would make the "total budget is absent" assertion pass
     # for the wrong reason.
     q = quotes.build([QuoteItemRequest(sku="STA-NB-A5")], mandate_id=mandate.mandate_id)
@@ -65,12 +65,12 @@ def test_the_serialised_envelope_contains_no_buyer_identity(
     envelope = gate.headroom_service.for_mandate(mandate.mandate_id)
     blob = envelope.model_dump_json().lower()
 
-    assert mandate.delegator.vpa.lower() not in blob
+    assert mandate.delegator.account.lower() not in blob
     assert mandate.intent.lower() not in blob
     assert mandate.delegator.pubkey.lower() not in blob
     # The total budget is the number that would tell a merchant how rich the
     # buyer is. Only what is *left* is publishable.
-    assert str(mandate.constraints.max_total_paise) not in blob
+    assert str(mandate.constraints.max_total_minor) not in blob
 
 
 def test_headroom_is_what_is_left_not_what_the_budget_was(gate, make_mandate, quotes, authorize):
@@ -78,13 +78,13 @@ def test_headroom_is_what_is_left_not_what_the_budget_was(gate, make_mandate, qu
     q = quotes.build([QuoteItemRequest(sku="STA-NB-A5")], mandate_id=mandate.mandate_id)
 
     before = gate.headroom_service.for_mandate(mandate.mandate_id)
-    assert before.headroom_paise == mandate.constraints.max_total_paise
+    assert before.headroom_minor == mandate.constraints.max_total_minor
 
     d = authorize(mandate, q)
     assert d.verdict == "ALLOW"
 
     after = gate.headroom_service.for_mandate(mandate.mandate_id)
-    assert after.headroom_paise == before.headroom_paise - q.total_paise
+    assert after.headroom_minor == before.headroom_minor - q.total_minor
     assert after.payments_remaining == before.payments_remaining - 1
 
 
@@ -105,7 +105,7 @@ def test_a_tampered_envelope_does_not_verify(gate, make_mandate):
     envelope = gate.headroom_service.for_mandate(mandate.mandate_id)
 
     forged = envelope.model_dump()
-    forged["headroom_paise"] = 99_999_999
+    forged["headroom_minor"] = 99_999_999
     assert not verify(
         forged, envelope.signature, gate.headroom_service.public_key_b64u
     )
@@ -122,7 +122,7 @@ def test_a_revoked_mandate_reports_zero_rather_than_disappearing(gate, make_mand
 
     envelope = gate.headroom_service.for_mandate(mandate.mandate_id)
     assert envelope is not None
-    assert envelope.headroom_paise == 0
+    assert envelope.headroom_minor == 0
     assert envelope.payments_remaining == 0
     assert envelope.categories_allowed == []
     assert envelope.merchant_in_scope is False

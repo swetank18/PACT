@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 
-from contracts.money import Paise
+from contracts.money import MinorUnits
 from core.rail import RailAdapter, RailIntent, RailResult, RailStatus
 from rails.razorpay.client import RazorpayClient, RazorpayError
 
@@ -23,24 +23,24 @@ class RazorpayAdapter(RailAdapter):
     def __init__(self, client: RazorpayClient) -> None:
         self.client = client
 
-    def create_intent(self, amount_paise: Paise, ref: str, idem_key: str) -> RailIntent:
+    def create_intent(self, amount_minor: MinorUnits, ref: str, idem_key: str) -> RailIntent:
         body = self.client.create_order(
-            amount_paise, receipt=ref, notes={"pact_ref": ref}, idem_key=idem_key
+            amount_minor, receipt=ref, notes={"pact_ref": ref}, idem_key=idem_key
         )
         return RailIntent(
             intent_id=body["id"],
-            amount_paise=int(body.get("amount", amount_paise)),
+            amount_minor=int(body.get("amount", amount_minor)),
             status=str(body.get("status", "created")),
             raw=body,
         )
 
-    def capture(self, intent_id: str, amount_paise: Paise, idem_key: str) -> RailResult:
+    def capture(self, intent_id: str, amount_minor: MinorUnits, idem_key: str) -> RailResult:
         """
         `intent_id` here is the payment id, not the order id. Razorpay captures
         payments; an order is only the thing a payment is made against.
         """
         try:
-            body = self.client.capture(intent_id, amount_paise, idem_key)
+            body = self.client.capture(intent_id, amount_minor, idem_key)
         except RazorpayError as exc:
             return RailResult(
                 ok=False,
@@ -58,9 +58,9 @@ class RazorpayAdapter(RailAdapter):
             raw=body,
         )
 
-    def refund(self, intent_id: str, amount_paise: Paise, idem_key: str) -> RailResult:
+    def refund(self, intent_id: str, amount_minor: MinorUnits, idem_key: str) -> RailResult:
         try:
-            body = self.client.refund(intent_id, amount_paise, idem_key)
+            body = self.client.refund(intent_id, amount_minor, idem_key)
         except RazorpayError as exc:
             return RailResult(
                 ok=False,
@@ -93,8 +93,8 @@ class RazorpayAdapter(RailAdapter):
         return RailStatus(
             intent_id=intent_id,
             status=str(chosen.get("status")) if chosen else "created",
-            amount_paise=int(chosen.get("amount", 0)) if chosen else 0,
-            amount_refunded_paise=int(chosen.get("amount_refunded", 0)) if chosen else 0,
+            amount_minor=int(chosen.get("amount", 0)) if chosen else 0,
+            amount_refunded_minor=int(chosen.get("amount_refunded", 0)) if chosen else 0,
             payment_id=chosen.get("id") if chosen else None,
             raw={"payments": payments},
         )

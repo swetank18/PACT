@@ -24,14 +24,14 @@ const MAX_ORDERS = 200;
 const STATS_POLL_MS = 2000;
 
 export const EMPTY_STATS: MerchantStats = {
-  gmv_paise: 0,
+  gmv_minor: 0,
   orders: 0,
-  avg_order_value_paise: 0,
+  avg_order_value_minor: 0,
   upsell_offers_made: 0,
   upsell_offers_accepted: 0,
   upsell_offers_filtered_by_headroom: 0,
   upsell_attach_rate: 0,
-  recovered_paise: 0,
+  recovered_minor: 0,
   recovered_orders: 0,
   needs_attention: 0,
 };
