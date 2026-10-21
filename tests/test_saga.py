@@ -37,8 +37,10 @@ def test_the_forward_path_reaches_fulfilled(bought, merchant):
 
     assert result.final_state == "FULFILLED"
     states = [s["state"] for s in merchant.audit.list_steps(result.order_id)]
+    # PAYMENT_AUTHORIZED because this rail holds the funds before it takes them.
     assert states == [
-        "QUOTED", "RESERVED_STOCK", "GATE_ALLOWED", "PAYMENT_CAPTURED", "FULFILLED",
+        "QUOTED", "RESERVED_STOCK", "GATE_ALLOWED", "PAYMENT_AUTHORIZED", "PAYMENT_CAPTURED",
+        "FULFILLED",
     ]
 
 

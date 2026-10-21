@@ -60,6 +60,10 @@ class ReasonCode(StrEnum):
 
     # settlement and fulfilment
     STOCK_UNAVAILABLE = "STOCK_UNAVAILABLE"
+    #: The rail would not open the payment: a declined wallet, or a rail that
+    #: did not answer. Nothing was captured, so nothing is refunded. Distinct
+    #: from a failed capture because the two read differently in a dispute.
+    RAIL_AUTHORIZATION_FAILED = "RAIL_AUTHORIZATION_FAILED"
     RAIL_CAPTURE_FAILED = "RAIL_CAPTURE_FAILED"
     SAGA_ROLLED_BACK = "SAGA_ROLLED_BACK"
 
@@ -138,6 +142,7 @@ REASON_TEXT: dict[ReasonCode, str] = {
     ReasonCode.QUOTE_EXPIRED: "That quote has expired",
     ReasonCode.QUOTE_AMOUNT_MISMATCH: "The payment amount does not match the quote",
     ReasonCode.STOCK_UNAVAILABLE: "Out of stock",
+    ReasonCode.RAIL_AUTHORIZATION_FAILED: "The payment was not authorised, so nothing was taken",
     ReasonCode.RAIL_CAPTURE_FAILED: "The payment could not be captured",
     ReasonCode.SAGA_ROLLED_BACK: "The order was rolled back and the money returned",
     ReasonCode.GATE_UNAVAILABLE: "The gate did not answer, so the order was not placed",

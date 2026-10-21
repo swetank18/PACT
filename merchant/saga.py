@@ -126,7 +126,10 @@ class OrderStore:
     #: Non-terminal for the reconciler. NEEDS_ATTENTION is deliberately absent:
     #: parking an order is how it leaves this loop, and re-polling something a
     #: human has been asked to look at is just noise on the poller.
-    UNSETTLED = ("QUOTED", "RESERVED_STOCK", "GATE_ALLOWED", "PAYMENT_CAPTURED")
+    UNSETTLED = (
+        "QUOTED", "RESERVED_STOCK", "GATE_ALLOWED",
+        "PAYMENT_AUTHORIZED", "PAYMENT_PENDING", "PAYMENT_CAPTURED",
+    )
 
     def pending_for_reconciliation(self, older_than_seconds: int = 30) -> list[Order]:
         """Anything stuck between capture and a terminal state."""
@@ -287,9 +290,31 @@ class SagaRunner:
 
         # 2. Move the money.
         idem = idempotency_key(order.order_id, quote.total_minor, 1)
-        intent = self.rail.create_intent(quote.total_minor, ref=order.order_id, idem_key=idem)
+        try:
+            intent = self.rail.create_intent(quote.total_minor, ref=order.order_id, idem_key=idem)
+        except Exception as exc:  # noqa: BLE001
+            # The payment never opened, so nothing was captured and nothing is
+            # refunded: put the stock back, give the budget back, close. On
+            # PayPal a declined wallet lands here, because the order and its
+            # authorisation are one call. This used to escape the saga with
+            # stock held and the reservation alive until the sweeper found it.
+            log.exception("could not open a payment for %s", order.order_id)
+            for sku, qty in held:
+                self.inventory.restore(sku, qty)
+            self._step(order, "ROLLED_BACK", "rail.create_intent", "FAIL",
+                       getattr(exc, "description", None) or str(exc) or type(exc).__name__,
+                       reason_code=ReasonCode.RAIL_AUTHORIZATION_FAILED)
+            self.gate.release(decision_id)
+            return SagaResult(order.order_id, "ROLLED_BACK")
         order.rail_order_id = intent.intent_id
         payment_ref = intent.raw.get("payment_id") or intent.intent_id
+        if intent.status == "authorized":
+            # Only when the rail really holds the funds first. A Razorpay order
+            # authorises nothing, and saying it did would be a row in the audit
+            # trail that never happened.
+            self._step(order, "PAYMENT_AUTHORIZED", "rail.create_intent", "OK",
+                       "funds held, not yet taken", payment_ref)
+            self._pause()
 
         capture = self.rail.capture(payment_ref, quote.total_minor, idem)
         if not capture.ok:
@@ -302,13 +327,32 @@ class SagaRunner:
             return SagaResult(order.order_id, "ROLLED_BACK")
 
         order.rail_payment_id = capture.ref
+        # Committed even while pending: the payer's money is committed, so for
+        # the principal's ceiling it is spent. Releasing it now and finding the
+        # capture landed later would be an overspend.
         self.gate.commit(decision_id)
+        if capture.status == "capture_pending":
+            # Not fulfilled. PayPal is explicit: check the capture's status
+            # before shipping. The reconciler finishes this order when the
+            # money lands, or rolls it back if it never does.
+            self._step(order, "PAYMENT_PENDING", "rail.capture", "PENDING",
+                       "the payer's money is committed and has not reached the merchant; "
+                       "fulfilment waits", capture.ref)
+            return SagaResult(order.order_id, "PAYMENT_PENDING")
         self._step(order, "PAYMENT_CAPTURED", "rail.capture", "OK",
                    "replayed, no second charge" if capture.replayed else "test mode", capture.ref)
         self._pause(1.2)
+        return self._fulfil(order, quote, decision_id, held)
 
-        # 3. Fulfil, or discover the stock is gone after the money moved. This
-        #    is the failure the brief asks for, and the interesting one.
+    def _fulfil(
+        self, order: Order, quote: Quote, decision_id: str, held: list[tuple[str, int]]
+    ) -> SagaResult:
+        """
+        3. Fulfil, or discover the stock is gone after the money moved. This is
+        the failure the brief asks for, and the interesting one. Shared by the
+        forward path and by a pending capture that lands later.
+        """
+        units = sum(l.qty for l in quote.items)
         target = quote.items[0]
         if not self.inventory.consume_forced(target.sku):
             self._step(order, "FULFILLED", "fulfil", "OK", f"{units} units dispatched")
@@ -492,6 +536,36 @@ class SagaRunner:
 
     # ---------------------------------------------------- reconciliation ----
 
+    def _settle_pending(self, order: Order, rail_status: str) -> int:
+        """
+        A capture that was pending when the saga left it. It lands, and the
+        order goes on to fulfilment; or it is refused, and nothing was taken,
+        so the stock and the budget go back with no refund to issue. Anything
+        else is still pending, and waits for the next pass.
+        """
+        decision_id = self.orders.decision_for(order.order_id)
+        quote = self.quotes.get(order.quote_id)
+        if decision_id is None or quote is None:
+            return 0
+        held = [(line.sku, line.qty) for line in quote.items]
+
+        if rail_status == "captured":
+            self._step(order, "PAYMENT_CAPTURED", "reconcile", "OK",
+                       "the pending capture completed", order.rail_payment_id)
+            self._fulfil(order, quote, decision_id, held)
+            return 1
+        if rail_status in ("declined", "failed"):
+            for sku, qty in held:
+                self.inventory.restore(sku, qty)
+            released = self.gate.release(decision_id)
+            self._step(order, "ROLLED_BACK", "reconcile", "FAIL",
+                       f"the pending capture was {rail_status}; nothing was taken, "
+                       f"{format_money(released or order.amount_minor, order.currency)} "
+                       "back to headroom",
+                       order.rail_payment_id, reason_code=ReasonCode.RAIL_CAPTURE_FAILED)
+            return 1
+        return 0
+
     def reconcile(self) -> int:
         """
         Never trust the webhook as the only path.
@@ -508,6 +582,10 @@ class SagaRunner:
                 status = self.rail.status(order.rail_order_id)
             except Exception:  # noqa: BLE001
                 log.exception("reconciliation failed for %s", order.order_id)
+                continue
+
+            if order.state == "PAYMENT_PENDING":
+                resolved += self._settle_pending(order, status.status)
                 continue
 
             if status.status == "captured" and order.state != "PAYMENT_CAPTURED":

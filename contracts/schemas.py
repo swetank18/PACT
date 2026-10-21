@@ -261,6 +261,12 @@ SagaState = Literal[
     "QUOTED",
     "RESERVED_STOCK",
     "GATE_ALLOWED",
+    #: The rail holds the payer's funds and has not taken them. Only for rails
+    #: that really authorise first; a Razorpay order authorises nothing.
+    "PAYMENT_AUTHORIZED",
+    #: Captured from the payer, not yet credited to the merchant. Budget is
+    #: committed — safe for the principal — and fulfilment waits.
+    "PAYMENT_PENDING",
     "PAYMENT_CAPTURED",
     "FULFILLED",
     "FULFILMENT",

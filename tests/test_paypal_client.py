@@ -611,3 +611,43 @@ def test_a_stockout_on_paypal_refunds_and_returns_the_budget(api, bought, mercha
         == before + q.total_minor
     (refund,) = api.refunds.values()
     assert refund["amount"]["value"] == to_value(q.total_minor, "USD")
+
+
+def test_a_declined_wallet_rolls_the_saga_back_with_nothing_taken(api, bought, merchant):
+    """
+    On PayPal the order and its authorisation are one call, so a declined
+    wallet fails create_intent. The saga used to let that exception out with
+    the stock held.
+    """
+    from contracts.reason_codes import ReasonCode
+
+    mandate, q, decision = bought
+    api.vaulted[VAULT_ID] = False
+    result = merchant.saga.run(quote=q, mandate_id=mandate.mandate_id,
+                               decision_id=decision.decision_id)
+
+    assert result.final_state == "ROLLED_BACK"
+    last = merchant.audit.list_steps(result.order_id)[-1]
+    assert last["reason_code"] == ReasonCode.RAIL_AUTHORIZATION_FAILED.value
+    assert "did not authorise" in last["detail"]
+    assert api.captures == {}
+
+
+def test_paypal_records_the_authorisation_before_the_capture(api, bought, merchant):
+    mandate, q, decision = bought
+    result = merchant.saga.run(quote=q, mandate_id=mandate.mandate_id,
+                               decision_id=decision.decision_id)
+    steps = merchant.audit.list_steps(result.order_id)
+    authorized = next(s for s in steps if s["state"] == "PAYMENT_AUTHORIZED")
+    assert authorized["ref"] in api.authorizations
+    assert [s["state"] for s in steps].index("PAYMENT_AUTHORIZED") \
+        < [s["state"] for s in steps].index("PAYMENT_CAPTURED")
+
+
+def test_a_pending_paypal_capture_waits_instead_of_shipping(api, bought, merchant):
+    mandate, q, decision = bought
+    api.capture_status = "PENDING"
+    result = merchant.saga.run(quote=q, mandate_id=mandate.mandate_id,
+                               decision_id=decision.decision_id)
+    assert result.final_state == "PAYMENT_PENDING"
+    assert "FULFILLED" not in [s["state"] for s in merchant.audit.list_steps(result.order_id)]

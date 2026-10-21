@@ -125,9 +125,9 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **291 Python tests, 57 console
+~11k lines of Python, ~10k of TypeScript. **299 Python tests, 57 console
 tests**, all green — one Python test skips unless the clone predates the key
-purge, so a run reports 290 passed and 1 skipped — plus two GitHub Actions
+purge, so a run reports 298 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every
 console surface against it on every push.
 
@@ -154,7 +154,7 @@ Development, services on separate ports with hot reload:
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh                            # 8000 gate, 8100 merchant, 8110 hooks, 8300 beats
 cd console && npm install && npm run dev    # 5173
-./scripts/test.sh                           # 291 tests
+./scripts/test.sh                           # 299 tests
 ```
 
 `scripts/test.sh` exists because a ROS install on this machine puts broken pytest
@@ -569,7 +569,9 @@ use of both PayPal and AI). Done on 2026-10-20: the PayPal rail, section 3. Next
   "PayPal and AI" that does not exist yet. The auditor with a key is item 2 below.
 - **The vault step in the grant flow**, so connecting PayPal is part of signing a
   mandate in the console rather than a script.
-- **A pending-capture state in the saga.** `rails/paypal/API_NOTES.md`, "Open".
+- **A pending-capture state in the saga.** Done 2026-10-21: `PAYMENT_PENDING`
+  and `PAYMENT_AUTHORIZED`, and a declined wallet rolls back cleanly instead of
+  escaping the saga. `rails/paypal/API_NOTES.md` has the detail.
 
 1. **Exercise the Razorpay path with real test keys.** The largest remaining
    unverified surface — see section 3 for exactly how narrow it now is.

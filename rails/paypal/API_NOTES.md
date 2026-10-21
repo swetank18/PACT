@@ -163,15 +163,23 @@ that can be voided instead of a charge that has to be refunded.
   every rail implements.
 - Postback is not supported for mock events from the dashboard simulator. SPEC.
 
-## Open, and stated rather than decided quietly
+## A `PENDING` capture, and a declined wallet
 
-- **A `PENDING` capture is treated as captured.** The saga has no state for
-  "the payer's money is committed and the payee does not have it yet". For the
-  principal's ceiling, counting it as spent is the safe direction. For
-  fulfilment it is not what PayPal advises — "check the payment status ...
-  before fulfilling". In the sandbox a vaulted-wallet capture is expected to
-  complete immediately (UNVERIFIED). The right fix is a pending state in the
-  saga, released by `PAYMENT.CAPTURE.COMPLETED` or the reconciler.
+Both were open when this file was first written; both are handled as of
+2026-10-21.
+
+- **`PENDING`:** the saga commits the budget — the payer's money is committed,
+  so for the principal's ceiling it is spent — and parks the order in
+  `PAYMENT_PENDING` without fulfilling, as PayPal advises ("check the payment
+  status ... before fulfilling"). The reconciler fulfils it when the capture
+  reads `COMPLETED`, or releases the budget and the stock when it reads
+  `DECLINED` or `FAILED`; nothing was taken, so there is nothing to refund.
+  In the sandbox a vaulted-wallet capture is expected to complete immediately
+  (UNVERIFIED), so this path may never run there. The webhook
+  `PAYMENT.CAPTURE.COMPLETED` will resolve it faster once the receiver exists.
+- **Declined wallet:** order and authorisation are one call, so a decline
+  fails `create_intent`, not `capture`. The saga rolls back with
+  `RAIL_AUTHORIZATION_FAILED`, stock and budget released, no refund.
 
 ## To close the gap
 

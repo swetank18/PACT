@@ -1,5 +1,5 @@
 {
-  "generated": "2026-10-21T05:59:30+00:00",
+  "generated": "2026-10-21T06:09:47+00:00",
   "sessions_per_arm": 200,
   "seeds": 3,
   "arms": {
@@ -392,6 +392,7 @@
         "QUOTED",
         "RESERVED_STOCK",
         "GATE_ALLOWED",
+        "PAYMENT_AUTHORIZED",
         "PAYMENT_CAPTURED",
         "FULFILMENT",
         "ROLLING_BACK",
@@ -411,6 +412,7 @@
         "QUOTED",
         "RESERVED_STOCK",
         "GATE_ALLOWED",
+        "PAYMENT_AUTHORIZED",
         "PAYMENT_CAPTURED",
         "FULFILLED",
         "PAYMENT_CAPTURED"
@@ -427,6 +429,7 @@
         "QUOTED",
         "RESERVED_STOCK",
         "GATE_ALLOWED",
+        "PAYMENT_AUTHORIZED",
         "PAYMENT_CAPTURED",
         "FULFILLED"
       ],
@@ -442,6 +445,7 @@
         "QUOTED",
         "RESERVED_STOCK",
         "GATE_ALLOWED",
+        "PAYMENT_AUTHORIZED",
         "PAYMENT_CAPTURED",
         "FULFILLED"
       ],
@@ -457,6 +461,7 @@
         "QUOTED",
         "RESERVED_STOCK",
         "GATE_ALLOWED",
+        "PAYMENT_AUTHORIZED",
         "PAYMENT_CAPTURED",
         "FULFILMENT",
         "ROLLING_BACK",

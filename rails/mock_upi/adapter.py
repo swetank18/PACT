@@ -50,6 +50,12 @@ class FailureSwitches:
     """
 
     capture_fails: bool = False
+    #: The payer's instrument is refused when the payment is opened — a
+    #: declined wallet — so there is never anything to capture.
+    create_fails: bool = False
+    #: Captures land as `capture_pending`: the payer's money is committed and
+    #: the payee does not have it yet. PayPal's PENDING, for the saga to wait on.
+    capture_pending: bool = False
     refund_fails: bool = False
     #: Refunds report `pending` instead of `processed`, so the saga has to cope
     #: with a compensation that has not finished.
@@ -114,6 +120,8 @@ class MockUpiAdapter(RailAdapter):
     # -------------------------------------------------------------- rail ---
 
     def create_intent(self, amount_minor: MinorUnits, ref: str, idem_key: str) -> RailIntent:
+        if self.failures.create_fails:
+            raise RuntimeError("the payer's instrument was declined when the payment was opened")
         with self._lock:
             intent = _Intent(intent_id=new_id("ord").replace("ord_", "mupi_"), amount_minor=amount_minor)
             self._intents[intent.intent_id] = intent
@@ -148,6 +156,11 @@ class MockUpiAdapter(RailAdapter):
                 # Same shape as Razorpay's behaviour: a second capture is not a
                 # new charge, and the caller sees that it was a replay.
                 result = RailResult(ok=True, ref=intent.payment_id, status="captured", replayed=True)
+                return self._remember(idem_key, result)
+
+            if self.failures.capture_pending:
+                intent.status = "capture_pending"
+                result = RailResult(ok=True, ref=intent.payment_id, status="capture_pending")
                 return self._remember(idem_key, result)
 
             intent.status = "captured"
@@ -198,6 +211,14 @@ class MockUpiAdapter(RailAdapter):
         return hmac.compare_digest(expected, signature or "")
 
     # ------------------------------------------------------------- testing --
+
+    def settle_pending(self, intent_id: str, *, completed: bool) -> None:
+        """What the rail does later to a pending capture: it lands, or it does not."""
+        with self._lock:
+            intent = self._intents.get(intent_id) or self._by_payment.get(intent_id)
+            if intent is None or intent.status != "capture_pending":
+                raise KeyError(f"no pending capture for {intent_id}")
+            intent.status = "captured" if completed else "declined"
 
     def sign_callback(self, body: bytes) -> str:
         """So the chaos suite can post a webhook that actually verifies."""
