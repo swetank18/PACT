@@ -59,7 +59,11 @@ def test_nothing_in_core_imports_a_rail():
 #: comment attached, instead of a quiet edit to an assertion.
 KNOWN_VENDOR_NAMES_IN_CONTRACT: set[str] = set()
 
-VENDORS = ("razorpay", "stripe", "adyen")
+#: Every rail this repository has, plus two it does not, so a vendor added later
+#: is caught here rather than in review. PayPal went in on 2026-10-21, a day
+#: after its rail did; for that day nothing would have stopped a check in
+#: `core/` from comparing against "paypal".
+VENDORS = ("razorpay", "paypal", "stripe", "adyen")
 
 
 def _executable_source(path: Path) -> str:
