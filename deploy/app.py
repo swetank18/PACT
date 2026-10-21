@@ -85,12 +85,27 @@ def _on_webhook_applied(order_id: str, state: str, entity: dict) -> None:
     merchant_service.publish_stats()
 
 
-webhook_app = build_app(
-    WebhookProcessor(
-        merchant_service.db, merchant_service.rail, on_applied=_on_webhook_applied
-    ),
-    path="/rail",
-)
+if merchant_service.rail.name == "paypal":
+    # PayPal signs with five headers and is verified by postback; its events
+    # settle a pending capture through the saga. One receiver per instance,
+    # because one instance settles on one rail.
+    from rails.paypal.webhooks import PayPalWebhookProcessor  # noqa: E402
+    from rails.paypal.webhooks import build_app as build_paypal_app  # noqa: E402
+
+    webhook_app = build_paypal_app(
+        PayPalWebhookProcessor(
+            merchant_service.db, merchant_service.rail,
+            settle=merchant_service.saga.settle_pending,
+        ),
+        path="/rail",
+    )
+else:
+    webhook_app = build_app(
+        WebhookProcessor(
+            merchant_service.db, merchant_service.rail, on_applied=_on_webhook_applied
+        ),
+        path="/rail",
+    )
 
 MOUNTED = (
     ("/api/gate", gate_app),

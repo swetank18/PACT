@@ -536,6 +536,18 @@ class SagaRunner:
 
     # ---------------------------------------------------- reconciliation ----
 
+    def settle_pending(self, order_id: str, rail_status: str) -> bool:
+        """
+        The entry point a rail's webhook uses to settle a pending capture:
+        `captured` fulfils it, `declined` or `failed` gives the budget and the
+        stock back. Only an order that is actually PAYMENT_PENDING moves, so a
+        late or repeated event cannot walk an order backwards.
+        """
+        order = self.orders.get(order_id)
+        if order is None or order.state != "PAYMENT_PENDING":
+            return False
+        return self._settle_pending(order, rail_status) == 1
+
     def _settle_pending(self, order: Order, rail_status: str) -> int:
         """
         A capture that was pending when the saga left it. It lands, and the

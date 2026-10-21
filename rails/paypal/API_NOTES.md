@@ -162,6 +162,19 @@ that can be voided instead of a charge that has to be refunded.
   that string. It is a wart, and it is a smaller one than changing a protocol
   every rail implements.
 - Postback is not supported for mock events from the dashboard simulator. SPEC.
+  So the dashboard's "simulate event" button cannot be used to test this
+  receiver; a real sandbox capture can.
+- The receiver (`rails/paypal/webhooks.py`, mounted by the single-port build on
+  a PayPal instance at `/api/webhooks/rail`) acts on `PAYMENT.CAPTURE.COMPLETED`
+  and `PAYMENT.CAPTURE.DENIED` for an order left `PAYMENT_PENDING`, and
+  acknowledges everything else with a 200, since a non-2xx is retried for three
+  days. It dedupes on the event's `id`, which PayPal keeps across redeliveries,
+  and releases its claim if applying fails so a redelivery is not mistaken for a
+  duplicate. Event names are from PayPal's event reference. UNVERIFIED: the
+  exact `resource` shape of a delivered capture event — the receiver reads only
+  `resource.id`.
+- The listener must be HTTPS on 443. Register it in the sandbox app's settings
+  against the deployed URL; `PAYPAL_WEBHOOK_ID` is the id PayPal gives it.
 
 ## A `PENDING` capture, and a declined wallet
 
@@ -175,8 +188,9 @@ Both were open when this file was first written; both are handled as of
   reads `COMPLETED`, or releases the budget and the stock when it reads
   `DECLINED` or `FAILED`; nothing was taken, so there is nothing to refund.
   In the sandbox a vaulted-wallet capture is expected to complete immediately
-  (UNVERIFIED), so this path may never run there. The webhook
-  `PAYMENT.CAPTURE.COMPLETED` will resolve it faster once the receiver exists.
+  (UNVERIFIED), so this path may never run there. `PAYMENT.CAPTURE.COMPLETED`
+  resolves it at once through the webhook receiver; the reconciler is the
+  backstop, not the path.
 - **Declined wallet:** order and authorisation are one call, so a decline
   fails `create_intent`, not `capture`. The saga rolls back with
   `RAIL_AUTHORIZATION_FAILED`, stock and budget released, no refund.
