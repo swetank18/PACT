@@ -113,9 +113,10 @@ class Auditor:
         client: Any = None,
     ) -> None:
         self.api_key = api_key if api_key is not None else os.environ.get("ANTHROPIC_API_KEY")
-        self.model = model or os.environ.get("AUDITOR_MODEL", DEFAULT_MODEL)
-        self.effort = effort or os.environ.get("AUDITOR_EFFORT", DEFAULT_EFFORT)
-        self.timeout_ms = timeout_ms or int(os.environ.get("AUDITOR_TIMEOUT_MS", DEFAULT_TIMEOUT_MS))
+        # Empty is unset: a .env line with no value exports an empty string.
+        self.model = model or os.environ.get("AUDITOR_MODEL") or DEFAULT_MODEL
+        self.effort = effort or os.environ.get("AUDITOR_EFFORT") or DEFAULT_EFFORT
+        self.timeout_ms = timeout_ms or int(os.environ.get("AUDITOR_TIMEOUT_MS") or DEFAULT_TIMEOUT_MS)
         #: Tests pass a client that answers the way the API does. It exists
         #: because the alternative was leaving every line below unexecuted
         #: until someone has a key — and the parts worth checking here are the

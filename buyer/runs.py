@@ -39,8 +39,8 @@ from contracts.ids import new_id
 log = logging.getLogger("pact.buyer.runs")
 
 DEFAULT_KEY_PATH = "fixtures/keys/agent_signing_key.hex"
-RUNS_PER_HOUR = int(os.environ.get("PACT_AGENT_RUNS_PER_HOUR", "30"))
-RUNS_AT_ONCE = int(os.environ.get("PACT_AGENT_RUNS_AT_ONCE", "2"))
+RUNS_PER_HOUR = int(os.environ.get("PACT_AGENT_RUNS_PER_HOUR") or "30")
+RUNS_AT_ONCE = int(os.environ.get("PACT_AGENT_RUNS_AT_ONCE") or "2")
 #: How many finished runs are kept for the viewer. In memory; a run is a demo
 #: artefact, and the money it moved is in the merchant's and the gate's own
 #: durable records.
@@ -49,7 +49,7 @@ KEEP_RUNS = 200
 
 def load_or_create_agent_key(path: str | None = None) -> Ed25519PrivateKey:
     """The agent's delegate key. Mandates for this agent name its public half."""
-    key_path = Path(path or os.environ.get("PACT_AGENT_KEY_PATH", DEFAULT_KEY_PATH))
+    key_path = Path(path or os.environ.get("PACT_AGENT_KEY_PATH") or DEFAULT_KEY_PATH)
     if key_path.exists():
         return private_key_from_seed(bytes.fromhex(key_path.read_text().strip()))
     key = Ed25519PrivateKey.generate()

@@ -50,18 +50,18 @@ from contracts.money import format_money
 
 log = logging.getLogger("pact.buyer.claude")
 
-MODEL = os.environ.get("PACT_AGENT_MODEL", "claude-opus-5-5")
+MODEL = os.environ.get("PACT_AGENT_MODEL") or "claude-opus-5-5"
 #: Opus 5.5 always thinks; effort is the control. Its default is medium, set
 #: explicitly so a change of default does not move the measurements.
-EFFORT = os.environ.get("PACT_AGENT_EFFORT", "medium")
+EFFORT = os.environ.get("PACT_AGENT_EFFORT") or "medium"
 MAX_TOKENS = 16_000
-MAX_TURNS = int(os.environ.get("PACT_AGENT_MAX_TURNS", "24"))
+MAX_TURNS = int(os.environ.get("PACT_AGENT_MAX_TURNS") or "24")
 #: A run whose model is declined by a safety classifier is re-run on the model
 #: Anthropic recommends for that category, server side.
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 #: How long a run waits for the principal to answer a step-up before treating
 #: silence as a no.
-STEP_UP_WAIT_S = float(os.environ.get("PACT_AGENT_STEP_UP_WAIT_S", "180"))
+STEP_UP_WAIT_S = float(os.environ.get("PACT_AGENT_STEP_UP_WAIT_S") or "180")
 SAGA_WAIT_S = 90.0
 
 #: The saga states the run viewer shows as money moving, and the ones that end

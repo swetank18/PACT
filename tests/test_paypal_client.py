@@ -106,6 +106,14 @@ def test_anything_but_the_sandbox_is_refused_at_construction(db):
         PayPalClient(db, creds(base_url="https://api-m.sandbox.paypal.com.evil.example"))
 
 
+def test_an_empty_base_url_means_the_sandbox(monkeypatch):
+    """docker compose passes an unset variable through as an empty string."""
+    from rails.paypal.client import SANDBOX_BASE, credentials_from_env
+
+    monkeypatch.setenv("PAYPAL_API_BASE", "")
+    assert credentials_from_env().base_url == SANDBOX_BASE
+
+
 def test_rupees_are_refused_rather_than_sent_as_dollars(db):
     """
     PayPal does not list INR, and the catalog is priced in paise. Sending

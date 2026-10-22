@@ -12,6 +12,81 @@ The consequence is the point. If the merchant can see remaining authority, every
 cross-sell it makes is provably approvable — so the spending gate stops being
 friction and becomes a conversion instrument.
 
+## PayPal AI Hackathon
+
+PayPal has given agents the power to pay: its Agent Toolkit and MCP server let
+a model create orders, capture and refund. PACT gives the person whose money it
+is the power to bound that, and lets the merchant read the bound before it
+sells.
+
+- **The principal** signs a mandate on their own device: how much, how often,
+  which merchants and categories, until when. They connect the PayPal wallet it
+  pays from, once, at PayPal.
+- **The agent**, Claude, shops through tools and pays through a gate. The gate
+  runs ten checks against the mandate and reserves the amount atomically, and
+  the agent cannot talk its way past it.
+- **The merchant** reads what the agent may still spend before it quotes, so
+  every offer it makes is one the gate will approve. Money moves over PayPal:
+  authorise against the vaulted wallet, capture, refund.
+
+### Run it as a judge
+
+```bash
+# No keys: everything runs, on the simulated rail, in dollars.
+PACT_PROFILE=paypal-agentic docker compose up --build      # http://localhost:8080
+
+# With PayPal sandbox and Claude: fill in .env, then the same command.
+cp .env.example .env
+```
+
+Then press `1` through `6` in the console for the six scripted beats, or open
+`#/firewall` for the principal's view. With `ANTHROPIC_API_KEY` set, the Claude
+agent runs at `/api/agent`.
+
+- `python3 scripts/paypal_sandbox.py` runs one real sandbox purchase, capture
+  and refund, and prints every place PayPal disagreed with the client's notes.
+- `python3 scripts/measure_auditor.py` measures the auditor's latency and
+  judgement against the real model.
+
+### Where PayPal is
+
+| | |
+| --- | --- |
+| `rails/paypal/client.py` | Orders v2 (`intent: AUTHORIZE` against a vaulted wallet), Payments v2 capture, void and refund, Vault v3 setup and payment tokens and their deletion, webhook verification by postback. Sandbox only, enforced on the host. |
+| `rails/paypal/adapter.py` | PayPal behind the five-method rail interface the saga uses |
+| `rails/paypal/webhooks.py` | `PAYMENT.CAPTURE.COMPLETED` / `.DENIED` settle a pending capture, once |
+| `merchant/wallets.py` | Connecting and disconnecting the wallet a mandate pays from, signed by the principal |
+| `rails/paypal/API_NOTES.md` | Every API detail the client relies on, marked as read in PayPal's spec or unverified |
+
+### Where Claude is
+
+| | |
+| --- | --- |
+| `buyer/llm_agent.py` | The buyer: `claude-opus-5-5`, seven strict tools, adaptive thinking, refusal fallbacks |
+| `buyer/runs.py`, `buyer/app.py` | Runs, rate limits, every step over SSE with its token usage, the step-up relay |
+| `core/gate/auditor.py` | Check ten: does the purchase fit the goal, and is the page trying to instruct the agent |
+
+### What changed during the hackathon
+
+The last commit before the event was on 2026-09-09. Everything from `98466e2`
+(2026-10-20) on was built for it — `git log 8d58407..HEAD`:
+
+- the PayPal rail, its webhooks, and wallet connection
+- a dollar profile, and currency signed into every mandate
+- the Claude buyer and the agent service
+- the auditor moved onto the Anthropic SDK
+- a pending-capture state in the saga
+- the bugs found on the way, each named in the commit message that fixed it
+
+### Not verified, stated plainly
+
+- **Nothing here has run against PayPal's sandbox or the real Claude model.**
+  There were no credentials where it was built. The PayPal client runs against a
+  fake built from PayPal's published specs, and the agent and auditor against
+  scripted models. The two scripts above close those gaps in one command each.
+- **The console still formats amounts in rupees on the dollar profile.** The
+  numbers are right; the symbol is not.
+
 ## Run it
 
 ```bash
@@ -30,7 +105,7 @@ Or for development, with hot reload and the services on separate ports:
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh          # gate :8000, merchant :8100, webhooks :8110, beats :8300
-./scripts/test.sh         # 357 tests
+./scripts/test.sh         # 359 tests
 
 cd console && npm install && npm run dev    # http://localhost:5173
 ```
@@ -73,7 +148,7 @@ driven:
 
 | | |
 | --- | --- |
-| `ci` | 357 Python tests, 57 console tests, typecheck, and a contract-drift check |
+| `ci` | 359 Python tests, 57 console tests, typecheck, and a contract-drift check |
 | `container` | builds the image, waits for its healthcheck, runs the six demo beats against it over HTTP, asserts the SSE stream is live, restarts it with the volume attached and checks the orders and the gate's signing key survived, drives every console surface in Chromium, records the demo video against that image, and soaks it for three minutes |
 
 The beats are asserted on what they are meant to prove, not on a 200 — beat 3

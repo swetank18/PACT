@@ -24,7 +24,18 @@ services:
     ports:
       - "8080:8080"
     environment:
-      PACT_PROFILE: razorpay-track01
+      # Rupees unless told otherwise. For the PayPal build, in dollars:
+      #   PACT_PROFILE=paypal-agentic docker compose up --build
+      PACT_PROFILE: "${PACT_PROFILE:-razorpay-track01}"
+
+      # All optional, read from the shell or from a .env beside this file (see
+      # .env.example; .env is ignored by git and by the image build). Empty
+      # means the simulated rail, no Claude agent, and the deterministic gate.
+      PAYPAL_CLIENT_ID: "${PAYPAL_CLIENT_ID:-}"
+      PAYPAL_CLIENT_SECRET: "${PAYPAL_CLIENT_SECRET:-}"
+      PAYPAL_WEBHOOK_ID: "${PAYPAL_WEBHOOK_ID:-}"
+      PAYPAL_VAULT_ID: "${PAYPAL_VAULT_ID:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
 
       # Paces the saga so the console can draw the rollback one row at a time.
       # Set to 0 for the simulation, which runs hundreds of sessions.

@@ -146,7 +146,9 @@ def credentials_from_env() -> Credentials:
         client_secret=os.environ.get("PAYPAL_CLIENT_SECRET", ""),
         webhook_id=os.environ.get("PAYPAL_WEBHOOK_ID", ""),
         vault_id=os.environ.get("PAYPAL_VAULT_ID", ""),
-        base_url=os.environ.get("PAYPAL_API_BASE", SANDBOX_BASE),
+        # Empty is unset. docker compose passes unset variables through as
+        # empty strings, and an empty host would be refused as not the sandbox.
+        base_url=os.environ.get("PAYPAL_API_BASE") or SANDBOX_BASE,
     )
 
 

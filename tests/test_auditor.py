@@ -356,3 +356,14 @@ def test_an_injection_the_pattern_scan_missed_still_blocks(
 
     assert decision.verdict == "BLOCK"
     assert decision.reason_code == ReasonCode.INTENT_INJECTION_SUSPECTED
+
+
+def test_empty_settings_mean_the_defaults(monkeypatch):
+    """A .env line with no value exports an empty string. Read naively, that is
+    a model called "" and an int("") that stops the gate from booting."""
+    from core.gate.auditor import DEFAULT_EFFORT, DEFAULT_TIMEOUT_MS
+
+    for name in ("AUDITOR_MODEL", "AUDITOR_EFFORT", "AUDITOR_TIMEOUT_MS"):
+        monkeypatch.setenv(name, "")
+    a = Auditor(api_key=None)
+    assert (a.model, a.effort, a.timeout_ms) == (DEFAULT_MODEL, DEFAULT_EFFORT, DEFAULT_TIMEOUT_MS)

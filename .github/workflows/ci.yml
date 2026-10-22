@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   python:
-    name: python (357 tests, layering, contract drift)
+    name: python (359 tests, layering, contract drift)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
