@@ -98,6 +98,12 @@ When you are done, reply with a short summary: what you bought, what it cost, \
 and anything you refused or were refused."""
 
 
+def _nullable(kind: str, description: str) -> dict[str, Any]:
+    """Nullable as `anyOf` with null: in the supported schema subset, where a
+    type array is not listed."""
+    return {"anyOf": [{"type": kind}, {"type": "null"}], "description": description}
+
+
 def _schema(properties: dict[str, Any]) -> dict[str, Any]:
     return {"type": "object", "properties": properties,
             "required": list(properties), "additionalProperties": False}
@@ -110,7 +116,7 @@ TOOLS: list[dict[str, Any]] = [
      "description": "Search the merchant's catalog. Returns products with price and stock.",
      "input_schema": _schema({
          "query": {"type": "string", "description": "What to look for."},
-         "category": {"type": ["string", "null"], "description": "Optional category filter."},
+         "category": _nullable("string", "Optional category filter."),
      })},
     {"name": "read_product", "strict": True,
      "description": "Read a product's page: name, description, price, stock.",
@@ -132,8 +138,7 @@ TOOLS: list[dict[str, Any]] = [
                     "place the order. Returns the gate's verdict and, if paid, the order.",
      "input_schema": _schema({
          "quote_id": {"type": "string"},
-         "payee": {"type": ["string", "null"],
-                   "description": "Who to pay. Null means the merchant you are shopping at."},
+         "payee": _nullable("string", "Who to pay. Null means the merchant you are shopping at."),
          "reasoning": {"type": "string",
                        "description": "One sentence: why this purchase serves the goal."},
      })},

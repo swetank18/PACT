@@ -210,6 +210,24 @@ def test_every_turn_asks_for_the_model_and_settings_it_should(run_agent):
         assert "tool_choice" not in request, "Opus 5.5 refuses a forced tool choice"
 
 
+def _walk(node):
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _walk(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _walk(value)
+
+
+def test_tool_schemas_stay_inside_the_supported_subset():
+    """Nullable is anyOf with null. A type array is not in the listed subset,
+    and a schema the API rejects is a 400 on every turn of every run."""
+    for t in TOOLS:
+        for node in _walk(t["input_schema"]):
+            assert not isinstance(node.get("type"), list), (t["name"], node)
+
+
 def test_every_tool_is_strict(run_agent):
     for t in TOOLS:
         schema = t["input_schema"]

@@ -30,7 +30,7 @@ Or for development, with hot reload and the services on separate ports:
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh          # gate :8000, merchant :8100, webhooks :8110, beats :8300
-./scripts/test.sh         # 350 tests
+./scripts/test.sh         # 357 tests
 
 cd console && npm install && npm run dev    # http://localhost:5173
 ```
@@ -73,7 +73,7 @@ driven:
 
 | | |
 | --- | --- |
-| `ci` | 350 Python tests, 57 console tests, typecheck, and a contract-drift check |
+| `ci` | 357 Python tests, 57 console tests, typecheck, and a contract-drift check |
 | `container` | builds the image, waits for its healthcheck, runs the six demo beats against it over HTTP, asserts the SSE stream is live, restarts it with the volume attached and checks the orders and the gate's signing key survived, drives every console surface in Chromium, records the demo video against that image, and soaks it for three minutes |
 
 The beats are asserted on what they are meant to prove, not on a 200 — beat 3
@@ -330,10 +330,11 @@ of the client, each caught. **None of it has run against the sandbox**:
   what that does not cover.
 - The intent auditor's model has never been called. With no `ANTHROPIC_API_KEY`
   the gate runs deterministic mode, which is a complete system by design. The
-  auditor's wiring is now tested through an injected transport — every failure
+  auditor's wiring is tested through an injected SDK client — every failure
   path returns `unavailable` and steps up, never approval — but nothing has
-  measured how well the model actually answers, so `atk_06` is reported **N/A**
-  rather than as a pass.
+  measured how well the model actually answers, or how fast, so `atk_06` is
+  reported **N/A** rather than as a pass. `scripts/measure_auditor.py` measures
+  both, against the 800 ms budget, once there is a key.
 - **Deployed, but not with a disk.** Render is live at
   `pact-9btr.onrender.com` on the free plan, which has none — so `/data` is
   ephemeral, a restart issues a new signing key and empties the ledger, and the

@@ -125,9 +125,9 @@ the directory ownership.
 | B — agent + evidence | `buyer/ sim/ eval/` | Built, tested, numbers generated |
 | C — interfaces | `console/` | Built, tested, wired to the real services |
 
-~11k lines of Python, ~10k of TypeScript. **350 Python tests, 57 console
+~11k lines of Python, ~10k of TypeScript. **357 Python tests, 57 console
 tests**, all green — one Python test skips unless the clone predates the key
-purge, so a run reports 349 passed and 1 skipped — plus two GitHub Actions
+purge, so a run reports 356 passed and 1 skipped — plus two GitHub Actions
 workflows that build the container image and drive the six demo beats and every
 console surface against it on every push.
 
@@ -154,7 +154,7 @@ Development, services on separate ports with hot reload:
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ./scripts/dev.sh                            # 8000 gate, 8100 merchant, 8110 hooks, 8300 beats
 cd console && npm install && npm run dev    # 5173
-./scripts/test.sh                           # 350 tests
+./scripts/test.sh                           # 357 tests
 ```
 
 `scripts/test.sh` exists because a ROS install on this machine puts broken pytest
@@ -295,6 +295,16 @@ Added 2026-09-05:
   failure path, and the three-way mapping onto verdicts through the gate — but
   nothing has measured how well the model answers. `atk_06` stays **N/A**, not a
   pass. Run the ablation suite with a key to change that.
+  **Moved onto the `anthropic` SDK on 2026-10-22**, and one thing that move found:
+  the old request sent `temperature: 0`, which current models reject with a 400,
+  so the first time anyone set a key the auditor would have been unavailable on
+  every call and every payment would have stepped up. It now fixes the answer's
+  shape with structured output instead, sends no sampling parameters, and builds
+  its client with no retries and the 800 ms budget as the timeout. The default
+  model is `claude-opus-5-5` at effort `low`, and whether that fits the budget is
+  unmeasured: `scripts/measure_auditor.py` measures latency and judgement on 13
+  labelled pages, including the payee-redirect phrasing the pattern scan misses.
+  Choosing a smaller model or a longer budget (doc 3, D6) waits on that number.
 - **Render has now been deployed. Fly has not.** `https://pact-9btr.onrender.com`,
   created 2026-09-05 through `scripts/render.py` against Render's API. Live on
   the first attempt: `/healthz` green with all four sub-apps mounted, 5/5 smoke
