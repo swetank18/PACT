@@ -58,7 +58,17 @@ await page.goto(base, { waitUntil: "networkidle" });
  * while one is running, so their state is the signal.
  */
 async function beat(n) {
+  // The beat's own request is the signal, and it is armed before the key is
+  // pressed. Waiting on the button alone raced: React had not disabled it yet
+  // when the first check ran, so the wait could return before the beat began,
+  // and beat 5 — the longest saga — was still in flight when the check moved
+  // on. It got one step longer on 2026-10-21 and the race started losing.
+  const finished = page.waitForResponse(
+    (r) => r.url().includes(`/demo/beat/${n}`) && r.request().method() === "POST",
+    { timeout: 90_000 },
+  );
   await page.keyboard.press(String(n));
+  await finished;
   await page.waitForFunction(
     (key) => {
       const button = [...document.querySelectorAll("button")]
